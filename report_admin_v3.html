@@ -1,0 +1,1488 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>大阪急配 管理システム</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700;900&family=Courier+Prime:wght@400;700&display=swap');
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --page:#f0ece6;--card:#faf8f5;--inp:#f5f2ee;
+  --ink:#2c2825;--mid:#7a6f66;--light:#b3a99e;
+  --brd:#ddd8d0;--div:#e8e3dc;
+  --clay:#8b6f5e;--sage:#6b7c6a;--slate:#607080;
+  --amber:#9a7a3a;--rust:#8b4a3a;--stone:#888078;--ok:#5a8a5a;
+  --mono:'Courier Prime',monospace;--sans:'Noto Sans JP',sans-serif;
+  --sh:0 1px 4px rgba(44,40,37,.08),0 4px 16px rgba(44,40,37,.04);
+}
+html,body{min-height:100vh;background:var(--page);font-family:var(--sans);color:var(--ink);}
+#pin-lock{position:fixed;inset:0;z-index:9000;background:#3a3530;display:flex;align-items:center;justify-content:center;transition:transform .5s cubic-bezier(.77,0,.18,1),opacity .35s ease;}
+#pin-lock.unlock{transform:translateY(-100%);opacity:0;pointer-events:none;}
+.lock-noise{position:absolute;inset:0;background-image:radial-gradient(circle at 25% 75%,rgba(139,111,94,.22) 0%,transparent 50%),radial-gradient(circle at 75% 25%,rgba(96,112,128,.18) 0%,transparent 50%),radial-gradient(circle,rgba(255,248,230,.38) 1.5px,transparent 1.5px);background-size:100% 100%,100% 100%,36px 36px;pointer-events:none;}
+.lock-wrap{display:flex;flex-direction:column;align-items:center;z-index:1;width:280px;}
+.lock-brand{text-align:center;margin-bottom:28px;}
+.lock-eye{color:rgba(255,255,255,.25);font-size:8px;letter-spacing:4px;margin-bottom:8px;font-family:var(--mono);}
+.lock-title{color:#fff;font-size:20px;font-weight:700;}
+.lock-div{width:28px;height:1px;background:rgba(255,255,255,.18);margin:8px auto;}
+.lock-sub{color:rgba(255,255,255,.22);font-size:8px;letter-spacing:3px;font-family:var(--mono);}
+.lock-icon{margin-bottom:22px;}
+.pin-dots{display:flex;gap:14px;justify-content:center;margin-bottom:5px;}
+.pin-dot{width:9px;height:9px;border-radius:50%;background:transparent;border:1px solid rgba(255,255,255,.28);transition:all .15s;}
+.pin-dot.on{background:#ffe066;border-color:#ffe066;transform:scale(1.15);}
+.pin-err{height:20px;text-align:center;color:#c09080;font-size:8px;letter-spacing:.15em;margin-bottom:12px;font-family:var(--mono);}
+.numpad{display:grid;grid-template-columns:repeat(3,64px);gap:7px;margin:0 auto;}
+.nk{width:64px;height:48px;background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:18px;cursor:pointer;font-family:var(--mono);border-radius:3px;transition:background .1s;}
+.nk:active{background:rgba(255,255,255,.22);}
+.nk.emp{background:transparent;border-color:transparent;cursor:default;}
+.main{display:none;}.main.on{display:block;}
+.header{background:linear-gradient(135deg,#3a3530 0%,#4a443e 100%);padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:56px;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.2);}
+.hd-brand{display:flex;align-items:center;gap:10px;}
+.hd-ico{width:30px;height:30px;border-radius:7px;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;}
+.hd-title{color:#fff;font-size:14px;font-weight:700;}
+.hd-sub{color:rgba(255,255,255,.4);font-size:9px;font-family:var(--mono);}
+.hd-lock{background:none;border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.55);border-radius:6px;padding:5px 12px;font-size:11px;cursor:pointer;font-family:var(--sans);display:flex;align-items:center;gap:5px;}
+.nav{background:var(--card);border-bottom:1px solid var(--brd);display:flex;overflow-x:auto;padding:0 16px;}
+.nav-tab{padding:12px 14px;background:none;border:none;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--sans);color:var(--light);white-space:nowrap;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;}
+.nav-tab.on{color:var(--clay);border-bottom-color:var(--clay);}
+.content{max-width:960px;margin:0 auto;padding:20px 16px;}
+.panel{display:none;}.panel.on{display:block;}
+.card{background:var(--card);border-radius:10px;border:1px solid var(--brd);padding:16px;margin-bottom:12px;box-shadow:var(--sh);}
+.card-title{font-size:14px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:7px;}
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;background:rgba(107,124,106,.12);color:var(--sage);margin-left:auto;}
+.item-badge{display:inline-flex;align-items:center;gap:3px;padding:3px 7px;margin:2px;border-radius:5px;background:rgba(96,112,128,.08);border:1px solid rgba(96,112,128,.2);font-size:11px;white-space:nowrap;}
+.tbl{width:100%;border-collapse:collapse;font-size:12px;}
+.tbl th{background:var(--inp);padding:8px 10px;text-align:left;font-size:10px;font-weight:700;color:var(--mid);letter-spacing:.05em;border-bottom:1px solid var(--brd);}
+.tbl td{padding:8px 10px;border-bottom:1px solid var(--div);vertical-align:middle;}
+.tbl tr:last-child td{border-bottom:none;}
+.tbl tr:hover td{background:rgba(240,236,230,.5);}
+.form-row{display:grid;gap:10px;margin-bottom:12px;}
+.form-row.col2{grid-template-columns:1fr 1fr;}
+.form-row.col3{grid-template-columns:1fr 1fr 1fr;}
+.form-row.col4{grid-template-columns:1fr 1fr 1fr 1fr;}
+.lbl{color:var(--mid);font-size:10px;font-weight:700;margin-bottom:4px;letter-spacing:.07em;}
+.fi{width:100%;padding:8px 11px;border-radius:7px;font-size:12.5px;border:1px solid var(--brd);background:var(--inp);color:var(--ink);outline:none;font-family:var(--sans);transition:border-color .15s;}
+.fi:focus{border-color:var(--clay);}
+.sel{width:100%;padding:8px 11px;border-radius:7px;font-size:12.5px;border:1px solid var(--brd);background:var(--inp);color:var(--ink);outline:none;font-family:var(--sans);}
+.btn{display:inline-flex;align-items:center;gap:5px;padding:8px 16px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--sans);border:none;transition:all .15s;}
+.btn-clay{background:var(--clay);color:#faf8f5;}
+.btn-sage{background:var(--sage);color:#faf8f5;}
+.btn-slate{background:var(--slate);color:#faf8f5;}
+.btn-amber{background:var(--amber);color:#faf8f5;}
+.btn-ghost{background:transparent;border:1px solid var(--brd);color:var(--mid);}
+.btn-del{background:rgba(139,74,58,.08);border:none;color:var(--rust);border-radius:6px;padding:3px 9px;cursor:pointer;font-size:11px;font-family:var(--sans);}
+.btn-sm{padding:5px 11px;font-size:11px;}
+.office-type-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+.type-chip{display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border-radius:6px;border:1px solid var(--brd);background:var(--inp);font-size:12px;cursor:pointer;font-family:var(--sans);transition:all .15s;user-select:none;}
+.type-chip.selected{background:var(--slate);color:#fff;border-color:var(--slate);}
+.type-chip.col-selected{background:var(--sage);color:#fff;border-color:var(--sage);}
+.region-tag{display:inline-flex;align-items:center;gap:4px;padding:3px 8px 3px 10px;background:var(--inp);border:1px solid var(--brd);border-radius:20px;font-size:11.5px;margin:3px;}
+.region-tag button{background:none;border:none;cursor:pointer;color:var(--light);font-size:14px;line-height:1;padding:0 2px;}
+.region-tag button:hover{color:var(--rust);}
+.exp-card{display:flex;align-items:center;gap:12px;padding:13px 15px;border-radius:9px;border:1px solid var(--brd);background:var(--card);cursor:pointer;margin-bottom:9px;transition:all .15s;box-shadow:var(--sh);}
+.exp-card:hover{background:var(--inp);}
+.exp-ico{width:38px;height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0;}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px;}
+.stat-box{background:var(--card);border-radius:9px;border:1px solid var(--brd);padding:14px 16px;box-shadow:var(--sh);}
+.stat-val{font-size:24px;font-weight:800;font-family:var(--mono);}
+.stat-lbl{color:var(--light);font-size:10px;margin-top:3px;}
+/* 詳細タブ */
+.detail-tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;}
+.dtab{padding:6px 14px;border-radius:20px;border:1px solid var(--brd);background:var(--inp);font-size:11.5px;font-weight:700;cursor:pointer;font-family:var(--sans);color:var(--mid);transition:all .15s;}
+.dtab.on{background:var(--slate);color:#fff;border-color:var(--slate);}
+/* CSV日付範囲 */
+.date-range{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
+.date-range .fi{max-width:150px;}
+.date-range span{color:var(--mid);font-size:12px;}
+.policy-box{background:rgba(96,112,128,.07);border:1px solid rgba(96,112,128,.18);border-radius:8px;padding:11px 13px;margin-bottom:14px;}
+.flow-chips{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:7px;}
+.chip{padding:2px 9px;border-radius:4px;font-size:10.5px;font-weight:700;}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(16px);z-index:9999;background:var(--card);border-radius:10px;padding:10px 18px;box-shadow:0 4px 20px rgba(0,0,0,.14);display:flex;align-items:center;gap:8px;min-width:220px;font-size:12.5px;opacity:0;transition:all .28s;pointer-events:none;}
+#toast.on{opacity:1;transform:translateX(-50%) translateY(0);}
+#pin-change-modal{display:none;position:fixed;inset:0;background:rgba(44,40,37,.65);z-index:800;align-items:center;justify-content:center;backdrop-filter:blur(4px);padding:16px;}
+#pin-change-modal.on{display:flex;}
+.modal-box{background:var(--card);border-radius:14px;padding:24px 22px;width:100%;max-width:340px;border:1px solid var(--brd);box-shadow:0 8px 36px rgba(0,0,0,.22);position:relative;}
+.mt12{margin-top:12px;}.mb12{margin-bottom:12px;}.mt8{margin-top:8px;}
+.flbc{display:flex;justify-content:space-between;align-items:center;}
+.mono{font-family:var(--mono);}
+.shake{animation:shake .38s ease;}
+@keyframes shake{0%,100%{transform:translateX(0)}25%,75%{transform:translateX(-6px)}50%{transform:translateX(6px)}}
+</style>
+<link rel="manifest" href="./manifest-admin.json">
+<link rel="apple-touch-icon" href="./icon-admin-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="管理">
+<meta name="theme-color" content="#4a443e">
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+window._fbImports = { initializeApp, getDatabase, ref, set, get, onValue };
+window._fbReady = true;
+document.dispatchEvent(new Event('fb-sdk-ready'));
+</script>
+</head>
+<body>
+
+<div id="pin-lock">
+  <div class="lock-noise"></div>
+  <div class="lock-wrap">
+    <div class="lock-brand">
+      <div class="lock-eye">OSAKA KYUHAI</div>
+      <div class="lock-title">管理システム</div>
+      <div class="lock-div"></div>
+      <div class="lock-sub">ADMIN PANEL</div>
+    </div>
+    <div class="lock-icon"><svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.3)" stroke-width="1.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+    <div class="pin-dots"><div class="pin-dot" id="ld0"></div><div class="pin-dot" id="ld1"></div><div class="pin-dot" id="ld2"></div><div class="pin-dot" id="ld3"></div></div>
+    <div class="pin-err" id="lock-err"></div>
+    <div class="numpad">
+      <button class="nk" onclick="lockKey('1')">1</button><button class="nk" onclick="lockKey('2')">2</button><button class="nk" onclick="lockKey('3')">3</button>
+      <button class="nk" onclick="lockKey('4')">4</button><button class="nk" onclick="lockKey('5')">5</button><button class="nk" onclick="lockKey('6')">6</button>
+      <button class="nk" onclick="lockKey('7')">7</button><button class="nk" onclick="lockKey('8')">8</button><button class="nk" onclick="lockKey('9')">9</button>
+      <button class="nk emp"></button><button class="nk" onclick="lockKey('0')">0</button><button class="nk" onclick="lockKey('DEL')">⌫</button>
+    </div>
+  </div>
+</div>
+
+<div class="main" id="main">
+<div id="fb-status" style="position:fixed;top:10px;right:12px;z-index:500;padding:4px 9px;border-radius:12px;font-size:9px;font-weight:700;font-family:monospace;background:rgba(90,138,90,.15);color:var(--ok);border:1px solid rgba(90,138,90,.25);display:none;">● CLOUD</div>
+<div id="toast"><span id="t-ico">✓</span><span id="t-msg"></span></div>
+
+<div class="header">
+  <div class="hd-brand">
+    <div class="hd-ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+    <div><div class="hd-title">大阪急配　管理システム</div><div class="hd-sub">ADMIN PANEL</div></div>
+  </div>
+  <button class="hd-lock" onclick="doLock()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>ロック</button>
+</div>
+
+<div class="nav">
+  <button class="nav-tab on" onclick="navTab('dashboard',this)">📊 ダッシュボード</button>
+  <button class="nav-tab" onclick="navTab('csv',this)">📋 CSV出力</button>
+  <button class="nav-tab" onclick="navTab('log',this)">📄 日報一覧</button>
+  <button class="nav-tab" onclick="navTab('cust',this)">🏢 顧客管理</button>
+  <button class="nav-tab" onclick="navTab('emp',this)">🚗 ドライバー管理</button>
+  <button class="nav-tab" onclick="navTab('office',this)">🏪 営業所</button>
+  <button class="nav-tab" onclick="navTab('region',this)">📍 地域管理</button>
+  <button class="nav-tab" onclick="navTab('pin',this)">🔐 PIN設定</button>
+  <button class="nav-tab" onclick="navTab('analysis',this)">📈 分析</button>
+  <button class="nav-tab" id="nav-detail" style="display:none;" onclick="navTab('detail',this)">🔍 詳細</button>
+</div>
+
+<div class="content">
+
+  <!-- ダッシュボード -->
+  <div class="panel on" id="panel-dashboard">
+    <div class="stat-grid" id="stat-grid"></div>
+    <!-- 詳細集計タブ -->
+    <div class="card">
+      <div class="card-title">📊 詳細集計</div>
+      <div class="detail-tabs">
+        <button class="dtab on" onclick="detailTab('office',this)">営業所別</button>
+        <button class="dtab" onclick="detailTab('driver',this)">個人別</button>
+        <button class="dtab" onclick="detailTab('customer',this)">顧客別</button>
+        <button class="dtab" onclick="detailTab('region',this)">地域別</button>
+      </div>
+      <div id="detail-content"></div>
+    </div>
+    <div class="card"><div class="card-title">📅 最近の提出（直近10件）</div><div id="recent-list"></div></div>
+  </div>
+
+  <!-- CSV出力 -->
+  <div class="panel" id="panel-csv">
+    <div class="card">
+      <div class="card-title">セキュリティポリシー</div>
+      <div class="policy-box">
+        <div style="color:var(--mid);font-size:11.5px;line-height:1.6;">日報アプリ ↔ 管理システム は <strong>直接連携しません。</strong><br>同一ブラウザのlocalStorageを共有します。</div>
+        <div class="flow-chips">
+          <span class="chip" style="background:rgba(96,112,128,.1);color:var(--slate);">日報アプリ</span>
+          <span style="color:var(--light);font-size:11px;">→ localStorage →</span>
+          <span class="chip" style="background:rgba(139,111,94,.1);color:var(--clay);">管理システム</span>
+          <span style="color:var(--light);font-size:11px;">→ CSV →</span>
+          <span class="chip" style="background:rgba(107,124,106,.1);color:var(--sage);">経営管理 v3</span>
+        </div>
+      </div>
+      <!-- 日付範囲 -->
+      <div style="background:var(--inp);border-radius:8px;padding:12px 14px;margin-bottom:14px;">
+        <div class="lbl" style="margin-bottom:8px;">📅 出力期間の指定</div>
+        <div class="date-range">
+          <input type="date" id="csv-date-from" class="fi">
+          <span>〜</span>
+          <input type="date" id="csv-date-to" class="fi">
+          <button class="btn btn-ghost btn-sm" onclick="setCsvDateRange('month')">今月</button>
+          <button class="btn btn-ghost btn-sm" onclick="setCsvDateRange('last')">先月</button>
+          <button class="btn btn-ghost btn-sm" onclick="setCsvDateRange('all')">全期間</button>
+        </div>
+        <div id="csv-stat" style="font-size:11.5px;color:var(--mid);margin-top:6px;"></div>
+      </div>
+      <div class="exp-card" onclick="doExport('yp')"><div class="exp-ico" style="background:rgba(96,112,128,.11);">📋</div><div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--slate);">宅配日報 CSV出力</div><div style="font-size:10.5px;color:var(--mid);">持出・完了・夜間・転送還付・持戻り・翌日廻し・集荷</div></div></div>
+      <div class="exp-card" onclick="doExport('col')"><div class="exp-ico" style="background:rgba(107,124,106,.11);">📦</div><div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--sage);">集荷日報 CSV出力</div><div style="font-size:10.5px;color:var(--mid);">品目別12種・顧客別・複数提出も全件出力</div></div></div>
+      <div class="exp-card" onclick="doExport('both')" style="margin-bottom:0;"><div class="exp-ico" style="background:rgba(139,111,94,.11);">📂</div><div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--clay);">両方まとめて出力</div><div style="font-size:10.5px;color:var(--mid);">宅配＋集荷を連続ダウンロード</div></div></div>
+      <div style="margin-top:12px;display:flex;align-items:flex-start;gap:5px;background:rgba(139,74,58,.06);border:1px solid rgba(139,74,58,.14);border-radius:7px;padding:9px 11px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--rust)" stroke-width="2" style="flex-shrink:0;margin-top:2px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><div style="font-size:10.5px;color:var(--rust);line-height:1.55;">出力CSVは <strong>経営管理システム v3</strong> のCSVインポート画面へドロップしてください。同日・同ドライバーの複数提出はすべて追記されます。</div></div>
+    </div>
+  </div>
+
+  <!-- 日報一覧 -->
+  <div class="panel" id="panel-log">
+    <div class="card">
+      <div class="flbc mb12">
+        <div style="display:flex;align-items:center;gap:10px;"><span style="font-size:14px;font-weight:700;">提出済み日報</span><span id="log-count" style="background:rgba(107,124,106,.12);color:var(--sage);padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;"></span></div>
+        <div style="display:flex;gap:7px;align-items:center;">
+          <select id="log-filter" class="sel" style="width:auto;font-size:11.5px;" onchange="renderLogList()"><option value="all">すべて</option><option value="yuupack">宅配のみ</option><option value="collection">集荷のみ</option></select>
+          <button onclick="clearLogs()" class="btn btn-ghost btn-sm" style="color:var(--rust);border-color:rgba(139,74,58,.3);">全削除</button>
+        </div>
+      </div>
+      <div style="overflow-x:auto;"><table class="tbl"><thead><tr><th>日付</th><th>種別</th><th>担当者</th><th>営業所</th><th>内容</th><th>提出時刻</th></tr></thead><tbody id="log-tbody"></tbody></table></div>
+    </div>
+  </div>
+
+  <!-- 顧客管理 -->
+  <div class="panel" id="panel-cust">
+    <div class="card mb12">
+      <div class="card-title">顧客一覧 <span class="badge" id="cust-count"></span></div>
+      <div style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap;">
+        <input type="text" id="cust-search" class="fi" style="max-width:240px;" placeholder="顧客名・地域で絞り込み..." oninput="renderCustList()">
+        <select id="cust-region-filter" class="sel" style="max-width:160px;" onchange="renderCustList()"><option value="">すべての地域</option></select>
+      </div>
+      <div style="overflow-x:auto;"><table class="tbl"><thead><tr><th>顧客番号</th><th>顧客名</th><th>地域</th><th></th></tr></thead><tbody id="cust-tbody"></tbody></table></div>
+    </div>
+    <div class="card">
+      <div class="card-title" style="color:var(--clay);">＋ 新規顧客登録</div>
+      <div class="form-row" style="display:grid;grid-template-columns:140px 1fr 1fr;gap:10px;flex-wrap:wrap;">
+        <div><div class="lbl">顧客番号 <span style="color:var(--light);font-size:10px;">（任意）</span></div><input type="text" id="new-cust-no" class="fi" placeholder="例: C001"></div>
+        <div><div class="lbl">顧客名</div><input type="text" id="new-cust-name" class="fi" placeholder="株式会社○○"></div>
+        <div><div class="lbl">地域</div><input type="text" id="new-cust-region" class="fi" placeholder="地域を入力または選択..." list="region-dl" oninput="filterRegionDl()"><datalist id="region-dl"></datalist></div>
+      </div>
+      <button class="btn btn-clay" onclick="addCust()">登録する</button>
+    </div>
+  </div>
+
+  <!-- ドライバー管理 -->
+  <div class="panel" id="panel-emp">
+    <div class="card mb12">
+      <div class="card-title">ドライバー一覧 <span class="badge" id="emp-count"></span></div>
+      <div style="overflow-x:auto;"><table class="tbl"><thead><tr><th>番号</th><th>氏名</th><th>会社名</th><th>種別 / 営業所</th><th></th></tr></thead><tbody id="emp-tbody"></tbody></table></div>
+    </div>
+    <div class="card">
+      <div class="card-title" style="color:var(--slate);">＋ 新規ドライバー登録</div>
+      <div class="form-row col4">
+        <div><div class="lbl">番号（4〜6桁）</div><input type="tel" id="new-emp-id" class="fi" placeholder="1004" maxlength="6"></div>
+        <div><div class="lbl">氏名</div><input type="text" id="new-emp-name" class="fi" placeholder="山田 太郎"></div>
+        <div style="grid-column:span 2;"><div class="lbl">会社名（委託の場合）</div><input type="text" id="new-emp-company" class="fi" placeholder="○○運送株式会社（空欄可）"></div>
+      </div>
+      <div class="lbl" style="margin-bottom:6px;">営業所・担当種別</div>
+      <div class="office-type-row" id="office-type-chips"></div>
+      <button class="btn btn-slate" onclick="addEmp()">登録する</button>
+    </div>
+  </div>
+
+  <!-- 営業所管理 -->
+  <div class="panel" id="panel-office">
+    <div class="card mb12">
+      <div class="card-title">営業所一覧 <span class="badge" id="office-count"></span></div>
+      <div id="office-summary" style="margin-bottom:12px;"></div>
+      <div style="overflow-x:auto;"><table class="tbl"><thead><tr><th>営業所名</th><th>種別</th><th>所在地</th><th>所属ドライバー</th><th></th></tr></thead><tbody id="office-tbody"></tbody></table></div>
+    </div>
+    <div class="card">
+      <div class="card-title" style="color:var(--amber);">＋ 新規営業所登録</div>
+      <div class="form-row col3">
+        <div><div class="lbl">営業所名</div><input type="text" id="new-office-name" class="fi" placeholder="○○営業所"></div>
+        <div><div class="lbl">種別</div><select id="new-office-type" class="sel"><option value="delivery">宅配</option><option value="collection">集荷</option><option value="both">宅配＋集荷</option></select></div>
+        <div><div class="lbl">所在地（任意）</div><input type="text" id="new-office-addr" class="fi" placeholder="大阪市○○区"></div>
+      </div>
+      <button class="btn btn-amber" onclick="addOffice()">登録する</button>
+    </div>
+  </div>
+
+  <!-- 地域管理 -->
+  <div class="panel" id="panel-region">
+    <div class="card mb12">
+      <div class="card-title">登録済み地域 <span class="badge" id="region-count"></span></div>
+      <div id="region-tags" style="padding:4px 0;min-height:40px;"></div>
+    </div>
+    <div class="card mb12">
+      <div class="card-title" style="color:var(--slate);">大阪市区から選んで追加</div>
+      <div id="osaka-ku-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:6px;"></div>
+    </div>
+    <div class="card mb12">
+      <div class="card-title" style="color:var(--clay);">京都から選んで追加</div>
+      <div id="kyoto-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:6px;"></div>
+    </div>
+    <div class="card mb12">
+      <div class="card-title" style="color:var(--sage);">大阪府（市以外）から選んで追加</div>
+      <div id="osaka-city-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:6px;"></div>
+    </div>
+    <div class="card mb12">
+      <div class="card-title" style="color:var(--slate);">🚛 大阪市内 方面グループ</div>
+      <div id="osaka-area-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px;"></div>
+    </div>
+    <div class="card mb12">
+      <div class="card-title" style="color:var(--clay);">🚛 京都 方面グループ</div>
+      <div id="kyoto-area-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px;"></div>
+    </div>
+    <div class="card mb12">
+      <div class="card-title" style="color:var(--slate);">📮 大阪市内 郵便局本局</div>
+      <div id="osaka-postoffice-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px;"></div>
+    </div>
+    <div class="card mb12">
+      <div class="card-title" style="color:var(--sage);">🚛 北摂 方面グループ</div>
+      <div id="hokusetu-area-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px;"></div>
+    </div>
+    <div class="card mb12">
+      <div class="card-title" style="color:var(--sage);">📮 北摂 郵便局本局</div>
+      <div id="hokusetu-postoffice-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px;"></div>
+    </div>
+    <div class="card mb12">
+      <div class="card-title" style="color:var(--clay);">📮 京都 郵便局本局</div>
+      <div id="kyoto-postoffice-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px;"></div>
+    </div>
+    <div class="card">
+      <div class="card-title" style="color:var(--amber);">＋ 手打ちで追加</div>
+      <div style="display:flex;gap:8px;"><input type="text" id="new-region-name" class="fi" placeholder="例: 神戸市灘区"><button class="btn btn-amber" onclick="addRegion()">追加</button></div>
+    </div>
+  </div>
+
+  <!-- PIN設定 -->
+  <div class="panel" id="panel-pin">
+    <div class="card mb12">
+      <div class="card-title">現在のPIN設定</div>
+      <table class="tbl"><thead><tr><th>種別</th><th>用途</th><th>現在値</th><th></th></tr></thead>
+        <tbody>
+          <tr><td><strong>セキュリティPIN</strong></td><td style="color:var(--mid);">日報アプリ ドライバー認証</td><td class="mono" style="letter-spacing:.2em;">●●●●</td><td><button class="btn btn-ghost btn-sm" onclick="openPinChange('sec')">変更</button></td></tr>
+          <tr><td><strong>管理者PIN</strong></td><td style="color:var(--mid);">この管理システムのロック解除</td><td class="mono" style="letter-spacing:.2em;">●●●●</td><td><button class="btn btn-ghost btn-sm" onclick="openPinChange('adm')">変更</button></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="background:rgba(96,112,128,.07);border:1px solid rgba(96,112,128,.15);border-radius:8px;padding:12px 14px;"><div style="font-size:10.5px;color:var(--mid);line-height:1.7;"><strong>セキュリティPIN</strong> を変更すると日報アプリ側の認証PINも同時に変わります。<br><strong>管理者PIN</strong> はこの管理システムへの入室のみに使用されます。</div></div>
+  </div>
+
+  <!-- 分析 -->
+  <div class="panel" id="panel-analysis">
+    <div class="card mb12">
+      <div class="card-title">📈 データ分析</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;">
+        <div>
+          <div class="lbl">業務種別</div>
+          <div style="display:flex;gap:0;border:1px solid var(--brd);border-radius:7px;overflow:hidden;">
+            <button id="an-type-col" onclick="setAnType('col')" style="padding:6px 14px;font-size:12px;font-weight:700;border:none;cursor:pointer;background:var(--sage);color:#fff;transition:all .15s;">集荷</button>
+            <button id="an-type-yp" onclick="setAnType('yp')" style="padding:6px 14px;font-size:12px;font-weight:700;border:none;cursor:pointer;background:var(--inp);color:var(--mid);transition:all .15s;">宅配</button>
+          </div>
+        </div>
+        <div><div class="lbl">集計軸</div><select id="an-axis" class="sel" style="min-width:120px;" onchange="renderAnalysis()"><option value="driver">個人別</option><option value="office">営業所別</option><option value="customer">顧客別</option><option value="company">委託会社別</option><option value="region">地域別</option></select></div>
+        <div><div class="lbl">期間</div><select id="an-period" class="sel" style="min-width:120px;" onchange="toggleAnPeriod()"><option value="month">月次</option><option value="day">日次</option><option value="custom">期間指定</option><option value="multi">複数日選択</option></select></div>
+        <div id="an-month-wrap"><div class="lbl">対象月</div><input type="month" id="an-month" class="fi" style="min-width:140px;" onchange="renderAnalysis()"></div>
+        <div id="an-day-wrap" style="display:none;"><div class="lbl">対象日</div><input type="date" id="an-day" class="fi" style="min-width:140px;" onchange="renderAnalysis()"></div>
+        <div id="an-range-wrap" style="display:none;gap:6px;align-items:flex-end;"><div><div class="lbl">開始</div><input type="date" id="an-from" class="fi" onchange="renderAnalysis()"></div><span style="color:var(--mid);padding-bottom:10px;">〜</span><div><div class="lbl">終了</div><input type="date" id="an-to" class="fi" onchange="renderAnalysis()"></div></div>
+        <div id="an-multi-wrap" style="display:none;">
+          <div class="lbl" style="margin-bottom:6px;">📅 日付を選択（複数可）</div>
+          <div id="an-multi-nav" style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <button onclick="anMultiPrev()" class="btn btn-ghost btn-sm">‹</button>
+            <span id="an-multi-month-label" style="font-size:12px;font-weight:700;min-width:80px;text-align:center;"></span>
+            <button onclick="anMultiNext()" class="btn btn-ghost btn-sm">›</button>
+            <button onclick="anMultiClear()" class="btn btn-ghost btn-sm" style="margin-left:auto;font-size:10px;">クリア</button>
+          </div>
+          <div id="an-multi-cal" style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;max-width:280px;"></div>
+          <div id="an-multi-selected" style="margin-top:8px;font-size:11px;color:var(--mid);"></div>
+        </div>
+        <div id="an-item-wrap"><div class="lbl">品目フィルター</div><select id="an-item" class="sel" style="min-width:150px;" onchange="renderAnalysis()"><option value="all">全品目（合計）</option></select></div>
+        <div id="an-yp-axis-wrap" style="display:none;"><div class="lbl">集計項目</div><select id="an-yp-axis" class="sel" style="min-width:150px;" onchange="renderAnalysis()"><option value="all">全数（合計）</option><option value="mochidashi">持出数</option><option value="kanryo">完了数</option><option value="yakan">夜間完了</option><option value="tenso">転送</option><option value="mochimodoiri">持戻</option></select></div>
+      </div>
+      <div id="an-summary" style="background:var(--inp);border-radius:7px;padding:8px 12px;font-size:11.5px;color:var(--mid);"></div>
+    </div>
+    <div class="card mb12">
+      <div class="card-title">📊 グラフ</div>
+      <div id="an-chart" style="overflow-x:auto;min-height:120px;padding:4px 0;"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">📋 品目別明細テーブル</div>
+      <div style="overflow-x:auto;"><table class="tbl"><thead id="an-thead"></thead><tbody id="an-tbody"></tbody></table></div>
+    </div>
+  </div>
+
+  <!-- 詳細ページ -->
+  <div class="panel" id="panel-detail">
+    <button class="back-link" onclick="closeDetail()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+      <span id="detail-back-label">戻る</span>
+    </button>
+    <div id="detail-content-page"></div>
+  </div>
+
+</div>
+</div>
+
+<div id="pin-change-modal">
+  <div class="modal-box">
+    <button onclick="closePinChange()" style="position:absolute;top:11px;right:12px;background:none;border:none;cursor:pointer;color:var(--light);font-size:17px;line-height:1;">×</button>
+    <div style="font-size:14px;font-weight:800;margin-bottom:16px;" id="pin-change-title">PIN変更</div>
+    <div class="form-row"><div><div class="lbl">新しいPIN（4桁）</div><input type="tel" id="chg-pin1" class="fi" maxlength="4" placeholder="****"></div><div><div class="lbl">確認入力</div><input type="tel" id="chg-pin2" class="fi" maxlength="4" placeholder="****"></div></div>
+    <button class="btn btn-clay" style="width:100%;justify-content:center;" onclick="execPinChange()">変更する</button>
+  </div>
+</div>
+
+<script>
+
+// ══ 品目定義・表示ヘルパー ══
+const ITEM_KEYS=['ゆうパック_60','ゆうパック_80','ゆうパック_100','ゆうパック_120','ゆうパック_140','ゆうパック_160','ゆうパケット_通常','ゆうパケット_7cm以上','クリックポスト','ケース','定形外(ゆうメール)','チャーター'];
+const ITEM_SHORT={'ゆうパック_60':'60','ゆうパック_80':'80','ゆうパック_100':'100','ゆうパック_120':'120','ゆうパック_140':'140','ゆうパック_160':'160','ゆうパケット_通常':'パケ','ゆうパケット_7cm以上':'パケ7','クリックポスト':'CP','ケース':'ケース','定形外(ゆうメール)':'定形外','チャーター':'チャーター'};
+const ITEM_COLOR={'ゆうパック_60':'#607080','ゆうパック_80':'#607080','ゆうパック_100':'#607080','ゆうパック_120':'#607080','ゆうパック_140':'#607080','ゆうパック_160':'#607080','ゆうパケット_通常':'#6b7c6a','ゆうパケット_7cm以上':'#6b7c6a','クリックポスト':'#9a7a3a','ケース':'#8b6f5e','定形外(ゆうメール)':'#888078','チャーター':'#8b4a3a'};
+
+
+// 1行分の row → カード型バッジ
+function itemOneCell(row){
+  const col=ITEM_COLOR[row.masterKey]||'#888';
+  const sht=ITEM_SHORT[row.masterKey]||row.masterKey;
+  return `<span style="display:inline-flex;flex-direction:column;align-items:center;padding:2px 8px 3px;border-radius:6px;background:${col}22;border:1px solid ${col}66;min-width:38px;"><span style="color:${col};font-size:9px;font-weight:700;">${sht}</span><span style="color:#2c2825;font-size:13px;font-weight:800;font-family:var(--mono);">${row.qty.toLocaleString()}</span></span>`;
+}
+// rows → 品目集計 {key:qty}
+function sumItems(rows){
+  const m={};
+  rows.forEach(r=>{m[r.masterKey]=(m[r.masterKey]||0)+r.qty;});
+  return m;
+}
+// 品目集計 → コンパクトテキスト HTML（テーブルセル用）
+function itemCompact(rows){
+  const m=sumItems(rows);
+  const parts=ITEM_KEYS.filter(k=>m[k]>0).map(k=>{
+    const bg=ITEM_COLOR[k]+'22';
+    const brd=ITEM_COLOR[k]+'66';
+    return `<span style="display:inline-flex;flex-direction:column;align-items:center;padding:2px 8px 3px;margin:2px 3px;border-radius:6px;background:${bg};border:1px solid ${brd};white-space:nowrap;min-width:38px;"><span style="color:${ITEM_COLOR[k]};font-size:9px;font-weight:700;letter-spacing:.03em;line-height:1.4;">${ITEM_SHORT[k]}</span><span style="color:#2c2825;font-size:13px;font-weight:800;font-family:var(--mono);line-height:1.3;">${m[k].toLocaleString()}</span></span>`;
+  });
+  return parts.length?`<div style="display:flex;flex-wrap:wrap;gap:0;align-items:flex-start;">${parts.join('')}</div>`:'<span style="color:var(--light);font-size:11px;">—</span>';
+}
+// popupで詳細表示
+function showItemPopup(title,rows,evt){
+  evt&&evt.stopPropagation();
+  const m=sumItems(rows);
+  let html=`<div style="font-weight:700;margin-bottom:10px;font-size:13px;">${title}</div><table style="width:100%;border-collapse:collapse;font-size:12px;">`;
+  ITEM_KEYS.filter(k=>m[k]>0).forEach(k=>{
+    html+=`<tr><td style="padding:4px 8px;border-bottom:1px solid #e8e3dc;color:${ITEM_COLOR[k]};font-weight:700;">${k.replace(/_/g,' ')}</td><td style="padding:4px 8px;border-bottom:1px solid #e8e3dc;text-align:right;font-family:monospace;font-weight:700;">${m[k]}</td></tr>`;
+  });
+  html+='</table>';
+  $('item-popup-body').innerHTML=html;
+  $('item-popup').style.display='flex';$('item-popup').classList.add('on');
+}
+
+// ══ 集荷グループ判定ヘルパー ══
+// COL_LOGSのログはドライバーのofficeTypeに関わらず常に「集荷」扱い
+// YP_LOGSでもshukka>0のものは集荷件数にカウント（既存ロジック通り）
+// 営業所別集計で「集荷営業所」として表示するキーを返す
+function colOfficeKey(log, D){
+  // 集荷日報は常に driver.office をそのまま使うが、
+  // officeType が delivery の場合は「(集荷)」サフィックスで区別
+  const d = D.DRIVERS.find(x=>x.id===log.driver.id||x.name===log.driver.name);
+  if(d && d.officeType==='collection') return d.office;
+  // 宅配担当者が集荷提出した場合→「集荷」グループに統合
+  return '集荷';
+}
+
+const LS={
+  SEC_PIN:'nikki_sec_pin',ADM_PIN:'nikki_adm_pin',
+  DRIVERS:'nikki_drivers',CUSTOMERS:'nikki_customers',
+  OFFICES:'nikki_offices',REGIONS:'nikki_regions',
+  YP_LOGS:'nikki_yp_logs',COL_LOGS:'nikki_col_logs',
+};
+
+// ── Firebase設定を自動注入（セットアップ不要） ──
+(function(){
+  const cfg = '{"apiKey": "AIzaSyDDsNZnlG3swyRtuCbMjkUkZpH4X68gUiI", "authDomain": "osq-report-3db91.firebaseapp.com", "databaseURL": "https://osq-report-3db91-default-rtdb.asia-southeast1.firebasedatabase.app", "projectId": "osq-report-3db91", "storageBucket": "osq-report-3db91.firebasestorage.app", "messagingSenderId": "86627546503", "appId": "1:86627546503:web:62d338fb75ebaa91bbcf22"}';
+  if (!localStorage.getItem('nikki_fb_config') || localStorage.getItem('nikki_fb_config') === 'offline') {
+    localStorage.setItem('nikki_fb_config', cfg);
+  }
+})();
+const ls_get=(k,def)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):def;}catch{return def;}};
+const ls_set=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}};
+
+// ══ FIREBASE 同期レイヤー（管理システム） ══
+const FB_KEY = 'nikki_fb_config';
+let fbDB = null;
+let fbOnline = false;
+
+async function initFirebase() {
+  const cfg = localStorage.getItem(FB_KEY);
+  if (!cfg || cfg === 'offline') { return; }
+  try {
+    const config = JSON.parse(cfg);
+    const { initializeApp, getDatabase } = window._fbImports || {};
+    if (!initializeApp) return;
+    const app = initializeApp(config, 'admin');
+    fbDB = getDatabase(app);
+    fbOnline = true;
+    await syncFromFirebase();
+    setupRealtimeSync();
+    console.log('Admin Firebase接続OK');
+    const badge = document.getElementById('fb-status');
+    if (badge) badge.style.display = 'block';
+  } catch(e) {
+    console.error('Firebase初期化エラー:', e);
+    fbOnline = false;
+  }
+}
+
+async function syncFromFirebase() {
+  if (!fbDB) return;
+  const { ref, get } = window._fbImports;
+  const keys = ['drivers','customers','offices','regions','yp_logs','col_logs','sec_pin','adm_pin'];
+  for (const k of keys) {
+    try {
+      const snap = await get(ref(fbDB, 'nikki/' + k));
+      if (snap.exists()) {
+        const val = snap.val();
+        localStorage.setItem('nikki_' + k, typeof val === 'string' ? val : JSON.stringify(val));
+      }
+    } catch(e) {}
+  }
+  // 変数再ロード
+  DRIVERS   = ls_get(LS.DRIVERS, DRIVERS);
+  CUSTOMERS = ls_get(LS.CUSTOMERS, CUSTOMERS);
+  OFFICES   = ls_get(LS.OFFICES, OFFICES);
+  REGIONS   = ls_get(LS.REGIONS, REGIONS);
+  YP_LOGS   = ls_get(LS.YP_LOGS, []);
+  COL_LOGS  = ls_get(LS.COL_LOGS, []);
+}
+
+async function fbSet(key, value) {
+  ls_set('nikki_' + key, value);
+  if (!fbDB) return;
+  const { ref, set } = window._fbImports;
+  try { await set(ref(fbDB, 'nikki/' + key), value); }
+  catch(e) { console.error('fb write error:', e); }
+}
+
+function setupRealtimeSync() {
+  if (!fbDB) return;
+  const { ref, onValue } = window._fbImports;
+  onValue(ref(fbDB, 'nikki/yp_logs'), snap => {
+    if (!snap.exists()) return;
+    YP_LOGS = snap.val() || [];
+    fbSet('yp_logs', YP_LOGS);
+  });
+  onValue(ref(fbDB, 'nikki/col_logs'), snap => {
+    if (!snap.exists()) return;
+    COL_LOGS = snap.val() || [];
+    fbSet('col_logs', COL_LOGS);
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  if (window._fbReady) initFirebase();
+  else document.addEventListener('fb-sdk-ready', initFirebase, { once: true });
+});
+
+const $=id=>document.getElementById(id);
+const fmtD=s=>{if(!s)return'';const d=new Date(s+'T00:00:00');return`${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;};
+
+const OSAKA_KU=['北区','都島区','福島区','此花区','中央区','西区','港区','大正区','天王寺区','浪速区','西淀川区','淀川区','東淀川区','東成区','生野区','旭区','城東区','鶴見区','阿倍野区','住之江区','住吉区','東住吉区','平野区','西成区'];
+const KYOTO_AREAS=['京都市上京区','京都市中京区','京都市下京区','京都市東山区','京都市左京区','京都市右京区','京都市北区','京都市西京区','京都市伏見区','京都市南区','京都市山科区','宇治市','長岡京市','向日市','八幡市','京田辺市'];
+const OSAKA_OTHER=['堺市北区','堺市中区','堺市東区','堺市西区','堺市南区','堺市堺区','堺市美原区','豊中市','吹田市','高槻市','茨木市','枚方市','寝屋川市','東大阪市','八尾市','松原市','大東市','和泉市','箕面市','池田市','摂津市','高石市','藤井寺市','泉大津市','守口市','門真市','四條畷市','交野市','大阪狭山市','富田林市','河内長野市','柏原市'];
+const OSAKA_AREA=['北方面','都島・城東方面','西・港方面','南方面（天王寺・阿倍野）','住吉・東住吉方面','住之江・平野方面','西成・浪速方面','淀川・東淀川方面','大正・西淀川方面','此花・福島方面'];
+const KYOTO_AREA=['京都市内北方面','京都市内中央方面','京都市内南方面','京都市内東方面','京都市内西方面','宇治・城陽方面','長岡京・向日方面','亀岡方面'];
+const OSAKA_POSTOFFICE=['大阪北郵便局', '大阪東郵便局', '大阪西郵便局', '大阪南郵便局', '鶴見郵便局', '生野郵便局', '城東郵便局', '布施郵便局', '住吉郵便局', '東住吉郵便局', '平野郵便局', '西成郵便局', '淀川郵便局', '東淀川郵便局', '西淀川郵便局', '浪速郵便局', '住之江郵便局', '大正郵便局', '港郵便局', '此花郵便局', '福島郵便局', '都島郵便局', '旭郵便局', '阿倍野郵便局', '新大阪郵便局', '浜寺郵便局'];
+const HOKUSETU_AREA=['豊中方面','吹田方面','摂津方面','茨木方面','高槻方面','枚方方面','寝屋川・守口方面','箕面・池田方面'];
+const HOKUSETU_POSTOFFICE=['寝屋川郵便局', '茨木郵便局', '豊中郵便局', '吹田郵便局', '高槻郵便局', '枚方郵便局', '摂津郵便局', '池田郵便局', '箕面郵便局'];
+const KYOTO_POSTOFFICE=['京都中央郵便局', '京都北郵便局', '京都伏見郵便局', '京都南郵便局', '京都右京郵便局', '京都左京郵便局', '京都東山郵便局', '京都西京郵便局', '宇治郵便局', '長岡京郵便局', '向日町郵便局', '八幡郵便局'];
+const DELIVERY_OFFICES=['西成','浜寺','藤井寺','大阪西'];
+
+const load=()=>({
+  SEC_PIN:ls_get(LS.SEC_PIN,'1234'),
+  ADM_PIN:ls_get(LS.ADM_PIN,'9999'),
+  DRIVERS:ls_get(LS.DRIVERS,[
+    {id:'1001',name:'田中 太郎',company:'',officeType:'delivery',office:'西成'},
+    {id:'1002',name:'佐藤 次郎',company:'',officeType:'delivery',office:'浜寺'},
+    {id:'1003',name:'鈴木 三郎',company:'',officeType:'delivery',office:'藤井寺'},
+    {id:'2001',name:'高橋 四郎',company:'',officeType:'collection',office:'集荷'},
+    {id:'2002',name:'伊藤 五郎',company:'',officeType:'delivery',office:'大阪西'},
+    {id:'2003',name:'渡辺 六郎',company:'○○委託運送',officeType:'collection',office:'集荷'},
+  ]),
+  CUSTOMERS:ls_get(LS.CUSTOMERS,[
+    {id:1,name:'株式会社アルファ',region:'大阪市北区'},
+    {id:2,name:'アルファ物流センター',region:'大阪市北区'},
+    {id:3,name:'ベータ商事株式会社',region:'大阪市中央区'},
+    {id:4,name:'ベータネット販売',region:'大阪市中央区'},
+    {id:5,name:'株式会社ガンマ',region:'大阪市西区'},
+    {id:6,name:'ガンマ通販事業部',region:'大阪市西区'},
+    {id:7,name:'デルタ物流株式会社',region:'大阪市住之江区'},
+    {id:8,name:'デルタEC出荷センター',region:'大阪市住之江区'},
+    {id:9,name:'イプシロン株式会社',region:'堺市北区'},
+    {id:10,name:'イプシロン南大阪支店',region:'堺市南区'},
+  ]),
+  OFFICES:ls_get(LS.OFFICES,[
+    {id:1,name:'西成',type:'delivery',addr:'大阪市西成区'},
+    {id:2,name:'浜寺',type:'delivery',addr:'堺市西区'},
+    {id:3,name:'藤井寺',type:'delivery',addr:'藤井寺市'},
+    {id:4,name:'大阪西',type:'delivery',addr:'大阪市西区'},
+    {id:5,name:'集荷',type:'collection',addr:''},
+  ]),
+  REGIONS:ls_get(LS.REGIONS,[
+    '大阪市北区','大阪市都島区','大阪市福島区','大阪市此花区','大阪市中央区',
+    '大阪市西区','大阪市港区','大阪市大正区','大阪市天王寺区','大阪市浪速区',
+    '大阪市西淀川区','大阪市淀川区','大阪市東淀川区','大阪市東成区','大阪市生野区',
+    '大阪市旭区','大阪市城東区','大阪市鶴見区','大阪市阿倍野区','大阪市住之江区',
+    '大阪市住吉区','大阪市東住吉区','大阪市平野区','大阪市西成区',
+    '堺市北区','堺市中区','堺市東区','堺市西区','堺市南区','堺市堺区',
+    '豊中市','吹田市','藤井寺市',
+  ]),
+  YP_LOGS:ls_get(LS.YP_LOGS,[]),
+  COL_LOGS:ls_get(LS.COL_LOGS,[]),
+});
+
+// ══ CSV日付フィルター ══
+function getCsvRange(){
+  const from=$('csv-date-from').value;
+  const to=$('csv-date-to').value;
+  return {from,to};
+}
+function filterByDate(logs){
+  const {from,to}=getCsvRange();
+  return logs.filter(r=>{
+    if(from&&r.date<from)return false;
+    if(to&&r.date>to)return false;
+    return true;
+  });
+}
+function setCsvDateRange(mode){
+  const now=new Date();
+  const y=now.getFullYear(),m=now.getMonth();
+  if(mode==='month'){
+    $('csv-date-from').value=`${y}-${String(m+1).padStart(2,'0')}-01`;
+    $('csv-date-to').value=`${y}-${String(m+1).padStart(2,'0')}-${String(new Date(y,m+1,0).getDate()).padStart(2,'0')}`;
+  }else if(mode==='last'){
+    const lm=m===0?12:m, ly=m===0?y-1:y;
+    $('csv-date-from').value=`${ly}-${String(lm).padStart(2,'0')}-01`;
+    $('csv-date-to').value=`${ly}-${String(lm).padStart(2,'0')}-${String(new Date(ly,lm,0).getDate()).padStart(2,'0')}`;
+  }else{
+    $('csv-date-from').value='';
+    $('csv-date-to').value='';
+  }
+  renderCsvStat();
+}
+function renderCsvStat(){
+  const D=load();
+  const yp=filterByDate(D.YP_LOGS);
+  const col=filterByDate(D.COL_LOGS);
+  const {from,to}=getCsvRange();
+  const range=from||to?`（${from||''}〜${to||''}）`:'（全期間）';
+  $('csv-stat').innerHTML=`${range}　宅配日報 <strong style="color:var(--slate);">${yp.length}件</strong>　集荷日報 <strong style="color:var(--sage);">${col.length}件</strong>`;
+}
+
+// ══ PIN LOCK ══
+let lockCode='';
+function lockKey(k){
+  const D=load();
+  if(k==='DEL'){lockCode=lockCode.slice(0,-1);}else if(lockCode.length<4){lockCode+=k;}
+  [0,1,2,3].forEach(i=>$('ld'+i).classList.toggle('on',i<lockCode.length));
+  $('lock-err').textContent='';
+  if(lockCode.length===4){
+    setTimeout(()=>{
+      if(lockCode===D.ADM_PIN){
+        $('pin-lock').classList.add('unlock');
+        $('main').classList.add('on');
+        initMain();
+      }else{
+        $('lock-err').textContent='コードが違います';
+        document.querySelectorAll('#pin-lock .pin-dot').forEach(d=>d.classList.add('shake'));
+        setTimeout(()=>{document.querySelectorAll('#pin-lock .pin-dot').forEach(d=>d.classList.remove('shake'));lockCode='';[0,1,2,3].forEach(i=>$('ld'+i).classList.remove('on'));},400);
+      }
+    },150);
+  }
+}
+function doLock(){lockCode='';[0,1,2,3].forEach(i=>$('ld'+i).classList.remove('on'));$('lock-err').textContent='';$('pin-lock').classList.remove('unlock');$('main').classList.remove('on');}
+
+function initMain(){
+  // CSV日付を今月に初期設定
+  setCsvDateRange('month');
+  renderDashboard();
+  buildEmpForm();
+}
+
+function navTab(t,el){
+  document.querySelectorAll('.nav-tab').forEach(b=>b.classList.remove('on'));el.classList.add('on');
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'));$('panel-'+t).classList.add('on');
+  if(t==='dashboard')renderDashboard();
+  if(t==='csv')renderCsvStat();
+  if(t==='log')renderLogList();
+  if(t==='cust')renderCustList();
+  if(t==='emp'){renderEmpList();buildEmpForm();}
+  if(t==='office')renderOfficeList();
+  if(t==='region')renderRegionPanel();
+  if(t==='analysis')initAnalysis();
+}
+
+// ══ 品目サマリーヘルパー ══
+// 集荷rows → 品目ごとに集計してバッジHTML
+function colItemBadges(rows){return itemCompact(rows);}
+// 1行分のitem-badge（ITEM_SHORTを使用）
+function itemBadge(masterKey,qty,unit){
+  const col=ITEM_COLOR[masterKey]||'#888';
+  const sht=ITEM_SHORT[masterKey]||masterKey;
+  return `<span style="display:inline-flex;align-items:center;gap:3px;padding:3px 7px;border-radius:5px;background:${col}1a;border:1px solid ${col}44;font-size:11px;white-space:nowrap;"><span style="color:${col};font-weight:700;">${sht}</span><span style="color:#2c2825;font-weight:800;font-family:var(--mono);">${qty}${unit}</span></span>`;
+}
+function colLogsBadges(logs){return itemCompact(logs.flatMap(r=>r.rows));}
+
+// 宅配日報 内容バッジ（持出・完了・夜間・転送・集荷）
+function ypBadge(form){
+  const defs=[
+    {key:'mochidashi', label:'持出', col:'#607080', always:true},
+    {key:'kanryo',     label:'完了', col:'#607080', always:true},
+    {key:'yakan',      label:'夜間', col:'#4a6090', always:false},
+    {key:'tenso',      label:'転送', col:'#9a6a3a', always:false},
+    {key:'mochimodoiri',label:'持戻',col:'#8b5a5a', always:false},
+    {key:'shukka',     label:'集荷', col:'#6b7c6a', always:true},
+  ];
+  return '<div style="display:flex;flex-wrap:wrap;gap:3px;align-items:center;">'
+    + defs.filter(d=>d.always||(form[d.key]>0)).map(d=>{
+        const v=form[d.key]||0;
+        const dim=!v;
+        return `<span style="display:inline-flex;flex-direction:column;align-items:center;padding:2px 7px 3px;border-radius:6px;background:${d.col}${dim?'10':'1e'};border:1px solid ${d.col}${dim?'28':'55'};min-width:34px;opacity:${dim?0.45:1};">
+          <span style="color:${d.col};font-size:9px;font-weight:700;line-height:1.3;">${d.label}</span>
+          <span style="color:#2c2825;font-size:12px;font-weight:800;font-family:var(--mono);line-height:1.2;">${v}</span>
+        </span>`;
+      }).join('')
+    + '</div>';
+}
+
+// 集荷カウント：顧客数（同日同顧客は1社）
+function colCustomerCount(logs){
+  const seen=new Set();
+  logs.forEach(r=>r.rows.forEach(row=>seen.add(r.date+'_'+row.customerName)));
+  return seen.size;
+}
+
+// ══ DASHBOARD ══
+function renderDashboard(){
+  const D=load(),today=new Date().toISOString().slice(0,10);
+  const colCustTotal=colCustomerCount(D.COL_LOGS);
+  const colCustToday=colCustomerCount(D.COL_LOGS.filter(r=>r.date===today));
+  $('stat-grid').innerHTML=`
+    <div class="stat-box"><div class="stat-val" style="color:var(--clay);">${D.DRIVERS.length}</div><div class="stat-lbl">登録ドライバー数</div></div>
+    <div class="stat-box"><div class="stat-val" style="color:var(--sage);">${D.CUSTOMERS.length}</div><div class="stat-lbl">登録顧客数</div></div>
+    <div class="stat-box"><div class="stat-val" style="color:var(--slate);">${D.YP_LOGS.length}</div><div class="stat-lbl">宅配日報（累計）</div></div>
+    <div class="stat-box"><div class="stat-val" style="color:var(--sage);">${colCustTotal}</div><div class="stat-lbl">集荷顧客数（累計）</div></div>
+    <div class="stat-box"><div class="stat-val" style="color:var(--sage);font-size:18px;">${[...new Set(D.COL_LOGS.map(r=>r.date))].length}</div><div class="stat-lbl">集荷稼働日数（累計）</div></div>
+    <div class="stat-box"><div class="stat-val" style="color:var(--slate);">${D.YP_LOGS.filter(r=>r.date===today).length}</div><div class="stat-lbl">宅配日報（本日）</div></div>
+    <div class="stat-box"><div class="stat-val" style="color:var(--sage);">${colCustToday}</div><div class="stat-lbl">集荷顧客数（本日）</div></div>`;
+  detailTab('office',document.querySelector('.dtab.on'));
+  const all=[...D.YP_LOGS.map(r=>({...r,label:'宅配',color:'var(--slate)'})),...D.COL_LOGS.map(r=>({...r,label:'集荷',color:'var(--sage)'}))].sort((a,b)=>b.id-a.id).slice(0,10);
+  $('recent-list').innerHTML=all.length?`<table class="tbl"><thead><tr><th>日付</th><th>種別</th><th>担当者</th><th>営業所</th><th>内容</th><th>提出時刻</th></tr></thead><tbody>${all.map(r=>`<tr class="clickable" onclick="openLogDetail('${r.id}','${r.label==='宅配'?'yp':'col'}')"><td class="mono">${fmtD(r.date)}</td><td><span style="background:${r.label==='宅配'?'rgba(96,112,128,.1)':'rgba(107,124,106,.1)'};color:${r.color};padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700;">${r.label}</span></td><td class="link-cell">${r.driver.name}</td><td style="color:var(--mid);font-size:11px;">${r.driver.office}</td><td style="font-size:11px;">${r.label==='宅配'?ypBadge(r.form):`<div class="item-badges">${colItemBadges(r.rows)}</div>`}</td><td style="color:var(--light);font-size:10.5px;" class="mono">${new Date(r.submittedAt).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}</td></tr>`).join('')}</tbody></table>`:'<div style="padding:16px;color:var(--light);font-size:12px;text-align:center;">提出済み日報はありません</div>';
+}
+
+// ══ 詳細集計 ══
+let curDetailTab='office';
+function detailTab(t,el){
+  curDetailTab=t;
+  document.querySelectorAll('.dtab').forEach(b=>b.classList.remove('on'));
+  if(el)el.classList.add('on');
+  const D=load();
+  const all=[...D.YP_LOGS,...D.COL_LOGS];
+  if(!all.length){$('detail-content').innerHTML='<div style="padding:16px;color:var(--light);font-size:12px;text-align:center;">データなし</div>';return;}
+
+  if(t==='office'){
+    const map={};
+    D.YP_LOGS.forEach(r=>{const k=r.driver.office;if(!map[k])map[k]={office:k,yp:0,col:0};map[k].yp++;});
+    D.COL_LOGS.forEach(r=>{const k=colOfficeKey(r,D);if(!map[k])map[k]={office:k,yp:0,col:0};const custSet=map[k]._cs||(map[k]._cs=new Set());r.rows.forEach(row=>custSet.add(r.date+'_'+row.customerName));map[k].col=custSet.size;});
+    const rows=Object.values(map).sort((a,b)=>b.yp-a.yp);
+    $('detail-content').innerHTML=`<table class="tbl"><thead><tr><th>営業所</th><th>宅配件数</th><th>集荷顧客数</th><th></th></tr></thead><tbody>${rows.map(r=>`<tr class="clickable" onclick="openDetailPage('office','${r.office.replace(/'/g,"\\'")}')"><td class="link-cell">${r.office}</td><td style="color:var(--slate);">${r.yp}</td><td style="color:var(--sage);">${r.col}</td><td style="color:var(--light);font-size:10px;">詳細 ›</td></tr>`).join('')}</tbody></table>`;
+  }else if(t==='driver'){
+    const map={};
+    D.YP_LOGS.forEach(r=>{const k=r.driver.name;if(!map[k])map[k]={name:k,office:r.driver.office,yp:0,col:0};map[k].yp++;});
+    D.COL_LOGS.forEach(r=>{const k=r.driver.name;if(!map[k])map[k]={name:k,office:r.driver.office,yp:0,col:0};const cs=map[k]._cs||(map[k]._cs=new Set());r.rows.forEach(row=>cs.add(r.date+'_'+row.customerName));map[k].col=cs.size;});
+    const rows=Object.values(map).sort((a,b)=>b.yp-a.yp);
+    $('detail-content').innerHTML=`<table class="tbl"><thead><tr><th>担当者</th><th>営業所</th><th>宅配</th><th>集荷顧客数</th><th></th></tr></thead><tbody>${rows.map(r=>`<tr class="clickable" onclick="openDetailPage('driver','${r.name.replace(/'/g,"\\'")}')"><td class="link-cell">${r.name}</td><td style="color:var(--mid);font-size:11px;">${r.office}</td><td style="color:var(--slate);">${r.yp}</td><td style="color:var(--sage);">${r.col}</td><td style="color:var(--light);font-size:10px;">詳細 ›</td></tr>`).join('')}</tbody></table>`;
+  }else if(t==='customer'){
+    const map={};
+    D.COL_LOGS.forEach(r=>r.rows.forEach(row=>{
+      const k=row.customerName;
+      if(!map[k])map[k]={name:k,region:row.region,items:{}};
+      map[k].items[row.masterKey]=(map[k].items[row.masterKey]||0)+row.qty;
+    }));
+    const rows=Object.values(map).sort((a,b)=>Object.values(b.items).reduce((s,v)=>s+v,0)-Object.values(a.items).reduce((s,v)=>s+v,0));
+    const usedKeys=ITEM_KEYS.filter(k=>rows.some(r=>r.items[k]>0));
+    $('detail-content').innerHTML=rows.length
+      ?`<div style="overflow-x:auto;"><table class="tbl"><thead><tr><th>顧客名</th><th>地域</th>${usedKeys.map(k=>`<th style="text-align:center;white-space:nowrap;color:${ITEM_COLOR[k]};min-width:42px;font-size:10.5px;">${ITEM_SHORT[k]}</th>`).join('')}<th></th></tr></thead><tbody>${rows.map(r=>`<tr class="clickable" onclick="openDetailPage('customer','${r.name.replace(/'/g,"\\'")}')"><td class="link-cell">${r.name}</td><td style="color:var(--mid);font-size:11px;">${r.region}</td>${usedKeys.map(k=>`<td style="text-align:center;font-family:var(--mono);font-weight:700;color:${r.items[k]?ITEM_COLOR[k]:'var(--light)'}">${r.items[k]||'—'}</td>`).join('')}<td style="color:var(--light);font-size:10px;">詳細 ›</td></tr>`).join('')}</tbody></table></div>`
+      :'<div style="padding:12px;color:var(--light);font-size:12px;">集荷データなし</div>';
+  }else if(t==='region'){
+    const map={};
+    D.COL_LOGS.forEach(r=>r.rows.forEach(row=>{
+      const k=row.region;
+      if(!map[k])map[k]={region:k,custs:new Set(),items:0};
+      map[k].custs.add(row.customerName);map[k].items+=row.qty;
+    }));
+    const rows=Object.values(map).sort((a,b)=>b.items-a.items);
+    $('detail-content').innerHTML=rows.length
+      ?`<table class="tbl"><thead><tr><th>地域</th><th>顧客数</th><th>合計数量</th><th></th></tr></thead><tbody>${rows.map(r=>`<tr class="clickable" onclick="openDetailPage('region','${r.region.replace(/'/g,"\\'")}')"><td class="link-cell">${r.region}</td><td>${r.custs.size}社</td><td class="mono" style="font-weight:700;">${r.items}</td><td style="color:var(--light);font-size:10px;">詳細 ›</td></tr>`).join('')}</tbody></table>`
+      :'<div style="padding:12px;color:var(--light);font-size:12px;">集荷データなし</div>';
+  }
+}
+
+// ══ CSV ══
+function doExport(t){
+  const D=load();
+  const yp=filterByDate(D.YP_LOGS);
+  const col=filterByDate(D.COL_LOGS);
+  const {from,to}=getCsvRange();
+  const suffix=from||to?`_${from||''}〜${to||''}`:`_全期間`;
+  const dt=new Date().toISOString().slice(0,10);
+  if(t==='yp'||t==='both')exportCSV(makeYPCSV(yp),`宅配日報${suffix}_${dt}.csv`);
+  if(t==='col'||t==='both')setTimeout(()=>exportCSV(makeColCSV(col),`集荷日報${suffix}_${dt}.csv`),t==='both'?600:0);
+  toast(`CSV出力しました（${t==='yp'?'宅配':t==='col'?'集荷':'宅配+集荷'}）`);
+}
+function makeYPCSV(logs){
+  // 同日・同人は最新1件のみ（アプリ側で置き換え済みだが念のため保護）
+  const deduped=[];
+  const seen=new Set();
+  [...logs].sort((a,b)=>b.submittedAt.localeCompare(a.submittedAt)).forEach(r=>{
+    const key=r.date+'_'+r.driver.id;
+    if(!seen.has(key)){seen.add(key);deduped.push(r);}
+  });
+  deduped.sort((a,b)=>a.date.localeCompare(b.date)||a.driver.name.localeCompare(b.driver.name));
+  const h='日付,営業所,従事員名,区分,持ち出し,完了,夜間,転送還付,持ち戻り,翌日廻し,集荷,備考,検証';
+  return [h,...deduped.map(r=>{const f=r.form,sum=f.kanryo+f.tenso+f.mochimodoiri+f['翌日廻し'];return[r.date,r.driver.office,r.driver.name,'社員',f.mochidashi,f.kanryo,f.yakan||0,f.tenso,f.mochimodoiri,f['翌日廻し'],f.shukka||0,f.notes||'',f.mochidashi===sum?'OK':'NG'].join(',');})].join('\n');
+}
+function makeColCSV(logs){
+  // 同日・同人の複数提出もすべて追記（submittedAtでソート）
+  const sorted=[...logs].sort((a,b)=>a.date.localeCompare(b.date)||a.submittedAt.localeCompare(b.submittedAt));
+  const h='日付,提出時刻,営業所,従事員名,顧客名,地域,品目,数量,単位';
+  const rows=[];
+  sorted.forEach(r=>{
+    const t=new Date(r.submittedAt).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
+    r.rows.forEach(row=>rows.push([r.date,t,r.driver.office,r.driver.name,row.customerName,row.region,row.masterKey,row.qty,row.unit].join(',')));
+  });
+  return [h,...rows].join('\n');
+}
+function exportCSV(csv,fname){const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fname;a.click();URL.revokeObjectURL(a.href);}
+
+// ══ 日報一覧 ══
+function renderLogList(){
+  const D=load(),filter=$('log-filter').value;
+  const all=[...D.YP_LOGS.map(r=>({...r,label:'宅配',ltype:'yuupack',color:'var(--slate)'})),...D.COL_LOGS.map(r=>({...r,label:'集荷',ltype:'collection',color:'var(--sage)'}))].filter(r=>filter==='all'||r.ltype===filter).sort((a,b)=>b.id-a.id);
+  $('log-count').textContent=`${all.length}件`;
+  $('log-tbody').innerHTML=all.length?all.map(r=>`<tr class="clickable" onclick="openLogDetail('${r.id}','${r.label==='宅配'?'yp':'col'}')"><td class="mono">${fmtD(r.date)}</td><td><span style="background:${r.label==='宅配'?'rgba(96,112,128,.1)':'rgba(107,124,106,.1)'};color:${r.color};padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700;">${r.label}</span></td><td class="link-cell">${r.driver.name}</td><td style="color:var(--mid);font-size:11px;">${r.driver.office}</td><td style="font-size:11px;">${r.label==='宅配'?ypBadge(r.form):`<div class="item-badges">${colItemBadges(r.rows)}</div>`}</td><td style="color:var(--light);font-size:10.5px;" class="mono">${new Date(r.submittedAt).toLocaleString('ja-JP')}</td></tr>`).join(''):'<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--light);">データなし</td></tr>';
+}
+function clearLogs(){if(!confirm('提出済み日報を全件削除しますか？'))return;fbSet('yp_logs',[]);fbSet('col_logs',[]);renderLogList();toast('日報を全件削除しました');}
+
+// ══ 顧客管理 ══
+function renderCustList(){
+  const D=load();
+  const search=$('cust-search').value.trim().toLowerCase();
+  const regionF=$('cust-region-filter').value;
+  const regs=[...new Set(D.CUSTOMERS.map(c=>c.region))].sort();
+  const cur=$('cust-region-filter').value;
+  $('cust-region-filter').innerHTML='<option value="">すべての地域</option>'+regs.map(r=>`<option value="${r}"${r===cur?' selected':''}>${r}</option>`).join('');
+  const filtered=D.CUSTOMERS.filter(c=>{
+    const ms=!search||(c.name.toLowerCase().includes(search)||c.region.toLowerCase().includes(search)||(c.customerNo||'').toLowerCase().includes(search));
+    return ms&&(!regionF||c.region===regionF);
+  });
+  $('cust-count').textContent=`${D.CUSTOMERS.length}社`;
+  $('region-dl').innerHTML=D.REGIONS.map(r=>`<option value="${r}">`).join('');
+  $('cust-tbody').innerHTML=filtered.length?filtered.map(c=>`<tr><td style="color:var(--light);font-size:11px;font-family:var(--mono);">${c.customerNo||'—'}</td><td style="font-weight:600;">${c.name}</td><td style="color:var(--mid);">${c.region}</td><td><button class="btn-del" onclick="delCust(${c.id})">削除</button></td></tr>`).join(''):'<tr><td colspan="4" style="text-align:center;padding:16px;color:var(--light);">該当なし</td></tr>';
+}
+function filterRegionDl(){const D=load();const q=$('new-cust-region').value.toLowerCase();$('region-dl').innerHTML=D.REGIONS.filter(r=>r.toLowerCase().includes(q)).map(r=>`<option value="${r}">`).join('');}
+function addCust(){
+  const D=load();
+  const customerNo=$('new-cust-no').value.trim();
+  const name=$('new-cust-name').value.trim(),region=$('new-cust-region').value.trim();
+  if(!name||!region){toast('顧客名と地域を入力してください','err');return;}
+  if(D.CUSTOMERS.find(c=>c.name===name)){toast('同名の顧客が既に存在します','err');return;}
+  if(customerNo&&D.CUSTOMERS.find(c=>c.customerNo===customerNo)){toast('その顧客番号は既に使用されています','err');return;}
+  D.CUSTOMERS.push({id:Date.now(),customerNo:customerNo||'',name,region});fbSet('customers',D.CUSTOMERS);
+  $('new-cust-no').value='';$('new-cust-name').value='';$('new-cust-region').value='';
+  renderCustList();toast(`「${name}」を登録しました`);
+}
+function delCust(id){
+  const D=load(),c=D.CUSTOMERS.find(x=>x.id===id);
+  if(!confirm(`「${c?.name}」を削除しますか？`))return;
+  fbSet('customers',D.CUSTOMERS.filter(x=>x.id!==id));renderCustList();toast('顧客を削除しました');
+}
+
+// ══ ドライバー管理 ══
+let selectedOfficeType=null;
+function buildEmpForm(){
+  const typeWrap=$('office-type-chips');
+  typeWrap.innerHTML='';
+  DELIVERY_OFFICES.forEach(name=>{
+    const chip=document.createElement('label');
+    chip.className='type-chip'+(selectedOfficeType==='delivery_'+name?' selected':'');
+    chip.textContent=`🚛 ${name}`;
+    chip.onclick=()=>{
+      selectedOfficeType='delivery_'+name;
+      document.querySelectorAll('.type-chip').forEach(c=>c.classList.remove('selected','col-selected'));
+      chip.classList.add('selected');
+    };
+    typeWrap.appendChild(chip);
+  });
+  const colChip=document.createElement('label');
+  colChip.className='type-chip'+(selectedOfficeType==='collection'?' col-selected':'');
+  colChip.textContent='📦 集荷';
+  colChip.onclick=()=>{
+    selectedOfficeType='collection';
+    document.querySelectorAll('.type-chip').forEach(c=>c.classList.remove('selected','col-selected'));
+    colChip.classList.add('col-selected');
+  };
+  typeWrap.appendChild(colChip);
+}
+
+function renderEmpList(){
+  const D=load();
+  $('emp-count').textContent=`${D.DRIVERS.length}名`;
+  $('emp-tbody').innerHTML=D.DRIVERS.length?D.DRIVERS.map(d=>{
+    const isCol=d.officeType==='collection';
+    const badge=isCol
+      ?`<span style="background:rgba(107,124,106,.12);color:var(--sage);padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700;">集荷</span>`
+      :`<span style="background:rgba(96,112,128,.1);color:var(--slate);padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700;">宅配</span>`;
+    return `<tr>
+      <td class="mono" style="font-size:11px;">${d.id}</td>
+      <td style="font-weight:600;">${d.name}</td>
+      <td style="color:var(--mid);font-size:11px;">${d.company||'—'}</td>
+      <td>${badge} <span style="font-size:11px;">${d.office}</span></td>
+      <td><button class="btn-del" onclick="delEmp('${d.id}')">削除</button></td>
+    </tr>`;
+  }).join(''):'<tr><td colspan="5" style="text-align:center;padding:16px;color:var(--light);">登録ドライバーなし</td></tr>';
+}
+
+function addEmp(){
+  const D=load();
+  const id=$('new-emp-id').value.trim(),name=$('new-emp-name').value.trim();
+  const company=$('new-emp-company').value.trim();
+  if(!id||!name){toast('番号と氏名を入力してください','err');return;}
+  if(!/^\d{4,6}$/.test(id)){toast('番号は4〜6桁の数字で入力してください','err');return;}
+  if(D.DRIVERS.find(d=>d.id===id)){toast('その番号は既に使用されています','err');return;}
+  if(!selectedOfficeType){toast('営業所・種別を選択してください','err');return;}
+  const isCol=selectedOfficeType==='collection';
+  D.DRIVERS.push({id,name,company,officeType:isCol?'collection':'delivery',office:isCol?'集荷':selectedOfficeType.replace('delivery_','')});
+  fbSet('drivers',D.DRIVERS);
+  $('new-emp-id').value='';$('new-emp-name').value='';$('new-emp-company').value='';
+  selectedOfficeType=null;buildEmpForm();renderEmpList();toast(`「${name}」を登録しました`);
+}
+function delEmp(id){
+  const D=load(),d=D.DRIVERS.find(x=>x.id===id);
+  if(!confirm(`「${d?.name}」を削除しますか？`))return;
+  fbSet('drivers',D.DRIVERS.filter(x=>x.id!==id));renderEmpList();toast('ドライバーを削除しました');
+}
+
+// ══ 営業所管理 ══
+function renderOfficeList(){
+  const D=load();
+  $('office-count').textContent=`${D.OFFICES.length}拠点`;
+  $('office-summary').innerHTML=`<div style="background:var(--inp);border-radius:7px;padding:9px 12px;font-size:11.5px;color:var(--mid);">全ドライバー <strong style="color:var(--ink);">${D.DRIVERS.length}名</strong> ／ 営業所 <strong style="color:var(--ink);">${D.OFFICES.length}拠点</strong></div>`;
+  const typeLabel={delivery:'🚛 宅配',collection:'📦 集荷',both:'🔄 両方'};
+  $('office-tbody').innerHTML=D.OFFICES.length?D.OFFICES.map(o=>{
+    const cnt=D.DRIVERS.filter(d=>d.office===o.name).length;
+    return `<tr><td style="font-weight:600;">${o.name}</td><td style="font-size:11px;">${typeLabel[o.type]||'—'}</td><td style="color:var(--mid);">${o.addr||'—'}</td><td><span style="color:${cnt?'var(--slate)':'var(--light)'};font-family:var(--mono);font-size:12px;">${cnt}名</span></td><td><button class="btn-del" onclick="delOffice(${o.id})">削除</button></td></tr>`;
+  }).join(''):'<tr><td colspan="5" style="text-align:center;padding:16px;color:var(--light);">登録営業所なし</td></tr>';
+}
+function addOffice(){
+  const D=load();
+  const name=$('new-office-name').value.trim(),type=$('new-office-type').value,addr=$('new-office-addr').value.trim();
+  if(!name){toast('営業所名を入力してください','err');return;}
+  if(D.OFFICES.find(o=>o.name===name)){toast('同名の営業所が既に存在します','err');return;}
+  D.OFFICES.push({id:Date.now(),name,type,addr});fbSet('offices',D.OFFICES);
+  $('new-office-name').value='';$('new-office-addr').value='';
+  renderOfficeList();toast(`「${name}」を登録しました`);
+}
+function delOffice(id){
+  const D=load(),o=D.OFFICES.find(x=>x.id===id);
+  const cnt=D.DRIVERS.filter(d=>d.office===o?.name).length;
+  if(!confirm(cnt>0?`「${o?.name}」には${cnt}名所属。削除しますか？`:`「${o?.name}」を削除しますか？`))return;
+  fbSet('offices',D.OFFICES.filter(x=>x.id!==id));renderOfficeList();toast('営業所を削除しました');
+}
+
+// ══ 地域管理 ══
+function renderRegionPanel(){
+  const D=load();
+  $('region-count').textContent=`${D.REGIONS.length}地域`;
+  $('region-tags').innerHTML=D.REGIONS.map(r=>`<span class="region-tag">${r}<button onclick="delRegion('${r.replace(/'/g,"\\'")}')">×</button></span>`).join('');
+  const mkGrid=(arr,getId)=>{
+    return arr.map(r=>{
+      const rname=getId(r);
+      const exists=D.REGIONS.includes(rname);
+      const rnEsc=rname.replace(/'/g,"\'"); return `<div onclick="toggleRegion('${rnEsc}')" style="padding:6px 8px;border-radius:6px;border:1px solid ${exists?'var(--ok)':'var(--brd)'};background:${exists?'rgba(90,138,90,.1)':'var(--inp)'};font-size:11.5px;cursor:pointer;color:${exists?'var(--ok)':'var(--ink)'};text-align:center;transition:all .15s;user-select:none;">${exists?'✓ ':''}${r}</div>`;
+    }).join('');
+  };
+  $('osaka-ku-grid').innerHTML=mkGrid(OSAKA_KU,ku=>`大阪市${ku}`);
+  $('kyoto-grid').innerHTML=mkGrid(KYOTO_AREAS,r=>r);
+  $('osaka-city-grid').innerHTML=mkGrid(OSAKA_OTHER,r=>r);
+  $('osaka-area-grid').innerHTML=mkGrid(OSAKA_AREA,r=>r);
+  $('kyoto-area-grid').innerHTML=mkGrid(KYOTO_AREA,r=>r);
+  $('osaka-postoffice-grid').innerHTML=mkGrid(OSAKA_POSTOFFICE,r=>r);
+  $('hokusetu-area-grid').innerHTML=mkGrid(HOKUSETU_AREA,r=>r);
+  $('hokusetu-postoffice-grid').innerHTML=mkGrid(HOKUSETU_POSTOFFICE,r=>r);
+  $('kyoto-postoffice-grid').innerHTML=mkGrid(KYOTO_POSTOFFICE,r=>r);
+}
+function addRegionDirect(name){
+  const D=load();
+  if(D.REGIONS.includes(name)){toast('既に登録済みです','info');return;}
+  D.REGIONS.push(name);D.REGIONS.sort();fbSet('regions',D.REGIONS);
+  renderRegionPanel();toast(`「${name}」を追加しました`);
+}
+function toggleRegion(name){
+  const D=load();
+  if(D.REGIONS.includes(name)){
+    fbSet('regions',D.REGIONS.filter(r=>r!==name));
+    renderRegionPanel();toast(`「${name}」を削除しました`);
+  }else{
+    D.REGIONS.push(name);D.REGIONS.sort();fbSet('regions',D.REGIONS);
+    renderRegionPanel();toast(`「${name}」を追加しました`);
+  }
+}
+function addRegion(){
+  const name=$('new-region-name').value.trim();
+  if(!name){toast('地域名を入力してください','err');return;}
+  addRegionDirect(name);$('new-region-name').value='';
+}
+function delRegion(name){
+  const D=load();
+  if(!confirm(`「${name}」を削除しますか？`))return;
+  fbSet('regions',D.REGIONS.filter(r=>r!==name));renderRegionPanel();toast(`「${name}」を削除しました`);
+}
+
+// ══ PIN変更 ══
+let pinChangeTarget=null;
+function openPinChange(t){pinChangeTarget=t;$('pin-change-title').textContent=t==='sec'?'セキュリティPIN変更（ドライバー用）':'管理者PIN変更';$('chg-pin1').value='';$('chg-pin2').value='';$('pin-change-modal').classList.add('on');setTimeout(()=>$('chg-pin1').focus(),100);}
+function closePinChange(){$('pin-change-modal').classList.remove('on');pinChangeTarget=null;}
+function execPinChange(){const p1=$('chg-pin1').value,p2=$('chg-pin2').value;if(!/^\d{4}$/.test(p1)){toast('PINは4桁の数字で入力してください','err');return;}if(p1!==p2){toast('PINが一致しません','err');return;}ls_set(pinChangeTarget==='sec'?LS.SEC_PIN:LS.ADM_PIN,p1);closePinChange();toast(`${pinChangeTarget==='sec'?'セキュリティ':'管理者'}PINを変更しました`);}
+
+
+
+// ══ 分析タブ ══
+// ══ 複数日選択カレンダー ══
+let anSelectedDates=new Set();
+let anMultiYear=new Date().getFullYear();
+let anMultiMonth=new Date().getMonth();
+
+function renderAnMultiCal(){
+  const y=anMultiYear,m=anMultiMonth;
+  const label=['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+  $('an-multi-month-label').textContent=`${y}年 ${label[m]}`;
+  const first=new Date(y,m,1).getDay(); // 0=日
+  const days=new Date(y,m+1,0).getDate();
+  const D=load();
+  // 集荷データがある日付
+  const logDates=new Set((anType==='yp'?D.YP_LOGS:D.COL_LOGS).map(r=>r.date));
+  let html='';
+  const wd=['日','月','火','水','木','金','土'];
+  wd.forEach((d,i)=>{
+    html+=`<div style="text-align:center;font-size:10px;color:var(--mid);padding:2px 0;${i===0?'color:#c08070;':i===6?'color:#7090c0;':''}">${d}</div>`;
+  });
+  for(let i=0;i<first;i++) html+='<div></div>';
+  for(let d=1;d<=days;d++){
+    const dt=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const sel=anSelectedDates.has(dt);
+    const hasData=logDates.has(dt);
+    const isSun=(first+d-1)%7===0;
+    const isSat=(first+d-1)%7===6;
+    html+=`<div onclick="anToggleDate('${dt}')" style="
+      text-align:center;padding:4px 2px;border-radius:5px;font-size:11px;cursor:${hasData||sel?'pointer':'default'};
+      background:${sel?'var(--slate)':hasData?'rgba(96,112,128,.12)':'transparent'};
+      color:${sel?'#fff':hasData?'var(--slate)':isSun?'#d0a090':isSat?'#90a0d0':'var(--light)'};
+      font-weight:${sel||hasData?'700':'400'};
+      border:${sel?'1px solid var(--slate)':hasData?'1px solid rgba(96,112,128,.25)':'1px solid transparent'};
+      opacity:${hasData||sel?1:0.35};
+      position:relative;
+    ">${d}${hasData&&!sel?`<div style="position:absolute;bottom:2px;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:var(--slate);"></div>`:''}
+    </div>`;
+  }
+  $('an-multi-cal').innerHTML=html;
+  updateAnMultiLabel();
+}
+
+function anToggleDate(dt){
+  const D=load();
+  const hasData=D.COL_LOGS.some(r=>r.date===dt);
+  if(!hasData&&!anSelectedDates.has(dt)) return;
+  if(anSelectedDates.has(dt)) anSelectedDates.delete(dt);
+  else anSelectedDates.add(dt);
+  renderAnMultiCal();
+  renderAnalysis();
+}
+
+function updateAnMultiLabel(){
+  const sorted=[...anSelectedDates].sort();
+  if(sorted.length===0){
+    $('an-multi-selected').textContent='日付を選択してください（データがある日のみ選択可）';
+  }else{
+    $('an-multi-selected').innerHTML=`選択中: <strong>${sorted.length}日</strong>　${sorted.slice(0,5).map(d=>d.slice(5)).join(', ')}${sorted.length>5?` ...他${sorted.length-5}日`:''}`;
+  }
+}
+
+function anMultiPrev(){
+  anMultiMonth--;
+  if(anMultiMonth<0){anMultiMonth=11;anMultiYear--;}
+  renderAnMultiCal();
+}
+function anMultiNext(){
+  anMultiMonth++;
+  if(anMultiMonth>11){anMultiMonth=0;anMultiYear++;}
+  renderAnMultiCal();
+}
+function anMultiClear(){
+  anSelectedDates.clear();
+  renderAnMultiCal();
+  renderAnalysis();
+}
+
+function initAnalysis(){
+  // 今月をデフォルト設定
+  const now=new Date();
+  const ym=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  if($('an-month'))$('an-month').value=ym;
+  if($('an-day'))$('an-day').value=now.toISOString().slice(0,10);
+  // 品目フィルターを構築
+  const sel=$('an-item');
+  if(sel&&sel.options.length===1){
+    ITEM_KEYS.forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=k.replace(/_/g,' ');sel.appendChild(o);});
+  }
+  renderAnalysis();
+}
+
+function toggleAnPeriod(){
+  const p=$('an-period').value;
+  $('an-month-wrap').style.display=p==='month'?'':'none';
+  $('an-day-wrap').style.display=p==='day'?'':'none';
+  $('an-range-wrap').style.display=p==='custom'?'flex':'none';
+  $('an-multi-wrap').style.display=p==='multi'?'':'none';
+  if(p==='multi')renderAnMultiCal();
+  renderAnalysis();
+}
+
+// ══ 分析業務種別 ══
+let anType='col'; // 'col'=集荷, 'yp'=宅配
+
+function setAnType(t){
+  anType=t;
+  // ボタンスタイル切替
+  $('an-type-col').style.background=t==='col'?'var(--sage)':'var(--inp)';
+  $('an-type-col').style.color=t==='col'?'#fff':'var(--mid)';
+  $('an-type-yp').style.background=t==='yp'?'var(--slate)':'var(--inp)';
+  $('an-type-yp').style.color=t==='yp'?'#fff':'var(--mid)';
+  // 集計軸の選択肢を種別に合わせて切替
+  const axSel=$('an-axis');
+  const curAxis=axSel.value;
+  if(t==='yp'){
+    // 宅配は顧客別・地域別は意味なし→非表示
+    axSel.innerHTML='<option value="driver">個人別</option><option value="office">営業所別</option><option value="company">委託会社別</option>';
+    if(!['driver','office','company'].includes(curAxis)) axSel.value='driver';
+    $('an-item-wrap').style.display='none';
+    $('an-yp-axis-wrap').style.display='';
+    // 複数日カレンダーは宅配データ有無で更新
+    if($('an-period').value==='multi') renderAnMultiCal();
+  }else{
+    axSel.innerHTML='<option value="driver">個人別</option><option value="office">営業所別</option><option value="customer">顧客別</option><option value="company">委託会社別</option><option value="region">地域別</option>';
+    if(!['driver','office','customer','company','region'].includes(axSel.value)) axSel.value='driver';
+    $('an-item-wrap').style.display='';
+    $('an-yp-axis-wrap').style.display='none';
+    if($('an-period').value==='multi') renderAnMultiCal();
+  }
+  renderAnalysis();
+}
+
+function getAnLogs(){
+  const D=load();
+  const p=$('an-period').value;
+  let logs=anType==='yp'?D.YP_LOGS:D.COL_LOGS;
+  if(p==='month'){
+    const ym=$('an-month').value;
+    if(ym) logs=logs.filter(r=>r.date.startsWith(ym));
+  }else if(p==='day'){
+    const d=$('an-day').value;
+    if(d) logs=logs.filter(r=>r.date===d);
+  }else if(p==='multi'){
+    if(anSelectedDates.size>0) logs=logs.filter(r=>anSelectedDates.has(r.date));
+    else logs=[];
+  }else{
+    const from=$('an-from').value,to=$('an-to').value;
+    if(from) logs=logs.filter(r=>r.date>=from);
+    if(to) logs=logs.filter(r=>r.date<=to);
+  }
+  return logs;
+}
+
+function getAxisKey(log,row,axis,D){
+  if(axis==='driver') return log.driver.name;
+  if(axis==='office') return anType==='yp'?log.driver.office:colOfficeKey(log,D);
+  if(axis==='customer') return row?.customerName||'—';
+  if(axis==='region') return row?.region||'—';
+  if(axis==='company'){
+    const d=D.DRIVERS.find(x=>x.id===log.driver.id||x.name===log.driver.name);
+    return d?.company||'（直営）';
+  }
+  return '—';
+}
+
+function renderAnalysis(){
+  const logs=getAnLogs();
+  const axis=$('an-axis').value;
+  const D=load();
+  const axisLabel={driver:'担当者',office:'営業所',customer:'顧客名',company:'委託会社',region:'地域'}[axis]||axis;
+
+  if(anType==='col'){
+    // ── 集荷分析 ──
+    const itemFilter=$('an-item').value;
+    const totalRows=logs.flatMap(r=>r.rows);
+    const filteredRows=itemFilter==='all'?totalRows:totalRows.filter(r=>r.masterKey===itemFilter);
+    const totalQty=filteredRows.reduce((s,r)=>s+r.qty,0);
+    const custSet=new Set(logs.flatMap(r=>r.rows.map(row=>r.date+'_'+row.customerName)));
+    $('an-summary').innerHTML=`<span style="color:var(--sage);font-weight:700;">📦 集荷</span>　日報 <strong>${logs.length}件</strong>　顧客数 <strong>${custSet.size}社</strong>　合計数量 <strong>${totalQty}</strong>`;
+    const map={};
+    logs.forEach(log=>{
+      log.rows.forEach(row=>{
+        if(itemFilter!=='all'&&row.masterKey!==itemFilter) return;
+        const key=getAxisKey(log,row,axis,D);
+        if(!map[key]) map[key]={_total:0};
+        map[key][row.masterKey]=(map[key][row.masterKey]||0)+row.qty;
+        map[key]._total+=row.qty;
+      });
+    });
+    const rows=Object.entries(map).sort((a,b)=>b[1]._total-a[1]._total);
+    if(!rows.length){$('an-chart').innerHTML='<div style="padding:20px;color:var(--light);font-size:12px;text-align:center;">該当データなし</div>';$('an-thead').innerHTML='';$('an-tbody').innerHTML='';return;}
+    const usedItems=itemFilter==='all'?ITEM_KEYS.filter(k=>rows.some(([,v])=>v[k]>0)):[itemFilter];
+    const maxQty=Math.max(...rows.map(([,v])=>v._total),1);
+    // ── HTMLグラフ ──
+    $('an-chart').innerHTML='<div style="display:flex;flex-direction:column;gap:6px;padding:4px 0;">'
+      +rows.map(([key,val])=>{
+        const pct=Math.round((val._total/maxQty)*100);
+        const badges=usedItems.filter(k=>val[k]>0).map(k=>`<span style="display:inline-flex;align-items:center;gap:2px;padding:1px 6px;border-radius:4px;background:${ITEM_COLOR[k]}22;border:1px solid ${ITEM_COLOR[k]}55;font-size:10px;white-space:nowrap;"><span style="color:${ITEM_COLOR[k]};font-weight:700;">${ITEM_SHORT[k]}</span><span style="color:#2c2825;font-weight:800;font-family:var(--mono);">${val[k]}</span></span>`).join('');
+        return `<div style="display:grid;grid-template-columns:130px 1fr auto;gap:8px;align-items:center;">
+          <div style="font-size:11.5px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right;padding-right:4px;">${key}</div>
+          <div style="display:flex;flex-direction:column;gap:3px;">
+            <div style="background:var(--brd);border-radius:3px;height:8px;overflow:hidden;">
+              <div style="height:100%;width:${pct}%;background:var(--sage);border-radius:3px;transition:width .3s;"></div>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:3px;">${badges}</div>
+          </div>
+          <div style="font-size:13px;font-weight:800;color:var(--ink);font-family:var(--mono);min-width:36px;text-align:right;">${val._total}</div>
+        </div>`;
+      }).join('')+'</div>';
+    $('an-thead').innerHTML=`<tr><th>${axisLabel}</th>${usedItems.map(k=>`<th style="white-space:nowrap;min-width:52px;">${ITEM_SHORT[k]}</th>`).join('')}<th>合計</th></tr>`;
+    $('an-tbody').innerHTML=rows.map(([key,val])=>`<tr><td style="font-weight:600;white-space:nowrap;max-width:160px;overflow:hidden;text-overflow:ellipsis;">${key}</td>${usedItems.map(k=>`<td style="text-align:right;font-family:var(--mono);color:${val[k]?ITEM_COLOR[k]:'var(--light)'};">${val[k]||'—'}</td>`).join('')}<td style="text-align:right;font-family:var(--mono);font-weight:700;">${val._total}</td></tr>`).join('');
+
+  }else{
+    // ── 宅配分析 ──
+    const ypAxis=$('an-yp-axis').value;
+    const ypAxisLabel={all:'全数（持出合計）',mochidashi:'持出数',kanryo:'完了数',yakan:'夜間完了',tenso:'転送',mochimodoiri:'持戻'}[ypAxis]||ypAxis;
+    const totalVal=ypAxis==='all'
+      ?logs.reduce((s,r)=>s+(r.form.mochidashi||0),0)
+      :logs.reduce((s,r)=>s+(r.form[ypAxis]||0),0);
+    const drivers=new Set(logs.map(r=>r.driver.name));
+    $('an-summary').innerHTML=`<span style="color:var(--slate);font-weight:700;">🚛 宅配</span>　日報 <strong>${logs.length}件</strong>　担当者 <strong>${drivers.size}名</strong>　${ypAxisLabel}合計 <strong>${totalVal}</strong>`;
+    const map={};
+    logs.forEach(log=>{
+      const key=getAxisKey(log,null,axis,D);
+      if(!map[key]) map[key]={mochidashi:0,kanryo:0,yakan:0,tenso:0,mochimodoiri:0,_cnt:0};
+      map[key].mochidashi+=(log.form.mochidashi||0);
+      map[key].kanryo+=(log.form.kanryo||0);
+      map[key].yakan+=(log.form.yakan||0);
+      map[key].tenso+=(log.form.tenso||0);
+      map[key].mochimodoiri+=(log.form.mochimodoiri||0);
+      map[key]._cnt++;
+    });
+    const sortKey=ypAxis==='all'?'mochidashi':ypAxis;
+    const rows=Object.entries(map).sort((a,b)=>b[1][sortKey]-a[1][sortKey]);
+    if(!rows.length){$('an-chart').innerHTML='<div style="padding:20px;color:var(--light);font-size:12px;text-align:center;">該当データなし</div>';$('an-thead').innerHTML='';$('an-tbody').innerHTML='';return;}
+    // 全数モードは持出を基準にmax算出、単項目モードは選択値
+    const maxVal=Math.max(ypAxis==='all'
+      ?Math.max(...rows.map(([,v])=>v.mochidashi))
+      :Math.max(...rows.map(([,v])=>v[ypAxis])),1);
+    // 全数セグメント色定義
+    const YP_SEG=[
+      {key:'mochidashi',col:'#607080',label:'持出'},
+      {key:'kanryo',    col:'#7898a0',label:'完了'},
+      {key:'yakan',     col:'#4a6090',label:'夜間'},
+      {key:'tenso',     col:'#9a6a3a',label:'転送'},
+      {key:'mochimodoiri',col:'#8b5a5a',label:'持戻'},
+    ];
+    // ── HTMLグラフ ──
+    $('an-chart').innerHTML='<div style="display:flex;flex-direction:column;gap:6px;padding:4px 0;">'
+      +rows.map(([key,val])=>{
+        if(ypAxis==='all'){
+          const base=val.mochidashi||0;
+          const pct=Math.round((base/maxVal)*100);
+          const badges=YP_SEG.filter(s=>val[s.key]>0).map(s=>`<span style="display:inline-flex;align-items:center;gap:2px;padding:1px 7px;border-radius:4px;background:${s.col}22;border:1px solid ${s.col}55;font-size:10px;white-space:nowrap;"><span style="color:${s.col};font-weight:700;">${s.label}</span><span style="color:#2c2825;font-weight:800;font-family:var(--mono);">${val[s.key]}</span></span>`).join('');
+          return `<div style="display:grid;grid-template-columns:130px 1fr auto;gap:8px;align-items:center;">
+            <div style="font-size:11.5px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right;padding-right:4px;">${key}</div>
+            <div style="display:flex;flex-direction:column;gap:3px;">
+              <div style="background:var(--brd);border-radius:3px;height:8px;overflow:hidden;">
+                <div style="height:100%;width:${pct}%;background:#607080;border-radius:3px;transition:width .3s;"></div>
+              </div>
+              <div style="display:flex;flex-wrap:wrap;gap:3px;">${badges}</div>
+            </div>
+            <div style="font-size:13px;font-weight:800;color:var(--ink);font-family:var(--mono);min-width:36px;text-align:right;">${base}</div>
+          </div>`;
+        }else{
+          const bv=val[ypAxis]||0;
+          const pct=Math.round((bv/maxVal)*100);
+          const seg=YP_SEG.find(s=>s.key===ypAxis)||{col:'#607080',label:ypAxisLabel};
+          return `<div style="display:grid;grid-template-columns:130px 1fr auto;gap:8px;align-items:center;">
+            <div style="font-size:11.5px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right;padding-right:4px;">${key}</div>
+            <div style="display:flex;flex-direction:column;gap:3px;">
+              <div style="background:var(--brd);border-radius:3px;height:8px;overflow:hidden;">
+                <div style="height:100%;width:${pct}%;background:${seg.col};border-radius:3px;transition:width .3s;"></div>
+              </div>
+              <div style="font-size:11px;color:${seg.col};font-weight:700;">${seg.label} <span style="color:#2c2825;font-weight:800;font-family:var(--mono);">${bv}</span></div>
+            </div>
+            <div style="font-size:13px;font-weight:800;color:var(--ink);font-family:var(--mono);min-width:36px;text-align:right;">${bv}</div>
+          </div>`;
+        }
+      }).join('')+'</div>';
+    $('an-thead').innerHTML=`<tr><th>${axisLabel}</th><th style="text-align:right;">持出</th><th style="text-align:right;">完了</th><th style="text-align:right;">夜間</th><th style="text-align:right;">転送</th><th style="text-align:right;">持戻</th><th style="text-align:right;">日報数</th></tr>`;
+    $('an-tbody').innerHTML=rows.map(([key,val])=>`<tr>
+      <td style="font-weight:600;white-space:nowrap;max-width:160px;overflow:hidden;text-overflow:ellipsis;">${key}</td>
+      <td style="text-align:right;font-family:var(--mono);${(ypAxis==='mochidashi'||ypAxis==='all')?'font-weight:700;color:var(--slate);':''}">${val.mochidashi}</td>
+      <td style="text-align:right;font-family:var(--mono);${ypAxis==='kanryo'?'font-weight:700;color:var(--slate);':''}">${val.kanryo}</td>
+      <td style="text-align:right;font-family:var(--mono);${ypAxis==='yakan'?'font-weight:700;color:var(--slate);':''}">${val.yakan||0}</td>
+      <td style="text-align:right;font-family:var(--mono);${ypAxis==='tenso'?'font-weight:700;color:var(--slate);':''}">${val.tenso||0}</td>
+      <td style="text-align:right;font-family:var(--mono);${ypAxis==='mochimodoiri'?'font-weight:700;color:var(--slate);':''}">${val.mochimodoiri||0}</td>
+      <td style="text-align:right;font-family:var(--mono);color:var(--light);">${val._cnt}</td>
+    </tr>`).join('');
+  }
+}
+
+
+// ══ 詳細ページ ══
+let detailFrom={tab:'dashboard'};
+function openDetailPage(type,key){
+  const D=load();
+  detailFrom={tab:document.querySelector('.nav-tab.on')?.textContent||'dashboard'};
+  $('nav-detail').style.display='';
+  document.querySelectorAll('.nav-tab').forEach(b=>b.classList.remove('on'));
+  $('nav-detail').classList.add('on');
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'));
+  $('panel-detail').classList.add('on');
+  let html='';
+  if(type==='office'){
+    const ypLogs=D.YP_LOGS.filter(r=>r.driver.office===key);
+    const colLogs=D.COL_LOGS.filter(r=>colOfficeKey(r,D)===key);
+    const drivers=[...new Set([...ypLogs.map(r=>r.driver.name),...colLogs.map(r=>r.driver.name)])];
+    $('detail-back-label').textContent='← 営業所別集計に戻る';
+    html=`<div class="card-title">🏪 ${key}</div>
+    <div class="detail-section">
+      <div class="detail-section-title">宅配実績</div>
+      ${ypLogs.length?`<table class="tbl"><thead><tr><th>日付</th><th>担当者</th><th>持出</th><th>完了</th><th>夜間</th></tr></thead><tbody>${ypLogs.sort((a,b)=>b.date.localeCompare(a.date)).map(r=>`<tr><td class="mono">${fmtD(r.date)}</td><td>${r.driver.name}</td><td>${r.form.mochidashi}</td><td>${r.form.kanryo}</td><td>${r.form.yakan||0}</td></tr>`).join('')}</tbody></table>`:'<div style="color:var(--light);font-size:12px;">宅配日報なし</div>'}
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-title">集荷実績（品目別）</div>
+      ${colLogs.length?`<div class="item-badges" style="margin-bottom:8px;">${colLogsBadges(colLogs)}</div><table class="tbl"><thead><tr><th>日付</th><th>担当者</th><th>顧客名</th><th>品目・数量</th></tr></thead><tbody>${colLogs.sort((a,b)=>b.date.localeCompare(a.date)).flatMap(r=>r.rows.map(row=>`<tr><td class="mono">${fmtD(r.date)}</td><td>${r.driver.name}</td><td>${row.customerName}</td><td>${itemBadge(row.masterKey,row.qty,row.unit)}</td></tr>`)).join('')}</tbody></table>`:'<div style="color:var(--light);font-size:12px;">集荷日報なし</div>'}
+    </div>`;
+  }else if(type==='driver'){
+    const d=D.DRIVERS.find(x=>x.name===key)||{name:key,office:'—',company:''};
+    const ypLogs=D.YP_LOGS.filter(r=>r.driver.name===key);
+    const colLogs=D.COL_LOGS.filter(r=>r.driver.name===key);
+    $('detail-back-label').textContent='← 個人別集計に戻る';
+    html=`<div class="card-title">👤 ${key}</div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px;">
+      <div><div class="lbl">営業所</div><div style="font-weight:600;">${d.office}</div></div>
+      ${d.company?`<div><div class="lbl">委託会社</div><div style="font-weight:600;">${d.company}</div></div>`:''}
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-title">宅配実績</div>
+      ${ypLogs.length?`<table class="tbl"><thead><tr><th>日付</th><th>持出</th><th>完了</th><th>夜間</th><th>集荷</th></tr></thead><tbody>${ypLogs.sort((a,b)=>b.date.localeCompare(a.date)).map(r=>`<tr><td class="mono">${fmtD(r.date)}</td><td>${r.form.mochidashi}</td><td>${r.form.kanryo}</td><td>${r.form.yakan||0}</td><td>${r.form.shukka||0}</td></tr>`).join('')}</tbody></table>`:'<div style="color:var(--light);font-size:12px;">宅配日報なし</div>'}
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-title">集荷実績（品目別）</div>
+      ${colLogs.length?`<div class="item-badges" style="margin-bottom:8px;">${colLogsBadges(colLogs)}</div><table class="tbl"><thead><tr><th>日付</th><th>顧客名</th><th>地域</th><th>品目・数量</th></tr></thead><tbody>${colLogs.sort((a,b)=>b.date.localeCompare(a.date)).flatMap(r=>r.rows.map(row=>`<tr><td class="mono">${fmtD(r.date)}</td><td>${row.customerName}</td><td style="color:var(--mid);font-size:11px;">${row.region}</td><td>${itemBadge(row.masterKey,row.qty,row.unit)}</td></tr>`)).join('')}</tbody></table>`:'<div style="color:var(--light);font-size:12px;">集荷日報なし</div>'}
+    </div>`;
+  }else if(type==='customer'){
+    const colLogs=D.COL_LOGS.filter(r=>r.rows.some(row=>row.customerName===key));
+    const reg=colLogs.length&&colLogs[0].rows.find(row=>row.customerName===key)?.region||'';
+    $('detail-back-label').textContent='← 顧客別集計に戻る';
+    html=`<div class="card-title">🏢 ${key}</div>
+    <div style="margin-bottom:12px;color:var(--mid);font-size:12px;">地域：${reg}</div>
+    <div class="detail-section">
+      <div class="detail-section-title">集荷実績（品目別合計）</div>
+      <div class="item-badges" style="margin-bottom:10px;">${colLogsBadges(colLogs.map(r=>({rows:r.rows.filter(row=>row.customerName===key)})))}</div>
+      <table class="tbl"><thead><tr><th>日付</th><th>担当者</th><th>品目・数量</th></tr></thead><tbody>${colLogs.sort((a,b)=>b.date.localeCompare(a.date)).flatMap(r=>r.rows.filter(row=>row.customerName===key).map(row=>`<tr><td class="mono">${fmtD(r.date)}</td><td>${r.driver.name}</td><td>${itemBadge(row.masterKey,row.qty,row.unit)}</td></tr>`)).join('')}</tbody></table>
+    </div>`;
+  }else if(type==='region'){
+    const colLogs=D.COL_LOGS.filter(r=>r.rows.some(row=>row.region===key));
+    const custs=[...new Set(colLogs.flatMap(r=>r.rows.filter(row=>row.region===key).map(row=>row.customerName)))];
+    $('detail-back-label').textContent='← 地域別集計に戻る';
+    html=`<div class="card-title">📍 ${key}</div>
+    <div style="margin-bottom:12px;color:var(--mid);font-size:12px;">顧客数：${custs.length}社</div>
+    <div class="detail-section">
+      <div class="detail-section-title">品目別合計</div>
+      <div class="item-badges" style="margin-bottom:10px;">${colLogsBadges(colLogs.map(r=>({rows:r.rows.filter(row=>row.region===key)})))}</div>
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-title">顧客別明細</div>
+      <table class="tbl"><thead><tr><th>顧客名</th><th>日付</th><th>担当者</th><th>品目・数量</th></tr></thead><tbody>${colLogs.sort((a,b)=>b.date.localeCompare(a.date)).flatMap(r=>r.rows.filter(row=>row.region===key).map(row=>`<tr><td style="font-weight:600;">${row.customerName}</td><td class="mono">${fmtD(r.date)}</td><td>${r.driver.name}</td><td>${itemBadge(row.masterKey,row.qty,row.unit)}</td></tr>`)).join('')}</tbody></table>
+    </div>`;
+  }
+  $('detail-content-page').innerHTML=`<div class="card">${html}</div>`;
+}
+
+function openLogDetail(id,type){
+  const D=load();
+  const r=type==='yp'?D.YP_LOGS.find(x=>String(x.id)===String(id)):D.COL_LOGS.find(x=>String(x.id)===String(id));
+  if(!r)return;
+  detailFrom={tab:document.querySelector('.nav-tab.on')?.textContent||'dashboard'};
+  $('nav-detail').style.display='';
+  document.querySelectorAll('.nav-tab').forEach(b=>b.classList.remove('on'));
+  $('nav-detail').classList.add('on');
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'));
+  $('panel-detail').classList.add('on');
+  $('detail-back-label').textContent='← 一覧に戻る';
+  let html='';
+  if(type==='yp'){
+    const f=r.form;
+    html=`<div class="card-title">📋 宅配日報 ${fmtD(r.date)}</div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px;">
+      <div><div class="lbl">担当者</div><div style="font-weight:600;cursor:pointer;color:var(--slate);text-decoration:underline;" onclick="openDetailPage('driver','${r.driver.name.replace(/'/g,"\'")}')">→ ${r.driver.name}</div></div>
+      <div><div class="lbl">営業所</div><div style="font-weight:600;cursor:pointer;color:var(--slate);text-decoration:underline;" onclick="openDetailPage('office','${r.driver.office.replace(/'/g,"\'")}')">→ ${r.driver.office}</div></div>
+      <div><div class="lbl">提出時刻</div><div style="font-size:11px;color:var(--mid);">${new Date(r.submittedAt).toLocaleString('ja-JP')}</div></div>
+    </div>
+    <table class="tbl" style="max-width:400px;"><tbody>
+      <tr><td style="color:var(--mid);">持出個数</td><td><strong>${f.mochidashi}</strong></td></tr>
+      <tr><td style="color:var(--mid);">配達完了</td><td>${f.kanryo}</td></tr>
+      <tr><td style="color:var(--mid);">夜間配達</td><td>${f.yakan||0}</td></tr>
+      <tr><td style="color:var(--mid);">転送還付</td><td>${f.tenso}</td></tr>
+      <tr><td style="color:var(--mid);">持ち戻り</td><td>${f.mochimodoiri}</td></tr>
+      <tr><td style="color:var(--mid);">翌日廻し</td><td>${f['翌日廻し']}</td></tr>
+      <tr><td style="color:var(--mid);">集荷</td><td>${f.shukka||0}</td></tr>
+      ${f.notes?`<tr><td style="color:var(--mid);">備考</td><td>${f.notes}</td></tr>`:''}
+    </tbody></table>`;
+  }else{
+    html=`<div class="card-title">📦 集荷日報 ${fmtD(r.date)}</div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px;">
+      <div><div class="lbl">担当者</div><div style="font-weight:600;cursor:pointer;color:var(--slate);text-decoration:underline;" onclick="openDetailPage('driver','${r.driver.name.replace(/'/g,"\'")}')">→ ${r.driver.name}</div></div>
+      <div><div class="lbl">営業所</div><div style="font-weight:600;cursor:pointer;color:var(--slate);text-decoration:underline;" onclick="openDetailPage('office','${r.driver.office.replace(/'/g,"\'")}')">→ ${r.driver.office}</div></div>
+      <div><div class="lbl">提出時刻</div><div style="font-size:11px;color:var(--mid);">${new Date(r.submittedAt).toLocaleString('ja-JP')}</div></div>
+    </div>
+    <div class="item-badges" style="margin-bottom:12px;">${colItemBadges(r.rows)}</div>
+    <table class="tbl"><thead><tr><th>顧客名</th><th>地域</th><th>品目</th><th>数量</th><th>単位</th></tr></thead><tbody>${r.rows.map(row=>`<tr><td style="font-weight:600;cursor:pointer;color:var(--slate);" onclick="openDetailPage('customer','${row.customerName.replace(/'/g,"\'")}')">→ ${row.customerName}</td><td style="color:var(--mid);font-size:11px;cursor:pointer;" onclick="openDetailPage('region','${row.region.replace(/'/g,"\'")}')">→ ${row.region}</td><td style="color:${ITEM_COLOR[row.masterKey]||'#888'};font-weight:700;">${ITEM_SHORT[row.masterKey]||row.masterKey}</td><td class="mono">${row.qty}</td><td style="color:var(--mid);">${row.unit}</td></tr>`).join('')}</tbody></table>
+    ${r.note?`<div style="margin-top:10px;padding:8px 11px;background:var(--inp);border-radius:7px;font-size:12px;color:var(--mid);">備考：${r.note}</div>`:''}`;
+  }
+  $('detail-content-page').innerHTML=`<div class="card">${html}</div>`;
+}
+
+function closeDetail(){
+  $('nav-detail').style.display='none';
+  document.querySelectorAll('.nav-tab').forEach(b=>b.classList.remove('on'));
+  // ダッシュボードに戻る
+  const tabs=document.querySelectorAll('.nav-tab:not(#nav-detail)');
+  tabs[0].classList.add('on');
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'));
+  $('panel-dashboard').classList.add('on');
+  renderDashboard();
+}
+
+function toast(msg,t='ok'){const el=$('toast'),ico=$('t-ico'),ms=$('t-msg');ico.textContent=t==='err'?'⚠':t==='info'?'ℹ':'✓';el.style.borderLeft=`4px solid ${t==='err'?'var(--rust)':t==='info'?'var(--slate)':'var(--ok)'}`;ms.textContent=msg;el.classList.add('on');setTimeout(()=>el.classList.remove('on'),2800);}
+</script>
+
+<div id="item-popup" style="display:none;position:fixed;inset:0;z-index:2000;background:rgba(44,40,37,.55);align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#faf8f5;border-radius:12px;padding:20px;width:100%;max-width:340px;box-shadow:0 8px 36px rgba(0,0,0,.22);position:relative;">
+    <button onclick="document.getElementById('item-popup').classList.remove('on');document.getElementById('item-popup').style.display='none';" style="position:absolute;top:10px;right:12px;background:none;border:none;cursor:pointer;font-size:18px;color:#b3a99e;">×</button>
+    <div id="item-popup-body"></div>
+  </div>
+</div>
+
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('./sw.js')
+      .then(()=>console.log('SW registered'))
+      .catch(e=>console.log('SW error',e));
+  });
+}
+</script>
+</body>
+</html>
