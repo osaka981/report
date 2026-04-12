@@ -1,0 +1,1859 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>軽貨物運送 日報アプリ</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700;900&family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap');
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+:root{
+  --page:#f0ece6;--card:#faf8f5;--inp:#f5f2ee;
+  --ink:#2c2825;--mid:#7a6f66;--light:#b3a99e;
+  --brd:#ddd8d0;--div:#e8e3dc;
+  --clay:#8b6f5e;--sage:#6b7c6a;--slate:#607080;
+  --amber:#9a7a3a;--rust:#8b4a3a;--stone:#888078;
+  --ok:#5a8a5a;
+  --mono:'Courier Prime',monospace;
+  --sans:'Noto Sans JP',sans-serif;
+  --sh:0 1px 4px rgba(44,40,37,.08),0 4px 16px rgba(44,40,37,.04);
+}
+html,body{min-height:100vh;background:var(--page);font-family:var(--sans);color:var(--ink);}
+.mb10{margin-bottom:10px;}
+
+/* ══ SECURITY LAYER ══ */
+#sec-layer{
+  position:fixed;inset:0;z-index:9000;
+  background:#48443f;
+  display:flex;align-items:center;justify-content:center;
+  overflow:hidden;
+  transition:transform .55s cubic-bezier(.77,0,.18,1),opacity .4s ease;
+}
+#sec-layer.slide-up{transform:translateY(-100%);opacity:0;pointer-events:none;}
+.sec-noise{
+  position:absolute;inset:0;
+  background-image:
+    radial-gradient(circle at 20% 80%,rgba(139,111,94,.2) 0%,transparent 50%),
+    radial-gradient(circle at 80% 20%,rgba(96,112,128,.15) 0%,transparent 50%),
+    radial-gradient(circle,rgba(255,248,230,.4) 1.5px,transparent 1.5px);
+  background-size:100% 100%,100% 100%,38px 38px;
+  pointer-events:none;
+}
+.sec-wrap{display:flex;flex-direction:column;align-items:center;z-index:1;width:100%;max-width:310px;padding:16px;}
+.sec-brand{text-align:center;margin-bottom:24px;}
+.sec-eyebrow{color:rgba(255,255,255,.28);font-size:8px;letter-spacing:4px;margin-bottom:8px;font-family:var(--mono);}
+.sec-title{color:#fff;font-size:22px;font-weight:700;letter-spacing:.06em;}
+.sec-divline{width:32px;height:1px;background:rgba(255,255,255,.2);margin:9px auto;}
+.sec-subtitle{color:rgba(255,255,255,.25);font-size:8px;letter-spacing:3px;font-family:var(--mono);}
+.sec-tabs{display:flex;border:1px solid rgba(255,255,255,.15);border-radius:3px;overflow:hidden;margin-bottom:22px;}
+.sec-tab{padding:7px 22px;background:transparent;border:none;color:rgba(255,255,255,.35);font-size:8px;letter-spacing:.2em;cursor:pointer;font-family:var(--mono);transition:all .15s;}
+.sec-tab.on{background:rgba(255,255,255,.13);color:#ffe066;}
+.sec-tab+.sec-tab{border-left:1px solid rgba(255,255,255,.15);}
+/* PIN */
+.pin-dots{display:flex;gap:14px;justify-content:center;margin-bottom:5px;}
+.pin-dot{width:9px;height:9px;border-radius:50%;background:transparent;border:1px solid rgba(255,255,255,.28);transition:all .15s;}
+.pin-dot.on{background:#ffe066;border-color:#ffe066;transform:scale(1.15);}
+.pin-err{height:20px;text-align:center;color:#c09080;font-size:8px;letter-spacing:.15em;margin-bottom:12px;font-family:var(--mono);}
+.numpad{display:grid;grid-template-columns:repeat(3,64px);gap:7px;margin:0 auto;}
+.nk{width:64px;height:48px;background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:18px;cursor:pointer;font-family:var(--mono);border-radius:3px;transition:background .1s;}
+.nk:active{background:rgba(255,255,255,.2);}
+.nk.emp{background:transparent;border-color:transparent;cursor:default;}
+/* FACE */
+.face-frame{width:175px;height:175px;position:relative;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);margin-bottom:14px;overflow:hidden;}
+.face-frame::before{content:'';position:absolute;top:-1px;left:-1px;width:18px;height:18px;border-top:2px solid #ffe066;border-left:2px solid #ffe066;}
+.face-frame::after{content:'';position:absolute;top:-1px;right:-1px;width:18px;height:18px;border-top:2px solid #ffe066;border-right:2px solid #ffe066;}
+.face-bl{position:absolute;bottom:-1px;left:-1px;width:18px;height:18px;border-bottom:2px solid #ffe066;border-left:2px solid #ffe066;}
+.face-br{position:absolute;bottom:-1px;right:-1px;width:18px;height:18px;border-bottom:2px solid #ffe066;border-right:2px solid #ffe066;}
+.face-scan-line{position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#ffe066,transparent);box-shadow:0 0 10px #ffe066;animation:scanY 2s linear infinite;display:none;}
+.face-scan-line.on{display:block;}
+@keyframes scanY{0%{top:0}100%{top:100%}}
+.face-inner{display:flex;align-items:center;justify-content:center;width:100%;height:100%;}
+.face-lbl{font-size:8px;letter-spacing:.3em;margin-bottom:14px;color:rgba(255,255,255,.28);font-family:var(--mono);transition:color .4s;}
+.sec-btn{background:none;border:1px solid rgba(255,255,255,.28);color:rgba(255,255,255,.65);border-radius:6px;padding:7px 16px;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--mono);}
+
+/* ══ MAIN APP ══ */
+.app{max-width:430px;margin:0 auto;min-height:100vh;background:var(--page);}
+.screen{display:none;}
+.screen.on{display:block;}
+.topbar{background:var(--card);border-bottom:1px solid var(--brd);padding:15px 18px 17px;position:sticky;top:0;z-index:100;}
+.tb-eye{color:var(--light);font-size:8.5px;letter-spacing:.2em;margin-bottom:4px;font-family:var(--mono);}
+.tb-title{font-size:18px;font-weight:700;}
+.tb-sub{color:var(--mid);font-size:11px;margin-top:2px;}
+.back-btn{display:inline-flex;align-items:center;gap:4px;background:none;border:1px solid var(--brd);border-radius:6px;color:var(--mid);padding:3px 10px;font-size:11px;cursor:pointer;margin-bottom:8px;}
+.card{background:var(--card);border-radius:10px;border:1px solid var(--brd);padding:14px;margin-bottom:8px;box-shadow:var(--sh);}
+.card.warn{border-left:3px solid var(--rust);}
+.row-hd{display:flex;align-items:center;gap:7px;margin-bottom:10px;}
+.row-ico{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:7px;}
+.row-lbl{font-weight:700;font-size:13px;}
+.lbl{color:var(--mid);font-size:10px;font-weight:700;margin-bottom:5px;letter-spacing:.07em;}
+.fi{width:100%;padding:9px 12px;border-radius:8px;font-size:13px;border:1px solid var(--brd);background:var(--inp);color:var(--ink);outline:none;font-family:var(--sans);transition:border-color .15s;}
+.fi:focus{border-color:var(--clay);}
+.fi-sm{padding:7px 10px;font-size:12px;}
+.sel{width:100%;padding:9px 12px;border-radius:8px;font-size:13px;border:1px solid var(--brd);background:var(--inp);color:var(--ink);outline:none;font-family:var(--sans);cursor:pointer;}
+.stpr{display:flex;align-items:center;gap:7px;}
+.sbtn{width:34px;height:34px;border-radius:8px;border:1px solid var(--brd);background:var(--card);font-size:16px;cursor:pointer;color:var(--mid);}
+.sbtn.p{border:none;background:var(--clay);color:#faf8f5;}
+.sval{flex:1;padding:6px;border-radius:8px;font-size:17px;font-weight:700;border:1px solid var(--brd);background:var(--inp);color:var(--ink);text-align:center;outline:none;font-family:var(--sans);}
+.irow{display:grid;grid-template-columns:1fr auto;align-items:center;gap:7px;padding:7px 0;border-bottom:1px solid var(--div);}
+.irow:last-child{border-bottom:none;}
+.ir-lbl{color:var(--mid);font-size:12px;}
+.ir-ctrl{display:flex;align-items:center;gap:5px;}
+.ib{width:30px;height:30px;border-radius:7px;border:1px solid var(--brd);background:var(--card);font-size:14px;cursor:pointer;color:var(--mid);}
+.ib.p{border:none;background:var(--slate);color:#faf8f5;}
+.iv{width:60px;height:30px;padding:2px;border-radius:7px;font-size:14px;font-weight:700;border:1px solid var(--brd);background:var(--inp);color:var(--ink);text-align:center;outline:none;font-family:var(--sans);}
+.btn-main{width:100%;padding:12px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--sans);border:none;transition:all .18s;}
+.btn-dis{background:var(--div)!important;color:var(--light)!important;cursor:not-allowed!important;}
+.btn-ghost{background:transparent;border:1px solid var(--brd);color:var(--mid);}
+.tag{display:inline-block;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700;}
+.vbox{background:var(--inp);border-radius:8px;padding:10px 12px;margin-top:7px;}
+.vrow{display:flex;justify-content:space-between;font-size:10px;margin-bottom:3px;}
+.veq{text-align:center;font-size:11px;font-weight:700;padding:5px;border-radius:6px;margin-top:6px;}
+.vok{background:rgba(90,138,90,.12);color:var(--ok);border:1px solid rgba(90,138,90,.2);}
+.vng{background:rgba(139,74,58,.1);color:var(--rust);border:1px solid rgba(139,74,58,.2);}
+.vwt{background:rgba(139,122,58,.1);color:var(--amber);}
+.sumbox{background:rgba(96,112,128,.08);border:1px solid rgba(96,112,128,.18);border-radius:8px;padding:12px;}
+.sum-row{display:flex;justify-content:space-around;text-align:center;}
+.sum-big{font-size:20px;font-weight:800;font-family:var(--mono);}
+.sum-cap{color:var(--light);font-size:9px;margin-top:2px;}
+.biz-btn{display:block;width:100%;padding:17px 15px;border-radius:10px;border:1px solid var(--brd);background:var(--card);cursor:pointer;text-align:left;box-shadow:var(--sh);font-family:var(--sans);margin-bottom:8px;transition:all .18s;}
+.biz-btn:active{transform:scale(.98);}
+.biz-t{font-weight:700;font-size:15px;margin-bottom:2px;}
+.biz-s{color:var(--light);font-size:10px;}
+.ok-ico{display:flex;justify-content:center;margin-bottom:13px;}
+.ok-ico span{display:inline-flex;align-items:center;justify-content:center;width:72px;height:72px;border-radius:19px;background:rgba(90,138,90,.13);}
+.sum-tbl .r{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--div);}
+.sum-tbl .r:last-child{border-bottom:none;}
+.sum-tbl .k{color:var(--light);font-size:12px;}
+.sum-tbl .v{font-weight:700;font-size:12px;font-family:var(--mono);}
+
+/* ══ ADMIN MODAL — 画面中央 ══ */
+#adm-overlay{
+  display:none;position:fixed;inset:0;
+  background:rgba(44,40,37,.72);
+  z-index:800;
+  align-items:center;
+  justify-content:center;
+  backdrop-filter:blur(5px);
+  padding:16px;
+}
+#adm-overlay.on{display:flex;}
+.adm-modal{
+  background:var(--card);
+  border-radius:14px;
+  width:100%;max-width:400px;
+  max-height:90vh;
+  border:1px solid var(--brd);
+  box-shadow:0 20px 60px rgba(0,0,0,.3);
+  overflow:hidden;
+  display:flex;flex-direction:column;
+}
+.adm-header{
+  background:linear-gradient(135deg,#4a443e 0%,#3a3530 100%);
+  padding:16px 18px;
+  display:flex;align-items:center;justify-content:space-between;
+  flex-shrink:0;
+}
+.adm-close{background:none;border:none;color:rgba(255,255,255,.5);font-size:20px;cursor:pointer;line-height:1;padding:2px 5px;}
+.adm-tabs{display:flex;border-bottom:1px solid var(--div);flex-shrink:0;overflow-x:auto;}
+.adm-tab{padding:10px 14px;background:none;border:none;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--sans);color:var(--light);white-space:nowrap;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.adm-tab.on{color:var(--clay);border-bottom-color:var(--clay);}
+.adm-body{padding:16px;overflow-y:auto;flex:1;}
+.adm-panel{display:none;}
+.adm-panel.on{display:block;}
+.adm-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--div);}
+.adm-row:last-child{border-bottom:none;}
+.adm-policy{background:rgba(96,112,128,.08);border:1px solid rgba(96,112,128,.18);border-radius:8px;padding:10px 12px;margin-bottom:12px;}
+.adm-flow{display:flex;align-items:center;gap:4px;font-size:10px;flex-wrap:wrap;margin-top:6px;}
+.exp-btn{display:flex;align-items:center;gap:10px;padding:11px 13px;border-radius:8px;border:1px solid var(--brd);background:var(--card);cursor:pointer;margin-bottom:8px;text-align:left;font-family:var(--sans);box-shadow:var(--sh);transition:all .15s;width:100%;}
+.exp-btn:hover{background:var(--inp);}
+.exp-ico{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;}
+.del-btn{background:rgba(139,74,58,.08);border:none;color:var(--rust);border-radius:6px;padding:3px 9px;cursor:pointer;font-size:10.5px;font-family:var(--sans);}
+.edit-form{background:var(--inp);border-radius:8px;padding:12px;margin-top:10px;}
+.edit-form .f2{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:7px;}
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;background:rgba(107,124,106,.12);color:var(--sage);}
+
+/* PIN Modal（管理者認証） */
+#pin-modal{
+  display:none;position:fixed;inset:0;
+  background:rgba(44,40,37,.65);
+  z-index:900;
+  align-items:center;justify-content:center;
+  backdrop-filter:blur(4px);
+  padding:16px;
+}
+#pin-modal.on{display:flex;}
+.pin-box{background:var(--card);border-radius:14px;padding:24px 22px;width:100%;max-width:280px;border:1px solid var(--brd);box-shadow:0 8px 36px rgba(0,0,0,.22);position:relative;}
+.adots{display:flex;gap:11px;justify-content:center;margin-bottom:5px;}
+.adot{width:9px;height:9px;border-radius:50%;background:transparent;border:1.5px solid var(--brd);transition:all .15s;}
+.adot.on{background:var(--clay);border-color:var(--clay);}
+.a-numpad{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}
+.ank{height:42px;border-radius:8px;border:1px solid var(--brd);background:var(--inp);color:var(--ink);font-size:16px;cursor:pointer;font-family:var(--mono);}
+.ank:active{background:var(--div);}
+.ank.emp{background:transparent;border-color:transparent;cursor:default;}
+
+/* TOAST */
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(16px);z-index:9999;background:var(--card);border-radius:10px;padding:10px 16px;box-shadow:0 4px 20px rgba(0,0,0,.13);display:flex;align-items:center;gap:8px;min-width:210px;font-size:12.5px;opacity:0;transition:all .28s;pointer-events:none;}
+#toast.on{opacity:1;transform:translateX(-50%) translateY(0);}
+
+/* MISC */
+.p16{padding:16px;}
+.mb8{margin-bottom:8px;}.mb12{margin-bottom:12px;}.mt8{margin-top:8px;}.mt10{margin-top:10px;}
+.flbc{display:flex;justify-content:space-between;align-items:center;}
+.fla{display:flex;align-items:center;}
+.muted{color:var(--mid);}.xs{font-size:10px;}.sm{font-size:11.5px;}
+.fw7{font-weight:700;}
+textarea.fi{resize:none;}
+.shake{animation:shake .38s ease;}
+@keyframes shake{0%,100%{transform:translateX(0)}25%,75%{transform:translateX(-6px)}50%{transform:translateX(6px)}}
+
+/* 地域タブ */
+.rtab{flex:1;padding:8px 4px;background:transparent;border:none;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--sans);color:var(--light);transition:all .15s;}
+.rtab.on{background:var(--card);color:var(--slate);box-shadow:0 1px 4px rgba(44,40,37,.1);}
+/* 地域ボタン */
+.rku-btn{padding:5px 9px;border-radius:20px;border:1px solid var(--brd);background:var(--inp);font-size:11.5px;cursor:pointer;font-family:var(--sans);color:var(--ink);transition:all .12s;white-space:nowrap;}
+.rku-btn:active,.rku-btn.on{background:var(--slate);color:#fff;border-color:var(--slate);}
+/* 顧客リスト */
+.cust-item{display:block;width:100%;padding:9px 12px;text-align:left;background:var(--card);border:none;cursor:pointer;font-family:var(--sans);font-size:12.5px;font-weight:600;color:var(--ink);}
+.cust-item+.cust-item{border-top:1px solid var(--div);}
+.cust-item:active{background:var(--inp);}
+.cust-hist-label{padding:5px 12px 3px;font-size:9.5px;color:var(--light);font-weight:700;letter-spacing:.1em;background:var(--inp);border-bottom:1px solid var(--div);}
+</style>
+<link rel="manifest" href="./manifest-app.json">
+<link rel="apple-touch-icon" href="./icon-app-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="日報">
+<meta name="theme-color" content="#607080">
+<script type="module">
+// Firebase SDK (CDN)
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, set, get, onValue, push, remove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+window._fbImports = { initializeApp, getDatabase, ref, set, get, onValue, push, remove };
+window._fbReady = true;
+document.dispatchEvent(new Event('fb-sdk-ready'));
+</script>
+</head>
+<body>
+
+
+<!-- ══ FIREBASE 設定画面 ══ -->
+<div id="fb-setup" style="display:none;position:fixed;inset:0;z-index:9500;background:#2c2825;overflow-y:auto;">
+  <div style="max-width:420px;margin:0 auto;padding:32px 20px;">
+    <div style="text-align:center;margin-bottom:28px;">
+      <div style="color:rgba(255,255,255,.3);font-size:9px;letter-spacing:3px;font-family:monospace;margin-bottom:8px;">CLOUD SETUP</div>
+      <div style="color:#fff;font-size:20px;font-weight:700;">Firebase 接続設定</div>
+      <div style="color:rgba(255,255,255,.4);font-size:11px;margin-top:6px;">初回のみ必要です</div>
+    </div>
+
+    <!-- ステップ1 -->
+    <div style="background:rgba(255,255,255,.07);border-radius:10px;padding:16px;margin-bottom:12px;">
+      <div style="color:#ffe066;font-size:11px;font-weight:700;margin-bottom:8px;">① Firebaseプロジェクトを作成</div>
+      <div style="color:rgba(255,255,255,.6);font-size:11px;line-height:1.7;">
+        1. <a href="https://console.firebase.google.com" target="_blank" style="color:#ffe066;">console.firebase.google.com</a> を開く<br>
+        2. 「プロジェクトを追加」→ 名前入力（例: report-app）<br>
+        3. Google アナリティクス: オフでOK → 「プロジェクトを作成」
+      </div>
+    </div>
+
+    <!-- ステップ2 -->
+    <div style="background:rgba(255,255,255,.07);border-radius:10px;padding:16px;margin-bottom:12px;">
+      <div style="color:#ffe066;font-size:11px;font-weight:700;margin-bottom:8px;">② Realtime Database を有効化</div>
+      <div style="color:rgba(255,255,255,.6);font-size:11px;line-height:1.7;">
+        1. 左メニュー「Realtime Database」→「データベースを作成」<br>
+        2. ロケーション: <strong style="color:#fff;">asia-southeast1</strong>（シンガポール）<br>
+        3. セキュリティルール: <strong style="color:#fff;">テストモード</strong>で開始 → 「有効にする」
+      </div>
+    </div>
+
+    <!-- ステップ3 -->
+    <div style="background:rgba(255,255,255,.07);border-radius:10px;padding:16px;margin-bottom:12px;">
+      <div style="color:#ffe066;font-size:11px;font-weight:700;margin-bottom:8px;">③ アプリ設定を取得</div>
+      <div style="color:rgba(255,255,255,.6);font-size:11px;line-height:1.7;">
+        1. 左上の歯車アイコン →「プロジェクトの設定」<br>
+        2. 「マイアプリ」→「&lt;/&gt;」（Webアプリ）をクリック<br>
+        3. アプリ名を入力 → 「アプリを登録」<br>
+        4. 表示された <strong style="color:#fff;">firebaseConfig</strong> をコピー
+      </div>
+    </div>
+
+    <!-- 設定貼り付けエリア -->
+    <div style="margin-bottom:16px;">
+      <div style="color:rgba(255,255,255,.5);font-size:10px;margin-bottom:6px;letter-spacing:.1em;">④ firebaseConfig を貼り付け</div>
+      <textarea id="fb-config-input" style="width:100%;height:180px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);border-radius:8px;color:#fff;font-family:monospace;font-size:11px;padding:10px;resize:none;outline:none;" placeholder='const firebaseConfig = {
+  apiKey: "AIzaSy...",
+  authDomain: "report-app.firebaseapp.com",
+  databaseURL: "https://report-app-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "report-app",
+  ...
+};'></textarea>
+      <div id="fb-config-err" style="color:#c09080;font-size:10px;margin-top:4px;min-height:16px;"></div>
+    </div>
+
+    <button onclick="saveFbConfig()" style="width:100%;padding:13px;background:#ffe066;color:#2c2825;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:sans-serif;">接続して保存</button>
+    <button onclick="skipFbSetup()" style="width:100%;padding:10px;background:transparent;color:rgba(255,255,255,.3);border:none;margin-top:8px;font-size:11px;cursor:pointer;font-family:sans-serif;">オフラインモードで使う（このPCのみ）</button>
+  </div>
+</div>
+
+<!-- ══ SECURITY LAYER ══ -->
+<div id="sec-layer">
+  <div class="sec-noise"></div>
+  <div class="sec-wrap">
+    <div class="sec-brand">
+      <div class="sec-eyebrow">SECURE ACCESS SYSTEM</div>
+      <div class="sec-title">軽貨物運送</div>
+      <div class="sec-divline"></div>
+      <div class="sec-subtitle">DRIVER REPORT TERMINAL</div>
+    </div>
+    <!-- PINコードをデフォルト -->
+    <div class="sec-tabs">
+      <button class="sec-tab on" id="tab-pin" onclick="secTab('pin')">PIN CODE</button>
+      <button class="sec-tab" id="tab-face" onclick="secTab('face')">FACE ID</button>
+    </div>
+    <!-- PIN（デフォルト表示） -->
+    <div id="pin-area" style="display:flex;flex-direction:column;align-items:center;width:100%;">
+      <div class="pin-dots" id="pin-dots">
+        <div class="pin-dot" id="pd0"></div><div class="pin-dot" id="pd1"></div>
+        <div class="pin-dot" id="pd2"></div><div class="pin-dot" id="pd3"></div>
+      </div>
+      <div class="pin-err" id="pin-err"></div>
+      <div class="numpad">
+        <button class="nk" onclick="pinKey('1')">1</button><button class="nk" onclick="pinKey('2')">2</button><button class="nk" onclick="pinKey('3')">3</button>
+        <button class="nk" onclick="pinKey('4')">4</button><button class="nk" onclick="pinKey('5')">5</button><button class="nk" onclick="pinKey('6')">6</button>
+        <button class="nk" onclick="pinKey('7')">7</button><button class="nk" onclick="pinKey('8')">8</button><button class="nk" onclick="pinKey('9')">9</button>
+        <button class="nk emp"></button><button class="nk" onclick="pinKey('0')">0</button><button class="nk" onclick="pinKey('DEL')">⌫</button>
+      </div>
+    </div>
+    <!-- FACE -->
+    <div id="face-area" style="display:none;flex-direction:column;align-items:center;">
+      <div class="face-frame" id="face-frame">
+        <div class="face-inner" id="face-inner">
+          <svg width="60" height="60" viewBox="0 0 72 72" fill="none">
+            <ellipse cx="36" cy="28" rx="14" ry="18" stroke="rgba(255,255,255,.3)" stroke-width="1.2"/>
+            <path d="M8 66 Q36 50 64 66" stroke="rgba(255,255,255,.3)" stroke-width="1.2" fill="none"/>
+            <circle cx="30" cy="26" r="2" fill="rgba(255,255,255,.4)"/><circle cx="42" cy="26" r="2" fill="rgba(255,255,255,.4)"/>
+            <path d="M31 34 Q36 38 41 34" stroke="rgba(255,255,255,.4)" stroke-width="1" fill="none" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="face-scan-line" id="face-scan"></div>
+        <div class="face-bl"></div><div class="face-br"></div>
+      </div>
+      <div class="face-lbl" id="face-lbl">FACE SCAN</div>
+      <button class="sec-btn" id="face-btn" onclick="startFace()">START SCAN</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MAIN APP ══ -->
+<div class="app">
+<div id="fb-status" style="position:fixed;top:10px;right:12px;z-index:500;padding:4px 9px;border-radius:12px;font-size:9px;font-weight:700;font-family:monospace;background:rgba(90,138,90,.15);color:#5a8a5a;border:1px solid rgba(90,138,90,.25);display:none;">● CLOUD</div>
+<div id="toast"><span id="t-ico">✓</span><span id="t-msg"></span></div>
+
+<!-- ログイン -->
+<div id="scr-login" class="screen on">
+  <div class="topbar">
+    <div class="tb-eye">軽貨物運送　日報システム</div>
+    <div class="tb-title" style="color:var(--clay);">ドライバー日報</div>
+    <div class="tb-sub">本日もよろしくお願いします</div>
+  </div>
+  <div class="p16">
+    <div class="card mb12">
+      <div style="text-align:center;margin-bottom:16px;">
+        <div style="display:inline-flex;align-items:center;justify-content:center;width:54px;height:54px;border-radius:14px;background:rgba(139,111,94,.13);margin-bottom:9px;">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--clay)" stroke-width="2"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+        </div>
+        <div style="font-size:15.5px;font-weight:700;">ログイン</div>
+        <div style="color:var(--light);font-size:11px;margin-top:2px;">社員番号を入力してください</div>
+      </div>
+      <div class="lbl">社員番号</div>
+      <input type="tel" id="emp-id" class="fi" style="font-size:18px;font-weight:700;text-align:center;letter-spacing:.25em;font-family:var(--mono);" placeholder="" oninput="$('login-err').style.display='none'">
+      <div id="login-err" style="display:none;background:rgba(139,74,58,.07);border:1px solid rgba(139,74,58,.22);border-radius:6px;padding:6px 10px;color:var(--rust);font-size:11px;margin-top:6px;"></div>
+      <button class="btn-main mt8" style="background:var(--clay);color:#faf8f5;" onclick="doLogin()">ログイン</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- 事業選択（個人ページ兼用） -->
+<div id="scr-select" class="screen">
+  <div class="topbar">
+    <div class="tb-eye">軽貨物運送　日報システム</div>
+    <div id="sel-name" class="tb-title" style="color:var(--clay)"></div>
+    <div id="sel-sub" class="tb-sub"></div>
+  </div>
+  <div class="p16">
+    <div style="color:var(--light);font-size:9.5px;font-family:var(--mono);margin-bottom:10px;text-align:center;" id="sel-date"></div>
+    <!-- 個人ページ：当月実績サマリー（お金情報なし） -->
+    <div class="card mb10" id="sel-stats-card">
+      <div style="font-size:10px;font-weight:700;color:var(--mid);letter-spacing:.08em;margin-bottom:8px;">今月の実績</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center;">
+        <div style="background:var(--inp);border-radius:8px;padding:8px 4px;">
+          <div style="font-size:18px;font-weight:700;font-family:var(--mono);color:var(--slate);" id="stat-yp-count">-</div>
+          <div style="font-size:9px;color:var(--light);margin-top:2px;">宅配件数</div>
+        </div>
+        <div style="background:var(--inp);border-radius:8px;padding:8px 4px;">
+          <div style="font-size:18px;font-weight:700;font-family:var(--mono);color:var(--sage);" id="stat-col-count">-</div>
+          <div style="font-size:9px;color:var(--light);margin-top:2px;">集荷件数</div>
+        </div>
+        <div style="background:var(--inp);border-radius:8px;padding:8px 4px;">
+          <div style="font-size:18px;font-weight:700;font-family:var(--mono);color:var(--clay);" id="stat-work-days">-</div>
+          <div style="font-size:9px;color:var(--light);margin-top:2px;">稼働日数</div>
+        </div>
+      </div>
+      <!-- 出勤時刻表示 -->
+      <div id="sel-clock-in" style="margin-top:8px;font-size:10px;color:var(--mid);text-align:center;font-family:var(--mono);display:none;"></div>
+    </div>
+    <!-- 業務ボタン（パートは非表示） -->
+    <div id="sel-biz-area">
+      <button class="biz-btn" id="btn-yp" onclick="selectBiz('yp')">
+        <div style="margin-bottom:6px;"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="var(--slate)" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div>
+        <div class="biz-t" style="color:var(--slate)">ゆうパック宅配事業</div>
+        <div class="biz-s">配達数・集荷・夜間・持ち戻りなど</div>
+      </button>
+      <button class="biz-btn" id="btn-col" onclick="selectBiz('col')">
+        <div style="margin-bottom:6px;"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="var(--sage)" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>
+        <div class="biz-t" style="color:var(--sage)">集荷事業</div>
+        <div class="biz-s">顧客別・品目別（12種）の集荷数量</div>
+      </button>
+    </div>
+    <!-- 業務終了ボタン -->
+    <button id="btn-clockout" onclick="startClockOut()" style="width:100%;padding:14px;background:rgba(139,74,58,.08);border:1.5px solid rgba(139,74,58,.25);border-radius:10px;color:var(--rust);font-size:13px;font-weight:700;cursor:pointer;margin-top:4px;display:flex;align-items:center;justify-content:center;gap:6px;">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      業務終了・退勤
+    </button>
+    <button onclick="doLogout()" style="background:none;border:none;color:var(--light);font-size:10px;cursor:pointer;width:100%;padding:7px;font-family:var(--mono);display:flex;align-items:center;justify-content:center;gap:4px;margin-top:2px;">
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>LOGOUT（日報のみ）
+    </button>
+  </div>
+</div>
+
+<!-- ゆうパック日報 -->
+<div id="scr-yp" class="screen">
+  <div class="topbar">
+    <button class="back-btn" onclick="goBack()"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>戻る</button>
+    <div class="tb-eye">軽貨物運送　日報システム</div>
+    <div class="tb-title" style="color:var(--slate)">ゆうパック日報</div>
+    <div class="tb-sub" id="yp-sub"></div>
+  </div>
+  <div class="p16">
+    <div class="card mb8"><div class="row-hd"><div class="row-ico" style="background:rgba(44,40,37,.07)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ink)" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><span class="row-lbl">日付</span></div><input type="date" id="yp-date" class="fi"></div>
+    <div class="card mb8" id="yp-card-m"><div class="row-hd"><div class="row-ico" style="background:rgba(44,40,37,.07)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ink)" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/></svg></div><span class="row-lbl">持出個数</span></div><div class="stpr"><button class="sbtn" onclick="ypStep('m',-1)">−</button><input type="number" id="yp-m" class="sval" min="0" value="0" oninput="valYP()"><button class="sbtn p" onclick="ypStep('m',1)">＋</button></div></div>
+    <div class="card mb8" id="yp-card-k"><div class="row-hd"><div class="row-ico" style="background:rgba(107,124,106,.11)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--sage)" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div><span class="row-lbl" style="color:var(--sage)">配達完了数</span></div><div class="stpr"><button class="sbtn" onclick="ypStep('k',-1)">−</button><input type="number" id="yp-k" class="sval" min="0" value="0" oninput="valYP()"><button class="sbtn p" style="background:var(--sage)" onclick="ypStep('k',1)">＋</button></div></div>
+    <div class="card mb8"><div class="row-hd"><div class="row-ico" style="background:rgba(96,112,128,.1)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--slate)" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></div><span class="row-lbl" style="color:var(--slate)">夜間配達（20時以降）</span><span class="tag" style="background:rgba(96,112,128,.1);color:var(--slate);margin-left:auto;">内計</span></div><div class="stpr"><button class="sbtn" onclick="ypStep('y',-1)">−</button><input type="number" id="yp-y" class="sval" min="0" value="0" oninput="valYP()"><button class="sbtn p" style="background:var(--slate)" onclick="ypStep('y',1)">＋</button></div><div id="yp-y-err" class="xs mt8" style="color:var(--rust);display:none;">⚠ 完了数を超えています</div></div>
+    <div class="card mb8"><div class="row-hd"><div class="row-ico" style="background:rgba(136,128,120,.09)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--stone)" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></div><span class="row-lbl" style="color:var(--stone)">転送還付</span></div><div class="stpr"><button class="sbtn" onclick="ypStep('t',-1)">−</button><input type="number" id="yp-t" class="sval" min="0" value="0" oninput="valYP()"><button class="sbtn p" style="background:var(--stone)" onclick="ypStep('t',1)">＋</button></div></div>
+    <div class="card mb8"><div class="row-hd"><div class="row-ico" style="background:rgba(154,122,58,.1)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.63"/></svg></div><span class="row-lbl" style="color:var(--amber)">持ち戻り</span></div><div class="stpr"><button class="sbtn" onclick="ypStep('mo',-1)">−</button><input type="number" id="yp-mo" class="sval" min="0" value="0" oninput="valYP()"><button class="sbtn p" style="background:var(--amber)" onclick="ypStep('mo',1)">＋</button></div></div>
+    <div class="card mb8"><div class="row-hd"><div class="row-ico" style="background:rgba(136,128,120,.09)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--stone)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><span class="row-lbl" style="color:var(--stone)">翌日配達廻し</span></div><div class="stpr"><button class="sbtn" onclick="ypStep('yo',-1)">−</button><input type="number" id="yp-yo" class="sval" min="0" value="0" oninput="valYP()"><button class="sbtn p" style="background:var(--stone)" onclick="ypStep('yo',1)">＋</button></div></div>
+    <div class="card mb8"><div class="row-hd"><div class="row-ico" style="background:rgba(139,111,94,.11)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--clay)" stroke-width="2"><path d="M22 12h-6l-2 3H10l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg></div><span class="row-lbl" style="color:var(--clay)">集荷</span></div><div class="stpr"><button class="sbtn" onclick="ypStep('s',-1)">−</button><input type="number" id="yp-s" class="sval" min="0" value="0"><button class="sbtn p" style="background:var(--clay)" onclick="ypStep('s',1)">＋</button></div></div>
+    <div id="yp-vbox" class="vbox mb8" style="display:none;"><div class="lbl mb8">■ リアルタイム検証</div><div class="vrow"><span>① 持出</span><span id="v-m" class="fw7" style="font-family:var(--mono)">0</span></div><div class="vrow"><span>②完了＋③転送＋④持戻＋⑤翌日</span><span id="v-s" class="fw7" style="font-family:var(--mono)">0</span></div><div id="v-res" class="veq vwt">数値を入力してください</div></div>
+    <div id="yp-sum" class="sumbox mb8" style="display:none;"><div class="sum-row"><div><div class="sum-big" id="s-rate">-</div><div class="sum-cap">配達率</div></div><div><div class="sum-big" style="color:var(--slate)" id="s-y">-</div><div class="sum-cap">夜間</div></div><div><div class="sum-big" style="color:var(--clay)" id="s-s">-</div><div class="sum-cap">集荷</div></div></div></div>
+    <div class="card mb8"><div class="row-hd"><div class="row-ico" style="background:rgba(136,128,120,.09)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--stone)" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div><span class="row-lbl" style="color:var(--stone)">備考</span></div><textarea id="yp-note" class="fi" rows="3" placeholder="トラブル・特記事項など"></textarea></div>
+    <button id="yp-submit" class="btn-main" onclick="submitYP()" style="background:var(--slate);color:#faf8f5;">日報を提出する</button>
+    <div style="height:28px;"></div>
+  </div>
+</div>
+
+<!-- 集荷日報 -->
+<div id="scr-col" class="screen">
+  <div class="topbar">
+    <button class="back-btn" onclick="goBack()"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>戻る</button>
+    <div class="tb-eye">軽貨物運送　日報システム</div>
+    <div class="tb-title" style="color:var(--sage)">集荷日報</div>
+    <div class="tb-sub" id="col-sub"></div>
+  </div>
+  <div class="p16">
+    <div class="card mb8"><div class="row-hd"><div class="row-ico" style="background:rgba(44,40,37,.07)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ink)" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><span class="row-lbl">日付</span></div><input type="date" id="col-date" class="fi"></div>
+    <div class="card mb8">
+      <div class="row-hd"><div class="row-ico" style="background:rgba(44,40,37,.07)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ink)" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div><span class="row-lbl">顧客選択</span></div>
+
+      <!-- ① 地域選択（タブ式） -->
+      <div class="lbl" style="margin-bottom:6px;">① 地域</div>
+      <div style="display:flex;border:1px solid var(--brd);border-radius:7px;overflow:hidden;margin-bottom:8px;background:var(--inp);">
+        <button id="rtab-other" class="rtab on" onclick="switchRegionTab('other')">その他</button>
+        <button id="rtab-osaka" class="rtab" onclick="switchRegionTab('osaka')">大阪市区</button>
+        <button id="rtab-kyoto" class="rtab" onclick="switchRegionTab('kyoto')">京都</button>
+        <button id="rtab-free" class="rtab" onclick="switchRegionTab('free')">手打ち</button>
+      </div>
+
+      <!-- その他（登録済み地域）→先頭に移動 -->
+      <div id="rtab-content-other" class="rtab-content">
+        <div id="other-region-btns" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px;"></div>
+      </div>
+      <!-- 大阪市区グリッド -->
+      <div id="rtab-content-osaka" class="rtab-content" style="display:none;">
+        <div id="osaka-ku-btns" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px;"></div>
+      </div>
+      <!-- 京都グリッド -->
+      <div id="rtab-content-kyoto" class="rtab-content" style="display:none;">
+        <div id="kyoto-btns" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px;"></div>
+      </div>
+      <!-- 手打ち -->
+      <div id="rtab-content-free" class="rtab-content" style="display:none;">
+        <input type="text" id="region-free-input" class="fi fi-sm" placeholder="地域名を入力..." oninput="onFreeRegionInput()" style="margin-bottom:6px;">
+        <div id="region-free-suggest" style="border:1px solid var(--brd);border-radius:7px;overflow:hidden;display:none;margin-bottom:6px;"></div>
+      </div>
+
+      <!-- 選択中の地域表示 -->
+      <div id="col-region-sel" style="display:none;background:rgba(96,112,128,.08);border:1px solid rgba(96,112,128,.2);border-radius:7px;padding:6px 11px;margin-bottom:8px;font-size:12px;display:flex;align-items:center;justify-content:space-between;">
+        <span>📍 <strong id="col-region-name"></strong></span>
+        <button onclick="clearRegion()" style="background:none;border:none;color:var(--light);cursor:pointer;font-size:13px;line-height:1;">×</button>
+      </div>
+
+      <!-- ② 顧客検索（履歴 + 手打ち） -->
+      <div id="col-cust-area" style="display:none;">
+        <div class="lbl" style="margin-bottom:6px;">② 顧客名</div>
+        <!-- 検索ボックス -->
+        <div style="position:relative;margin-bottom:6px;">
+          <input type="text" id="col-search" class="fi fi-sm" placeholder="顧客名で絞り込み（空欄でよく使う顧客を表示）" oninput="showCustList()" onfocus="showCustList()">
+        </div>
+        <!-- 顧客リスト（履歴 + 検索結果） -->
+        <div id="col-cust-list" style="display:none;border:1px solid var(--brd);border-radius:8px;overflow:hidden;max-height:220px;overflow-y:auto;margin-bottom:6px;"></div>
+      </div>
+
+      <!-- 選択済み顧客 -->
+      <div id="col-cust-sel" style="display:none;background:rgba(107,124,106,.08);border:1px solid rgba(107,124,106,.22);border-radius:8px;padding:8px 11px;"></div>
+    </div>
+    <div class="card mb8"><div class="row-hd"><div class="row-ico" style="background:rgba(44,40,37,.07)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ink)" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div><span class="row-lbl">品目・数量</span></div>
+      <div style="background:#f0f4f8;border-radius:8px;padding:10px;margin-bottom:8px;"><div style="color:var(--slate);font-weight:700;font-size:10px;margin-bottom:6px;">ゆうパック</div>
+        <div class="irow"><span class="ir-lbl">60サイズ</span><div class="ir-ctrl"><button class="ib" onclick="iStep('y60',-1)">−</button><input type="number" id="i-y60" class="iv" min="0" value="0" oninput="updPrev()"><button class="ib p" onclick="iStep('y60',1)">＋</button></div></div>
+        <div class="irow"><span class="ir-lbl">80サイズ</span><div class="ir-ctrl"><button class="ib" onclick="iStep('y80',-1)">−</button><input type="number" id="i-y80" class="iv" min="0" value="0" oninput="updPrev()"><button class="ib p" onclick="iStep('y80',1)">＋</button></div></div>
+        <div class="irow"><span class="ir-lbl">100サイズ</span><div class="ir-ctrl"><button class="ib" onclick="iStep('y100',-1)">−</button><input type="number" id="i-y100" class="iv" min="0" value="0" oninput="updPrev()"><button class="ib p" onclick="iStep('y100',1)">＋</button></div></div>
+        <div class="irow"><span class="ir-lbl">120サイズ</span><div class="ir-ctrl"><button class="ib" onclick="iStep('y120',-1)">−</button><input type="number" id="i-y120" class="iv" min="0" value="0" oninput="updPrev()"><button class="ib p" onclick="iStep('y120',1)">＋</button></div></div>
+        <div class="irow"><span class="ir-lbl">140サイズ</span><div class="ir-ctrl"><button class="ib" onclick="iStep('y140',-1)">−</button><input type="number" id="i-y140" class="iv" min="0" value="0" oninput="updPrev()"><button class="ib p" onclick="iStep('y140',1)">＋</button></div></div>
+        <div class="irow" style="border-bottom:none;"><span class="ir-lbl">160サイズ</span><div class="ir-ctrl"><button class="ib" onclick="iStep('y160',-1)">−</button><input type="number" id="i-y160" class="iv" min="0" value="0" oninput="updPrev()"><button class="ib p" onclick="iStep('y160',1)">＋</button></div></div>
+      </div>
+      <div style="background:#f0f5f0;border-radius:8px;padding:10px;margin-bottom:8px;"><div style="color:var(--sage);font-weight:700;font-size:10px;margin-bottom:6px;">ゆうパケット</div>
+        <div class="irow"><span class="ir-lbl">通常</span><div class="ir-ctrl"><button class="ib" onclick="iStep('pk1',-1)">−</button><input type="number" id="i-pk1" class="iv" min="0" value="0" oninput="updPrev()"><button class="ib p" onclick="iStep('pk1',1)">＋</button></div></div>
+        <div class="irow" style="border-bottom:none;"><span class="ir-lbl">7cm以上</span><div class="ir-ctrl"><button class="ib" onclick="iStep('pk2',-1)">−</button><input type="number" id="i-pk2" class="iv" min="0" value="0" oninput="updPrev()"><button class="ib p" onclick="iStep('pk2',1)">＋</button></div></div>
+      </div>
+      <div style="background:var(--inp);border-radius:8px;padding:10px;margin-bottom:8px;"><div style="color:var(--stone);font-weight:700;font-size:10px;margin-bottom:6px;">その他</div>
+        <div class="irow"><span class="ir-lbl">クリックポスト</span><div class="ir-ctrl"><button class="ib" onclick="iStep('cp',-1)">−</button><input type="number" id="i-cp" class="iv" min="0" value="0" oninput="updPrev()"><button class="ib p" onclick="iStep('cp',1)">＋</button></div></div>
+        <div class="irow"><span class="ir-lbl">ケース</span><div class="ir-ctrl"><button class="ib" onclick="iStep('ke',-1)">−</button><input type="number" id="i-ke" class="iv" min="0" value="0" oninput="updPrev()"><button class="ib p" onclick="iStep('ke',1)">＋</button></div></div>
+        <div class="irow" style="border-bottom:none;"><span class="ir-lbl">定形外(ゆうメール)</span><div class="ir-ctrl"><button class="ib" onclick="iStep('te',-1)">−</button><input type="number" id="i-te" class="iv" min="0" value="0" oninput="updPrev()"><button class="ib p" onclick="iStep('te',1)">＋</button></div></div>
+      </div>
+      <div style="background:#faf6ee;border-radius:8px;padding:10px;margin-bottom:11px;"><div style="color:var(--amber);font-weight:700;font-size:10px;margin-bottom:6px;">チャーター</div>
+        <div class="irow" style="border-bottom:none;"><span class="ir-lbl">件数</span><div class="ir-ctrl"><button class="ib" onclick="iStep('ch',-1)">−</button><input type="number" id="i-ch" class="iv" min="0" value="0" oninput="updPrev()"><button class="ib p" onclick="iStep('ch',1)">＋</button></div></div>
+        <div id="ch-dest-area" style="display:none;margin-top:8px;"><div class="lbl">到着場所</div><input type="text" id="ch-dest" class="fi fi-sm" placeholder="例: ○○倉庫"></div>
+      </div>
+      <div id="col-prev" style="display:none;background:rgba(107,124,106,.08);border:1px solid rgba(107,124,106,.2);border-radius:8px;padding:8px 12px;margin-bottom:8px;"><div class="sm">合計：<strong id="prev-tot">0</strong>個・件</div></div>
+      <button id="col-add-btn" class="btn-main" onclick="addRows()" style="background:var(--sage);color:#faf8f5;">＋ まとめて明細に追加</button>
+      <div id="col-add-hint" class="xs muted mt8" style="text-align:center;display:none;"></div>
+    </div>
+    <div id="col-rows-card" class="card mb8" style="display:none;"><div class="row-hd"><div class="row-ico" style="background:rgba(44,40,37,.07)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ink)" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></div><span class="row-lbl" id="col-rows-lbl">入力済み明細（0件）</span></div><div id="col-rows-list"></div></div>
+    <div class="card mb8"><div class="row-hd"><div class="row-ico" style="background:rgba(136,128,120,.09)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--stone)" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div><span class="row-lbl" style="color:var(--stone)">備考</span></div><textarea id="col-note" class="fi" rows="3" placeholder="トラブル・特記事項など"></textarea></div>
+    <button id="col-submit" class="btn-main btn-dis" onclick="submitCol()" style="background:var(--sage);color:#faf8f5;">日報を提出する</button>
+    <div style="height:28px;"></div>
+  </div>
+</div>
+
+<!-- 退勤確認画面 -->
+<div id="scr-clockout" class="screen">
+  <div class="topbar">
+    <div class="tb-eye">軽貨物運送　日報システム</div>
+    <div class="tb-title" style="color:var(--rust)">業務終了・退勤</div>
+    <div class="tb-sub" id="co-sub"></div>
+  </div>
+  <div class="p16">
+    <!-- 稼働時間プレビュー（時間単価・パートのみ表示） -->
+    <div id="co-time-card" class="card mb8" style="display:none;">
+      <div class="row-hd">
+        <div class="row-ico" style="background:rgba(139,111,94,.11)">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--clay)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </div>
+        <span class="row-lbl" style="color:var(--clay)">稼働時間</span>
+      </div>
+      <div style="display:flex;align-items:baseline;gap:10px;margin-top:6px;">
+        <div style="font-size:28px;font-weight:700;font-family:var(--mono);color:var(--clay);" id="co-work-disp">--:--</div>
+        <div style="font-size:11px;color:var(--mid);">（15分刻み丸め後）</div>
+      </div>
+      <div style="font-size:11px;color:var(--mid);margin-top:4px;" id="co-time-detail"></div>
+    </div>
+    <!-- GPS判定（時間単価・パートのみ表示） -->
+    <div id="co-gps-card" class="card mb8" style="display:none;">
+      <div class="row-hd">
+        <div class="row-ico" style="background:rgba(96,112,128,.1)">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--slate)" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+        </div>
+        <span class="row-lbl" style="color:var(--slate)">退勤場所の確認</span>
+      </div>
+      <div id="co-gps-status" style="margin-top:8px;padding:8px 10px;border-radius:7px;font-size:12px;font-weight:700;">GPS取得中...</div>
+      <div id="co-gps-detail" style="font-size:10px;color:var(--mid);margin-top:4px;"></div>
+    </div>
+    <!-- 帰社時刻修正（集荷・時間単価のみ） -->
+    <div id="co-adjust-card" class="card mb8" style="display:none;">
+      <div class="row-hd">
+        <div class="row-ico" style="background:rgba(154,122,58,.1)">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </div>
+        <span class="row-lbl" style="color:var(--amber)">本社帰社時刻の修正</span>
+        <span style="margin-left:auto;font-size:9px;color:var(--light);">任意</span>
+      </div>
+      <div style="font-size:11px;color:var(--mid);margin:6px 0 8px;">帰宅後に退勤した場合、実際の帰社時刻を入力してください</div>
+      <div class="lbl">実際の帰社時刻</div>
+      <input type="time" id="co-adj-time" class="fi" style="font-family:var(--mono);">
+      <div style="font-size:10px;color:var(--light);margin-top:4px;">※ GPS記録はそのまま保持されます</div>
+    </div>
+    <!-- 退勤確定ボタン -->
+    <button class="btn-main mt8" id="co-confirm-btn" onclick="confirmClockOut()" style="background:var(--rust);color:#faf8f5;">退勤を記録する</button>
+    <button onclick="cancelClockOut()" style="background:none;border:none;color:var(--light);font-size:10px;cursor:pointer;width:100%;padding:8px;margin-top:4px;">キャンセル（業務に戻る）</button>
+  </div>
+</div>
+
+<!-- 完了 -->
+<div id="scr-done" class="screen">
+  <div class="topbar"><div class="tb-eye">軽貨物運送　日報システム</div><div id="done-title" class="tb-title" style="color:var(--ok)">提出完了</div><div class="tb-sub">お疲れさまでした</div></div>
+  <div class="p16" style="padding-top:24px;text-align:center;">
+    <div class="ok-ico"><span><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--ok)" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span></div>
+    <div style="font-size:18px;font-weight:700;margin-bottom:3px;">日報を提出しました</div>
+    <div id="done-time" style="color:var(--light);font-size:10px;font-family:var(--mono);margin-bottom:22px;"></div>
+    <div class="card" style="text-align:left;margin-bottom:10px;"><div class="lbl">提出内容サマリー</div><div class="sum-tbl" id="done-sum"></div></div>
+    <div style="display:flex;gap:7px;"><button class="btn-main btn-ghost" onclick="doEdit()" style="flex:1;font-size:12px;display:flex;align-items:center;justify-content:center;gap:4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>修正</button><button class="btn-main" onclick="goTop()" style="flex:2;background:var(--ok);color:#faf8f5;font-size:12px;">トップへ戻る</button></div>
+  </div>
+</div>
+</div><!-- .app -->
+
+<!-- ══ 管理画面モーダル（画面中央） ══ -->
+<div id="adm-overlay" onclick="closeAdmOutside(event)">
+  <div class="adm-modal" onclick="event.stopPropagation()">
+    <div class="adm-header">
+      <div class="fla" style="gap:9px;">
+        <div style="width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <div>
+          <div style="color:#fff;font-size:13.5px;font-weight:700;">管理画面</div>
+          <div style="color:rgba(255,255,255,.5);font-size:9px;font-family:var(--mono);">ADMIN PANEL</div>
+        </div>
+      </div>
+      <button class="adm-close" onclick="closeAdm()">×</button>
+    </div>
+    <div class="adm-tabs" id="adm-tabs">
+      <button class="adm-tab on" onclick="admTab('csv')">📋 CSV出力</button>
+      <button class="adm-tab" onclick="admTab('cust')">🏢 顧客管理</button>
+      <button class="adm-tab" onclick="admTab('emp')">👤 社員管理</button>
+      <button class="adm-tab" onclick="admTab('office')">🏪 営業所</button>
+      <button class="adm-tab" onclick="admTab('pin')">🔐 PIN変更</button>
+      <button class="adm-tab" onclick="admTab('log')">📄 日報一覧</button>
+    </div>
+    <div class="adm-body">
+
+      <!-- CSV出力 -->
+      <div class="adm-panel on" id="panel-csv">
+        <div class="adm-policy">
+          <div style="display:flex;align-items:center;gap:5px;margin-bottom:4px;"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--slate)" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg><span style="color:var(--slate);font-size:8.5px;font-weight:700;letter-spacing:.2em;font-family:var(--mono);">SECURITY POLICY</span></div>
+          <div style="color:var(--mid);font-size:10.5px;line-height:1.55;">日報アプリ ↔ 経営管理システム v3 は<strong>直接連携しません。</strong></div>
+          <div class="adm-flow">
+            <span style="background:rgba(96,112,128,.1);color:var(--slate);padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700;">日報アプリ</span>
+            <span style="color:var(--light);font-size:10px;">→ CSV出力 →</span>
+            <span style="background:rgba(154,122,58,.1);color:var(--amber);padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700;">管理者確認</span>
+            <span style="color:var(--light);font-size:10px;">→</span>
+            <span style="background:rgba(107,124,106,.1);color:var(--sage);padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700;">v3取込</span>
+          </div>
+        </div>
+        <div id="csv-stat" style="background:var(--inp);border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:11px;color:var(--mid);"></div>
+        <button class="exp-btn" onclick="doExport('yp')"><div class="exp-ico" style="background:rgba(96,112,128,.11);">📋</div><div style="flex:1;"><div style="font-size:12.5px;font-weight:700;color:var(--slate);">宅配日報 CSV出力</div><div style="font-size:10px;color:var(--mid);">持出・完了・夜間・転送・持戻・翌日廻し</div></div></button>
+        <button class="exp-btn" onclick="doExport('col')"><div class="exp-ico" style="background:rgba(107,124,106,.11);">📦</div><div style="flex:1;"><div style="font-size:12.5px;font-weight:700;color:var(--sage);">集荷日報 CSV出力</div><div style="font-size:10px;color:var(--mid);">品目別12種・サイズ別明細</div></div></button>
+        <button class="exp-btn" onclick="doExport('both')" style="margin-bottom:0;"><div class="exp-ico" style="background:rgba(139,111,94,.11);">📂</div><div style="flex:1;"><div style="font-size:12.5px;font-weight:700;color:var(--clay);">両方まとめて出力</div><div style="font-size:10px;color:var(--mid);">宅配＋集荷を連続ダウンロード</div></div></button>
+        <div style="margin-top:12px;display:flex;align-items:flex-start;gap:5px;background:rgba(139,74,58,.06);border:1px solid rgba(139,74,58,.15);border-radius:7px;padding:9px 11px;">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--rust)" stroke-width="2" style="flex-shrink:0;margin-top:1px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <div style="font-size:10px;color:var(--rust);line-height:1.55;">出力ファイルは <strong>経営管理システム v3</strong> のCSVインポート画面にドロップしてください。</div>
+        </div>
+      </div>
+
+      <!-- 顧客管理 -->
+      <div class="adm-panel" id="panel-cust">
+        <div class="flbc mb8"><span style="font-weight:700;font-size:13px;">顧客一覧</span><span id="cust-count" class="badge">0社</span></div>
+        <div id="cust-list" style="margin-bottom:14px;border:1px solid var(--brd);border-radius:8px;overflow:hidden;"></div>
+        <div class="edit-form">
+          <div style="font-size:11.5px;font-weight:700;margin-bottom:9px;color:var(--clay);">＋ 新規顧客登録</div>
+          <div style="display:grid;grid-template-columns:100px 1fr 1fr;gap:6px;margin-bottom:7px;">
+            <div><div class="lbl">顧客番号<span style="color:var(--light);font-size:9px;margin-left:2px;">任意</span></div><input type="text" id="new-cust-no" class="fi fi-sm" placeholder="C001"></div>
+            <div><div class="lbl">顧客名</div><input type="text" id="new-cust-name" class="fi fi-sm" placeholder="株式会社○○"></div>
+            <div><div class="lbl">地域</div><input type="text" id="new-cust-region" class="fi fi-sm" placeholder="大阪市北区"></div>
+          </div>
+          <button class="btn-main" style="background:var(--clay);color:#faf8f5;font-size:12px;" onclick="addCust()">登録する</button>
+        </div>
+      </div>
+
+      <!-- 社員管理 -->
+      <div class="adm-panel" id="panel-emp">
+        <div class="flbc mb8"><span style="font-weight:700;font-size:13px;">社員一覧</span><span id="emp-count" class="badge">0名</span></div>
+        <div id="emp-list" style="margin-bottom:14px;border:1px solid var(--brd);border-radius:8px;overflow:hidden;"></div>
+        <div class="edit-form">
+          <div style="font-size:11.5px;font-weight:700;margin-bottom:9px;color:var(--slate);">＋ 新規社員登録</div>
+          <div class="f2"><div><div class="lbl">社員番号</div><input type="tel" id="new-emp-id" class="fi fi-sm" placeholder="1004"></div><div><div class="lbl">氏名</div><input type="text" id="new-emp-name" class="fi fi-sm" placeholder="山田 太郎"></div></div>
+          <div class="lbl mt8" style="margin-bottom:6px;">担当種別</div>
+          <div id="emp-type-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;"></div>
+          <div id="emp-office-wrap" style="display:none;">
+            <div class="lbl" style="margin-bottom:5px;">営業所</div>
+            <input type="text" id="new-emp-office" class="fi fi-sm mb8" placeholder="大阪北営業所" list="office-list">
+            <datalist id="office-list"></datalist>
+          </div>
+          <button class="btn-main" style="background:var(--slate);color:#faf8f5;font-size:12px;" onclick="addEmp()">登録する</button>
+        </div>
+      </div>
+
+      <!-- PIN変更 -->
+      <div class="adm-panel" id="panel-pin">
+        <div style="background:var(--inp);border-radius:8px;padding:13px;margin-bottom:14px;">
+          <div style="font-size:11px;color:var(--mid);line-height:1.6;">
+            <div style="font-weight:700;color:var(--ink);margin-bottom:6px;">現在のPIN設定</div>
+            <div class="adm-row" style="border-bottom:1px solid var(--div);padding:5px 0;"><span style="font-size:11px;">セキュリティ（ドライバー用）</span><span id="cur-sec-pin" class="fw7" style="font-family:var(--mono);font-size:13px;">●●●●</span></div>
+            <div class="adm-row" style="padding:5px 0;border-bottom:none;"><span style="font-size:11px;">管理者PIN</span><span id="cur-adm-pin" class="fw7" style="font-family:var(--mono);font-size:13px;">●●●●</span></div>
+          </div>
+        </div>
+        <div class="edit-form mb12">
+          <div style="font-size:11.5px;font-weight:700;margin-bottom:9px;color:var(--ink);">セキュリティPIN変更（ドライバー用）</div>
+          <div class="f2"><div><div class="lbl">新しいPIN（4桁）</div><input type="tel" id="new-sec-pin" class="fi fi-sm" maxlength="4" placeholder="****"></div><div><div class="lbl">確認入力</div><input type="tel" id="new-sec-pin2" class="fi fi-sm" maxlength="4" placeholder="****"></div></div>
+          <button class="btn-main mt8" style="background:var(--clay);color:#faf8f5;font-size:12px;" onclick="changePin('sec')">変更する</button>
+        </div>
+        <div class="edit-form">
+          <div style="font-size:11.5px;font-weight:700;margin-bottom:9px;color:var(--ink);">管理者PIN変更</div>
+          <div class="f2"><div><div class="lbl">新しいPIN（4桁）</div><input type="tel" id="new-adm-pin" class="fi fi-sm" maxlength="4" placeholder="****"></div><div><div class="lbl">確認入力</div><input type="tel" id="new-adm-pin2" class="fi fi-sm" maxlength="4" placeholder="****"></div></div>
+          <button class="btn-main mt8" style="background:var(--slate);color:#faf8f5;font-size:12px;" onclick="changePin('adm')">変更する</button>
+        </div>
+      </div>
+
+      <!-- 営業所管理 -->
+      <div class="adm-panel" id="panel-office">
+        <div class="flbc mb8"><span style="font-weight:700;font-size:13px;">営業所一覧</span><span id="office-count" class="badge">0拠点</span></div>
+        <div id="office-list-adm" style="margin-bottom:14px;border:1px solid var(--brd);border-radius:8px;overflow:hidden;"></div>
+        <!-- 所属社員・顧客数のサマリー -->
+        <div id="office-summary" style="margin-bottom:14px;"></div>
+        <div class="edit-form">
+          <div style="font-size:11.5px;font-weight:700;margin-bottom:9px;color:var(--amber);">＋ 新規営業所登録</div>
+          <div class="lbl">営業所名</div>
+          <input type="text" id="new-office-name" class="fi fi-sm mb8" placeholder="○○営業所">
+          <div class="lbl">所在地（任意）</div>
+          <input type="text" id="new-office-addr" class="fi fi-sm mb8" placeholder="大阪市○○区">
+          <button class="btn-main" style="background:var(--amber);color:#faf8f5;font-size:12px;" onclick="addOffice()">登録する</button>
+        </div>
+      </div>
+
+      <!-- 日報一覧 -->
+      <div class="adm-panel" id="panel-log">
+        <div class="flbc mb8">
+          <span style="font-weight:700;font-size:13px;">提出済み日報</span>
+          <button onclick="clearLogs()" style="background:rgba(139,74,58,.08);border:none;color:var(--rust);border-radius:6px;padding:3px 10px;cursor:pointer;font-size:10.5px;font-family:var(--sans);">全削除</button>
+        </div>
+        <div id="log-list"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- PIN認証モーダル -->
+<div id="pin-modal">
+  <div class="pin-box">
+    <button onclick="closePinModal()" style="position:absolute;top:10px;right:11px;background:none;border:none;cursor:pointer;color:var(--light);font-size:17px;line-height:1;">×</button>
+    <div style="text-align:center;margin-bottom:16px;">
+      <div style="display:inline-flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:10px;background:rgba(139,111,94,.11);margin-bottom:8px;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="var(--clay)" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+      <div style="font-size:14px;font-weight:800;">管理者認証</div>
+      <div style="color:var(--light);font-size:10.5px;margin-top:2px;" id="pin-m-desc">管理者PINを入力</div>
+    </div>
+    <div class="adots" id="pin-m-dots"><div class="adot" id="am0"></div><div class="adot" id="am1"></div><div class="adot" id="am2"></div><div class="adot" id="am3"></div></div>
+    <div style="height:18px;text-align:center;color:var(--rust);font-size:10.5px;margin-bottom:10px;" id="pin-m-err"></div>
+    <div class="a-numpad">
+      <button class="ank" onclick="admKey('1')">1</button><button class="ank" onclick="admKey('2')">2</button><button class="ank" onclick="admKey('3')">3</button>
+      <button class="ank" onclick="admKey('4')">4</button><button class="ank" onclick="admKey('5')">5</button><button class="ank" onclick="admKey('6')">6</button>
+      <button class="ank" onclick="admKey('7')">7</button><button class="ank" onclick="admKey('8')">8</button><button class="ank" onclick="admKey('9')">9</button>
+      <button class="ank emp"></button><button class="ank" onclick="admKey('0')">0</button><button class="ank" onclick="admKey('DEL')">⌫</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══ localStorageキー ══
+const LS={
+  SEC_PIN:'nikki_sec_pin', ADM_PIN:'nikki_adm_pin',
+  DRIVERS:'nikki_drivers', CUSTOMERS:'nikki_customers',
+  OFFICES:'nikki_offices',REGIONS:'nikki_regions',
+  CUST_HIST:'nikki_cust_hist',
+  YP_LOGS:'nikki_yp_logs', COL_LOGS:'nikki_col_logs',
+  ATT_LOGS:'nikki_att_logs',
+};
+
+// ── Firebase設定を自動注入（セットアップ不要） ──
+(function(){
+  const cfg = '{"apiKey": "AIzaSyDDsNZnlG3swyRtuCbMjkUkZpH4X68gUiI", "authDomain": "osq-report-3db91.firebaseapp.com", "databaseURL": "https://osq-report-3db91-default-rtdb.asia-southeast1.firebasedatabase.app", "projectId": "osq-report-3db91", "storageBucket": "osq-report-3db91.firebasestorage.app", "messagingSenderId": "86627546503", "appId": "1:86627546503:web:62d338fb75ebaa91bbcf22"}';
+  if (!localStorage.getItem('nikki_fb_config') || localStorage.getItem('nikki_fb_config') === 'offline') {
+    localStorage.setItem('nikki_fb_config', cfg);
+  }
+})();
+const ls_get=(k,def)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):def;}catch{return def;}};
+const ls_set=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}};
+
+// ══ FIREBASE 同期レイヤー ══
+const FB_KEY = 'nikki_fb_config';
+let fbDB = null;
+let fbOnline = false;
+
+// 設定を読み込んでFirebase初期化
+async function initFirebase() {
+  const cfg = localStorage.getItem(FB_KEY);
+  if (!cfg) { showFbSetup(); return; }
+  try {
+    const config = JSON.parse(cfg);
+    const { initializeApp, getDatabase } = window._fbImports || {};
+    if (!initializeApp) { fbOnline = false; return; }
+    const app = initializeApp(config);
+    fbDB = getDatabase(app);
+    fbOnline = true;
+    console.log('Firebase接続OK');
+    const badge = document.getElementById('fb-status');
+    if (badge) badge.style.display = 'block';
+    await syncFromFirebase(); // 起動時にクラウドから読み込み
+    setupRealtimeSync();      // リアルタイム更新を購読
+  } catch(e) {
+    console.error('Firebase初期化エラー:', e);
+    fbOnline = false;
+    toast('クラウド接続失敗。オフラインで動作します', 'info');
+  }
+}
+
+function showFbSetup() {
+  // fb-setup not needed (config embedded)
+}
+function skipFbSetup() {
+  localStorage.setItem(FB_KEY, 'offline');
+  document.getElementById('fb-setup').style.display = 'none';
+}
+
+function saveFbConfig() {
+  const raw = document.getElementById('fb-config-input').value.trim();
+  const errEl = document.getElementById('fb-config-err');
+  // firebaseConfig オブジェクトを抽出
+  let config;
+  try {
+    // "const firebaseConfig = {...}" 形式でも "{...}" 形式でも対応
+    const match = raw.match(/\{[\s\S]+\}/);
+    if (!match) throw new Error('設定が見つかりません');
+    // JSオブジェクト → JSON変換（キーをクォート）
+    const jsonStr = match[0]
+      .replace(/\/\/.*$/gm, '')           // コメント除去
+      .replace(/,\s*\}/g, '}')           // 末尾カンマ
+      .replace(/([{,]\s*)(\w+)\s*:/g, '$1"$2":') // キーをクォート
+      .replace(/:\s*"([^"]+)"/g, (m, v) => `: "${v}"`);
+    config = JSON.parse(jsonStr);
+    if (!config.apiKey || !config.databaseURL) throw new Error('apiKey と databaseURL が必要です');
+  } catch(e) {
+    errEl.textContent = '設定の解析に失敗: ' + e.message;
+    return;
+  }
+  localStorage.setItem(FB_KEY, JSON.stringify(config));
+  document.getElementById('fb-setup').style.display = 'none';
+  errEl.textContent = '';
+  initFirebase();
+}
+
+// Firebase → localStorage へ同期（起動時）
+async function syncFromFirebase() {
+  if (!fbDB) return;
+  const { ref, get } = window._fbImports;
+  const keys = ['drivers','customers','offices','regions','yp_logs','col_logs','att_logs','sec_pin','adm_pin'];
+  for (const k of keys) {
+    try {
+      const snap = await get(ref(fbDB, 'nikki/' + k));
+      if (snap.exists()) {
+        const val = snap.val();
+        const lsKey = 'nikki_' + k;
+        localStorage.setItem(lsKey, typeof val === 'string' ? val : JSON.stringify(val));
+      }
+    } catch(e) { /* ignore */ }
+  }
+  // グローバル変数を再ロード
+  DRIVERS   = ls_get(LS.DRIVERS, DRIVERS);
+  CUSTOMERS = ls_get(LS.CUSTOMERS, CUSTOMERS);
+  OFFICES   = ls_get(LS.OFFICES, OFFICES);
+  REGIONS   = ls_get(LS.REGIONS, REGIONS);
+  YP_LOGS   = ls_get(LS.YP_LOGS, []);
+  COL_LOGS  = ls_get(LS.COL_LOGS, []);
+  ATT_LOGS  = ls_get(LS.ATT_LOGS, []);
+  console.log('Firebase同期完了');
+}
+
+// Firebase書き込み
+async function fbSet(key, value) {
+  ls_set('nikki_' + key, value); // localStorageは常に更新
+  if (!fbDB) return;
+  const { ref, set } = window._fbImports;
+  try {
+    await set(ref(fbDB, 'nikki/' + key), value);
+  } catch(e) { console.error('fb write error:', e); }
+}
+
+// リアルタイム同期購読（他のスマホの変更を受信）
+function setupRealtimeSync() {
+  if (!fbDB) return;
+  const { ref, onValue } = window._fbImports;
+  // 日報ログをリアルタイムで受信
+  onValue(ref(fbDB, 'nikki/yp_logs'), snap => {
+    if (!snap.exists()) return;
+    YP_LOGS = snap.val() || [];
+    fbSet('yp_logs', YP_LOGS);
+  });
+  onValue(ref(fbDB, 'nikki/col_logs'), snap => {
+    if (!snap.exists()) return;
+    COL_LOGS = snap.val() || [];
+    fbSet('col_logs', COL_LOGS);
+  });
+  // マスタデータもリアルタイム更新
+  onValue(ref(fbDB, 'nikki/drivers'), snap => {
+    if (!snap.exists()) return;
+    DRIVERS = snap.val() || DRIVERS;
+    fbSet('drivers', DRIVERS);
+  });
+  onValue(ref(fbDB, 'nikki/customers'), snap => {
+    if (!snap.exists()) return;
+    CUSTOMERS = snap.val() || CUSTOMERS;
+    fbSet('customers', CUSTOMERS);
+  });
+}
+
+// DOMが読み込まれたらFirebase初期化
+document.addEventListener('DOMContentLoaded', () => {
+  if (localStorage.getItem(FB_KEY) === 'offline') return; // オフラインモード
+  if (window._fbReady) {
+    initFirebase();
+  } else {
+    document.addEventListener('fb-sdk-ready', initFirebase, { once: true });
+  }
+});
+
+
+// ══ データロード ══
+let SEC_PIN = ls_get(LS.SEC_PIN,'1234');
+let ADM_PIN = ls_get(LS.ADM_PIN,'9999');
+let DRIVERS = ls_get(LS.DRIVERS,[
+  {id:'1001',name:'田中 太郎',officeType:'delivery',office:'西成',colAreas:[],kyuyo:'個数制（歩合）',kbn:'個人事業主（歩合）'},
+  {id:'1002',name:'佐藤 次郎',officeType:'delivery',office:'浜寺',colAreas:[],kyuyo:'個数制（歩合）',kbn:'個人事業主（歩合）'},
+  {id:'1003',name:'鈴木 三郎',officeType:'delivery',office:'藤井寺',colAreas:[],kyuyo:'時間単価',kbn:'個人事業主（時間単価）'},
+  {id:'2001',name:'高橋 四郎',officeType:'collection',office:'集荷',colAreas:['西成','浜寺'],kyuyo:'時間単価',kbn:'個人事業主（時間単価）'},
+  {id:'2002',name:'伊藤 五郎',officeType:'delivery',office:'大阪西',colAreas:[],kyuyo:'個数制（歩合）',kbn:'個人事業主（歩合）'},
+  {id:'2003',name:'渡辺 六郎',officeType:'collection',office:'集荷',colAreas:['藤井寺','大阪西'],kyuyo:'時間単価',kbn:'個人事業主（時間単価）'},
+  {id:'9001',name:'山田 七子',officeType:'office',office:'本社',colAreas:[],kyuyo:'時間給',kbn:'パート（事務）'},
+]);
+let CUSTOMERS = ls_get(LS.CUSTOMERS,[
+  {id:1,name:'株式会社アルファ',region:'大阪市北区'},
+  {id:2,name:'アルファ物流センター',region:'大阪市北区'},
+  {id:3,name:'ベータ商事株式会社',region:'大阪市中央区'},
+  {id:4,name:'ベータネット販売',region:'大阪市中央区'},
+  {id:5,name:'株式会社ガンマ',region:'大阪市西区'},
+  {id:6,name:'ガンマ通販事業部',region:'大阪市西区'},
+  {id:7,name:'デルタ物流株式会社',region:'大阪市住之江区'},
+  {id:8,name:'デルタEC出荷センター',region:'大阪市住之江区'},
+  {id:9,name:'イプシロン株式会社',region:'堺市北区'},
+  {id:10,name:'イプシロン南大阪支店',region:'堺市南区'},
+]);
+let REGIONS = ls_get(LS.REGIONS,[
+  '大阪市北区','大阪市中央区','大阪市西区','大阪市住之江区',
+  '大阪市西成区','大阪市浪速区','大阪市阿倍野区',
+  '堺市北区','堺市中区','堺市南区','堺市西区','堺市東区','堺市堺区',
+  '豊中市','吹田市','藤井寺市',
+]);
+let CUST_HIST = ls_get(LS.CUST_HIST,[]); // [{id, name, region, count, lastUsed}]
+let YP_LOGS = ls_get(LS.YP_LOGS,[]);
+let COL_LOGS = ls_get(LS.COL_LOGS,[]);
+let ATT_LOGS = ls_get(LS.ATT_LOGS,[]); // 勤怠ログ {id,driverId,clockIn,clockInGps,clockOut,clockOutGps,adjustedOut,workMin}
+// 営業所マスタ：DRIVERSから自動生成して初期値として使用
+let OFFICES = ls_get(LS.OFFICES,(()=>{
+  const names=[...new Set([
+    '大阪北営業所','大阪南営業所','豊中営業所','吹田営業所'
+  ])];
+  return names.map((name,i)=>({id:i+1,name,addr:''}));
+})());
+
+// 大阪市区・京都の定数
+const OSAKA_KU=['北区','都島区','福島区','此花区','中央区','西区','港区','大正区','天王寺区','浪速区','西淀川区','淀川区','東淀川区','東成区','生野区','旭区','城東区','鶴見区','阿倍野区','住之江区','住吉区','東住吉区','平野区','西成区'];
+const KYOTO_AREAS=['京都市上京区','京都市中京区','京都市下京区','京都市東山区','京都市左京区','京都市右京区','京都市北区','京都市西京区','京都市伏見区','京都市南区','京都市山科区','宇治市','長岡京市','向日市','八幡市','京田辺市'];
+
+const ITEM_MAP=[
+  ['y60','ゆうパック_60'],['y80','ゆうパック_80'],['y100','ゆうパック_100'],
+  ['y120','ゆうパック_120'],['y140','ゆうパック_140'],['y160','ゆうパック_160'],
+  ['pk1','ゆうパケット_通常'],['pk2','ゆうパケット_7cm以上'],
+  ['cp','クリックポスト'],['ke','ケース'],['te','定形外(ゆうメール)'],['ch','チャーター'],
+];
+const UNIT={
+  'ゆうパック_60':{u:'個'},'ゆうパック_80':{u:'個'},'ゆうパック_100':{u:'個'},
+  'ゆうパック_120':{u:'個'},'ゆうパック_140':{u:'個'},'ゆうパック_160':{u:'個'},
+  'ゆうパケット_通常':{u:'個'},'ゆうパケット_7cm以上':{u:'個'},
+  'クリックポスト':{u:'個'},'ケース':{u:'個'},'定形外(ゆうメール)':{u:'個'},'チャーター':{u:'件'},
+};
+
+// ══ ユーティリティ ══
+const $=id=>document.getElementById(id);
+const today=()=>new Date().toISOString().slice(0,10);
+const fmtD=s=>{const d=new Date(s+'T00:00:00');return`${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;};
+const n=id=>Math.max(0,parseInt($(id)?.value)||0);
+let driver=null, lastResult=null;
+let colRows=[], colCustId=null, colCustName='', colRegion='';
+
+// ══ 画面切替 ══
+function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));$(id).classList.add('on');}
+
+// ══ init ══
+window.onload=()=>{
+  $('yp-date').value=today(); $('col-date').value=today();
+  refreshRegions();
+  // セキュリティ層: PINがデフォルト
+};
+
+function refreshRegions(){
+  const regs=[...new Set(CUSTOMERS.map(c=>c.region))].sort();
+  const rs=$('col-region'); rs.innerHTML='<option value="">地域を選択してください</option>';
+  regs.forEach(r=>{const o=document.createElement('option');o.value=r;o.textContent=r;rs.appendChild(o);});
+}
+
+// ══ SECURITY LAYER ══
+function secAuth(){
+  const layer=$('sec-layer');
+  layer.classList.add('slide-up');
+  layer.addEventListener('transitionend',()=>{layer.style.display='none';},{once:true});
+}
+function secReset(){
+  const layer=$('sec-layer');
+  layer.style.display='flex';
+  requestAnimationFrame(()=>requestAnimationFrame(()=>layer.classList.remove('slide-up')));
+  pinCode=''; [0,1,2,3].forEach(i=>$('pd'+i).classList.remove('on'));
+  $('pin-err').textContent='';
+  secTab('pin'); // リセット時もPINがデフォルト
+}
+function secTab(t){
+  $('tab-pin').classList.toggle('on',t==='pin');
+  $('tab-face').classList.toggle('on',t==='face');
+  $('pin-area').style.display=t==='pin'?'flex':'none';
+  $('face-area').style.display=t==='face'?'flex':'none';
+  if(t==='face')startFace();
+}
+
+// PINコード認証
+let pinCode='';
+function pinKey(k){
+  SEC_PIN=ls_get(LS.SEC_PIN,'1234'); // 常に最新を取得
+  if(k==='DEL'){pinCode=pinCode.slice(0,-1);}else if(pinCode.length<4){pinCode+=k;}
+  [0,1,2,3].forEach(i=>$('pd'+i).classList.toggle('on',i<pinCode.length));
+  $('pin-err').textContent='';
+  if(pinCode.length===4){
+    setTimeout(()=>{
+      if(pinCode===SEC_PIN){secAuth();}
+      else{
+        $('pin-err').textContent='コードが違います';
+        $('pin-dots').classList.add('shake');
+        setTimeout(()=>$('pin-dots').classList.remove('shake'),400);
+        pinCode=''; [0,1,2,3].forEach(i=>$('pd'+i).classList.remove('on'));
+      }
+    },150);
+  }
+}
+
+// Face ID
+function startFace(){
+  const frame=$('face-frame'),inner=$('face-inner'),lbl=$('face-lbl'),btn=$('face-btn'),scan=$('face-scan');
+  lbl.style.color='rgba(255,200,80,.7)'; lbl.textContent='INITIALIZING'; btn.style.display='none'; scan.classList.remove('on');
+  navigator.mediaDevices?.getUserMedia({video:{facingMode:'user'}}).then(s=>{
+    const v=document.createElement('video'); v.srcObject=s; v.muted=true; v.playsInline=true; v.play();
+    v.style.cssText='width:100%;height:100%;object-fit:cover;filter:grayscale(1) brightness(.7)';
+    inner.innerHTML=''; inner.appendChild(v); scan.classList.add('on');
+    lbl.style.color='rgba(255,230,102,.85)'; lbl.textContent='SCANNING';
+    setTimeout(()=>{
+      s.getTracks().forEach(t=>t.stop()); scan.classList.remove('on');
+      inner.innerHTML='<div style="font-size:36px;color:#7ec87e;">✓</div>';
+      lbl.style.color='#7ec87e'; lbl.textContent='AUTHENTICATED';
+      setTimeout(()=>secAuth(),600);
+    },3000);
+  }).catch(()=>{
+    inner.innerHTML='<svg width="60" height="60" viewBox="0 0 72 72" fill="none"><ellipse cx="36" cy="28" rx="14" ry="18" stroke="rgba(255,255,255,.3)" stroke-width="1.2"/><path d="M8 66 Q36 50 64 66" stroke="rgba(255,255,255,.3)" stroke-width="1.2" fill="none"/><circle cx="30" cy="26" r="2" fill="rgba(255,255,255,.4)"/><circle cx="42" cy="26" r="2" fill="rgba(255,255,255,.4)"/></svg>';
+    lbl.style.color='rgba(255,255,255,.25)'; lbl.textContent='NO CAMERA';
+    btn.style.display='block'; btn.textContent='RETRY';
+  });
+}
+
+// ══ 勤怠ユーティリティ ══
+// 給与形態から勤怠タイプを判定
+function attType(d){
+  const k=d.kyuyo||'個数制（歩合）';
+  if(k==='時間給')return'part';         // パート（事務）
+  if(k==='時間単価')return'jikan';      // 個人事業主（時間単価）
+  return'other';                         // 歩合・委託・スポット
+}
+// 集荷の時間単価かどうか（帰社修正UI表示判定）
+function isColJikan(d){
+  return attType(d)==='jikan' && (d.officeType==='collection');
+}
+// GPS退勤警告が必要か
+function needsGpsCheck(d){
+  return attType(d)==='part' || attType(d)==='jikan';
+}
+// 15分刻み丸め（7分以下切り捨て・8分以上切り上げ）
+function roundTo15(totalMin){
+  const base=Math.floor(totalMin/15)*15;
+  const rem=totalMin%15;
+  return rem<=7 ? base : base+15;
+}
+function fmtMin(m){
+  return `${Math.floor(m/60)}時間${String(m%60).padStart(2,'0')}分`;
+}
+// 2点間の距離(m) ハバーサイン公式
+function calcDist(lat1,lng1,lat2,lng2){
+  const R=6371000,r=Math.PI/180;
+  const dLat=(lat2-lat1)*r, dLng=(lng2-lng1)*r;
+  const a=Math.sin(dLat/2)**2+Math.cos(lat1*r)*Math.cos(lat2*r)*Math.sin(dLng/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+// 営業所座標マスタ
+const OFFICE_COORDS={
+  '本社':     {lat:34.5783, lng:135.4892, name:'本社（堺市北区常磐町）'},
+  '大阪西':   {lat:34.6865, lng:135.4897, name:'大阪西営業所（大阪西郵便局）'},
+  '西成':     {lat:34.6334, lng:135.4939, name:'西成営業所（西成郵便局）'},
+  '浜寺':     {lat:34.5571, lng:135.4371, name:'浜寺営業所（浜寺郵便局）'},
+  '藤井寺':   {lat:34.5720, lng:135.5966, name:'藤井寺営業所（藤井寺郵便局）'},
+};
+// ドライバーの所属営業所座標を返す
+function getDriverOfficeCoord(d){
+  for(const key of Object.keys(OFFICE_COORDS)){
+    if((d.office||'').includes(key)) return OFFICE_COORDS[key];
+  }
+  return OFFICE_COORDS['本社']; // デフォルト
+}
+
+// ══ ログイン ══
+let todayAttId = null; // 本日の勤怠ID
+function doLogin(){
+  const id=$('emp-id').value.trim();
+  const d=DRIVERS.find(x=>x.id===id);
+  if(!d){$('login-err').textContent='社員番号が見つかりません';$('login-err').style.display='block';return;}
+  driver=d;
+  const now=new Date();
+  const dt=now.toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric',weekday:'short'});
+  $('sel-name').textContent=`${d.name} さん`; $('sel-sub').textContent=`${d.office}　ID: ${d.id}`; $('sel-date').textContent=dt;
+  // 当日の既存勤怠チェック（再ログイン時）
+  const todayStr=now.toISOString().slice(0,10);
+  ATT_LOGS=ls_get(LS.ATT_LOGS,[]);
+  const existing=ATT_LOGS.find(a=>a.driverId===d.id&&a.date===todayStr&&!a.clockOut);
+  if(existing){
+    todayAttId=existing.id;
+    const ci=new Date(existing.clockIn);
+    $('sel-clock-in').textContent=`出勤: ${ci.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}`;
+    $('sel-clock-in').style.display='block';
+  } else {
+    // 新規出勤記録
+    const att={id:Date.now(),driverId:d.id,driverName:d.name,date:todayStr,
+      clockIn:now.toISOString(),clockInGps:null,clockOut:null,clockOutGps:null,
+      adjustedOut:null,workMin:null,kyuyo:d.kyuyo||'個数制（歩合）'};
+    todayAttId=att.id;
+    // GPS取得（バックグラウンド）
+    if(navigator.geolocation){
+      navigator.geolocation.getCurrentPosition(pos=>{
+        att.clockInGps={lat:pos.coords.latitude,lng:pos.coords.longitude,acc:pos.coords.accuracy};
+        const idx=ATT_LOGS.findIndex(a=>a.id===att.id);
+        if(idx>=0){ATT_LOGS[idx]=att;}
+        fbSet('att_logs',ATT_LOGS);
+      },()=>{},{timeout:8000,maximumAge:0});
+    }
+    ATT_LOGS.push(att);
+    fbSet('att_logs',ATT_LOGS);
+    $('sel-clock-in').textContent=`出勤: ${now.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}`;
+    $('sel-clock-in').style.display='block';
+  }
+  // パートはbiz-areaを非表示
+  const isP=attType(d)==='part';
+  $('sel-biz-area').style.display=isP?'none':'block';
+  // 当月実績を集計
+  renderPersonalStats(d);
+  show('scr-select');
+}
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&$('scr-login').classList.contains('on'))doLogin();});
+function doLogout(){driver=null;todayAttId=null;clockOutGps=null;$('emp-id').value='';show('scr-login');secReset();}
+function goTop(){renderPersonalStats(driver);show('scr-select');}
+function goBack(){renderPersonalStats(driver);show('scr-select');}
+function selectBiz(t){
+  if(t==='yp'){$('yp-sub').textContent=`${driver.name} ／ ${driver.office}`;ypReset();show('scr-yp');}
+  else{$('col-sub').textContent=`${driver.name} ／ ${driver.office}`;colReset();buildRegionTabs();show('scr-col');}
+}
+
+// ══ 個人ページ 実績集計 ══
+function renderPersonalStats(d){
+  if(!d) return;
+  if(!$('stat-yp-count')) return; // 画面未表示時はスキップ
+  const mon=new Date().toISOString().slice(0,7); // YYYY-MM
+  const ypM=(YP_LOGS||[]).filter(r=>r.driver&&r.driver.id===d.id&&r.date&&r.date.startsWith(mon));
+  const colM=(COL_LOGS||[]).filter(r=>r.driver&&r.driver.id===d.id&&r.date&&r.date.startsWith(mon));
+  // 宅配件数（完了+転送）
+  const ypCnt=ypM.reduce((s,r)=>s+(r.form?.kanryo||0)+(r.form?.tenso||0),0);
+  // 集荷件数（全品目合計）
+  const colCnt=colM.reduce((s,r)=>{
+    const items=r.items||{};
+    return s+Object.values(items).reduce((a,v)=>a+(Number(v)||0),0);
+  },0);
+  // 稼働日数（日報入力日のユニーク数）
+  const days=new Set([...ypM.map(r=>r.date),...colM.map(r=>r.date)]).size;
+  $('stat-yp-count').textContent=ypCnt||'0';
+  $('stat-col-count').textContent=colCnt||'0';
+  $('stat-work-days').textContent=days||'0';
+}
+
+// ══ 退勤処理 ══
+let clockOutGps=null;
+function startClockOut(){
+  if(!driver){show('scr-login');return;}
+  const att=ATT_LOGS.find(a=>a.id===todayAttId);
+  const co=$('co-sub');
+  co.textContent=`${driver.name} ／ ${driver.office}`;
+  const needGps=needsGpsCheck(driver);
+  const showAdj=isColJikan(driver);
+  // 稼働時間プレビュー（時間単価・パートのみ）
+  if(needGps && att?.clockIn){
+    const ci=new Date(att.clockIn);
+    const now=new Date();
+    const rawMin=Math.round((now-ci)/60000);
+    const rounded=roundTo15(rawMin);
+    $('co-work-disp').textContent=fmtMin(rounded);
+    $('co-time-detail').textContent=`出勤: ${ci.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})} ／ 退勤: ${now.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})} ／ 実稼働: ${fmtMin(rawMin)}`;
+    $('co-time-card').style.display='block';
+  } else {
+    $('co-time-card').style.display='none';
+  }
+  // GPS取得・警告（時間単価・パートのみ）
+  $('co-gps-card').style.display=needGps?'block':'none';
+  if(needGps){
+    $('co-gps-status').textContent='GPS取得中...';
+    $('co-gps-status').style.background='rgba(96,112,128,.08)';
+    $('co-gps-status').style.color='var(--mid)';
+    clockOutGps=null;
+    if(navigator.geolocation){
+      navigator.geolocation.getCurrentPosition(pos=>{
+        clockOutGps={lat:pos.coords.latitude,lng:pos.coords.longitude,acc:pos.coords.accuracy};
+        const oc=getDriverOfficeCoord(driver);
+        const dist=calcDist(pos.coords.latitude,pos.coords.longitude,oc.lat,oc.lng);
+        const distM=Math.round(dist);
+        let statusHtml,bgColor,textColor;
+        if(distM<=100){
+          statusHtml=`✅ 正常（${oc.name}から約${distM}m）`;
+          bgColor='rgba(90,138,90,.1)'; textColor='var(--ok)';
+        } else if(distM<=500){
+          statusHtml=`⚠️ 会社から約${distM}m離れた場所で退勤しています`;
+          bgColor='rgba(154,122,58,.1)'; textColor='var(--amber)';
+        } else {
+          statusHtml=`🚨 会社から約${distM}m以上離れています。確認が必要です`;
+          bgColor='rgba(139,74,58,.1)'; textColor='var(--rust)';
+        }
+        $('co-gps-status').innerHTML=statusHtml;
+        $('co-gps-status').style.background=bgColor;
+        $('co-gps-status').style.color=textColor;
+        $('co-gps-detail').textContent=`GPS精度: ±${Math.round(pos.coords.accuracy)}m`;
+      },()=>{
+        $('co-gps-status').textContent='⚠️ GPS取得できませんでした';
+        $('co-gps-status').style.background='rgba(154,122,58,.1)';
+        $('co-gps-status').style.color='var(--amber)';
+      },{timeout:10000,maximumAge:0});
+    }
+  }
+  // 帰社時刻修正UI（集荷時間単価のみ）
+  $('co-adjust-card').style.display=showAdj?'block':'none';
+  if(showAdj){
+    const now=new Date();
+    $('co-adj-time').value=`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  }
+  show('scr-clockout');
+}
+
+function cancelClockOut(){
+  renderPersonalStats(driver);
+  show('scr-select');
+}
+
+function confirmClockOut(){
+  if(!driver)return;
+  const now=new Date();
+  ATT_LOGS=ls_get(LS.ATT_LOGS,[]);
+  const idx=ATT_LOGS.findIndex(a=>a.id===todayAttId);
+  if(idx<0){toast('勤怠記録が見つかりません','err');return;}
+  const att=ATT_LOGS[idx];
+  att.clockOut=now.toISOString();
+  att.clockOutGps=clockOutGps;
+  // 帰社修正時刻（集荷時間単価のみ）
+  if(isColJikan(driver)){
+    const adjVal=$('co-adj-time').value;
+    if(adjVal){
+      const [h,m]=adjVal.split(':').map(Number);
+      const adjDate=new Date(now);
+      adjDate.setHours(h,m,0,0);
+      att.adjustedOut=adjDate.toISOString();
+      // 帰社修正時刻で稼働時間を計算
+      const rawMin=Math.round((adjDate-new Date(att.clockIn))/60000);
+      att.workMin=roundTo15(Math.max(0,rawMin));
+    }
+  }
+  // 時間単価・パートで修正なしの場合
+  if(!att.workMin && needsGpsCheck(driver) && att.clockIn){
+    const rawMin=Math.round((now-new Date(att.clockIn))/60000);
+    att.workMin=roundTo15(Math.max(0,rawMin));
+  }
+  ATT_LOGS[idx]=att;
+  fbSet('att_logs',ATT_LOGS);
+  // 完了画面へ
+  $('done-title').textContent='退勤完了';
+  $('done-time').textContent=now.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})+' 退勤記録';
+  const wm=att.workMin;
+  const doneSum=$('done-sum');
+  if(doneSum) doneSum.innerHTML=`
+    <div class="sum-row" style="border-top:none;">
+      <span>退勤時刻</span><span class="fw7">${now.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}</span>
+    </div>
+    ${wm!=null?`<div class="sum-row"><span>稼働時間（丸め後）</span><span class="fw7" style="color:var(--clay)">${fmtMin(wm)}</span></div>`:''}
+    ${att.adjustedOut?`<div class="sum-row"><span>帰社修正時刻</span><span class="fw7" style="color:var(--amber)">${new Date(att.adjustedOut).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}</span></div>`:''}
+  `;
+  show('scr-done');
+}
+
+// ══ ゆうパック ══
+function ypReset(){['yp-m','yp-k','yp-y','yp-t','yp-mo','yp-yo','yp-s'].forEach(id=>{const e=$(id);if(e)e.value=0;});$('yp-note').value='';$('yp-date').value=today();valYP();}
+const ypN=id=>Math.max(0,parseInt($(id)?.value)||0);
+function ypStep(k,d){const map={m:'yp-m',k:'yp-k',y:'yp-y',t:'yp-t',mo:'yp-mo',yo:'yp-yo',s:'yp-s'};const el=$(map[k]);if(!el)return;el.value=Math.max(0,(parseInt(el.value)||0)+d);valYP();}
+function valYP(){
+  const m=ypN('yp-m'),k=ypN('yp-k'),y=ypN('yp-y'),t=ypN('yp-t'),mo=ypN('yp-mo'),yo=ypN('yp-yo');
+  const sum=k+t+mo+yo; const yOk=y<=k; const mOk=m===0&&sum===0?true:m===sum;
+  $('yp-vbox').style.display=(m>0||sum>0)?'block':'none';
+  $('v-m').textContent=m; $('v-s').textContent=`${k}+${t}+${mo}+${yo}=${sum}`;
+  const vr=$('v-res');
+  if(m>0&&sum>0){if(mOk&&yOk){vr.className='veq vok';vr.textContent=`✓ 検証OK：持出(${m}) ＝ 合計(${sum})`;}else{vr.className='veq vng';vr.textContent=`✗ 持出(${m}) ≠ 合計(${sum})${!yOk?' ／ 夜間エラー':''}`;}}else{vr.className='veq vwt';vr.textContent='数値を入力してください';}
+  $('yp-y-err').style.display=!yOk&&y>0?'block':'none';
+  $('yp-card-m').classList.toggle('warn',!mOk&&m>0); $('yp-card-k').classList.toggle('warn',!yOk&&y>0);
+  const sm=$('yp-sum');
+  if(m>0){sm.style.display='block';$('s-rate').textContent=m>0?Math.round(k/m*100)+'%':'-';$('s-y').textContent=y;$('s-s').textContent=ypN('yp-s');}else sm.style.display='none';
+  const sub=$('yp-submit');
+  if(m>0){sub.classList.remove('btn-dis');sub.style.background=mOk?'var(--slate)':'var(--amber)';}else sub.classList.add('btn-dis');
+}
+function submitYP(){
+  const m=ypN('yp-m'); if(!m){toast('持出個数を入力してください','err');return;}
+  const k=ypN('yp-k'),y=ypN('yp-y'),t=ypN('yp-t'),mo=ypN('yp-mo'),yo=ypN('yp-yo');
+  const sum=k+t+mo+yo;
+  if(sum!==m&&!confirm(`検証エラー：持出(${m})≠合計(${sum})\n保存しますか？`))return;
+  if(y>k&&!confirm(`夜間(${y})>完了(${k})\n保存しますか？`))return;
+  // 同日・同人の重複チェック → 警告して置き換え
+  const date=$('yp-date').value;
+  YP_LOGS=ls_get(LS.YP_LOGS,[]);
+  const dupIdx=YP_LOGS.findIndex(r=>r.date===date&&r.driver.id===driver.id);
+  if(dupIdx>=0){
+    const prev=YP_LOGS[dupIdx];
+    const prevTime=new Date(prev.submittedAt).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
+    if(!confirm(`⚠ ${date} はすでに提出済みです（${prevTime}提出）。\n上書きしますか？\n※前回のデータは削除されます`))return;
+    YP_LOGS.splice(dupIdx,1);
+  }
+  const rec={id:Date.now(),type:'yuupack',driver:{...driver},date,
+    form:{mochidashi:m,kanryo:k,yakan:y,tenso:t,mochimodoiri:mo,'翌日廻し':yo,shukka:ypN('yp-s'),notes:$('yp-note').value||''},
+    submittedAt:new Date().toISOString()};
+  YP_LOGS.push(rec); fbSet('yp_logs',YP_LOGS);
+  lastResult=rec; showDone();
+}
+
+// ══ 集荷 ══
+let curRegionTab='other';
+
+function colReset(){
+  colRows=[];colCustId=null;colCustName='';colRegion='';
+  $('col-date').value=today();$('col-note').value='';
+  $('col-cust-area').style.display='none';
+  $('col-cust-sel').style.display='none';
+  $('col-rows-card').style.display='none';$('col-rows-list').innerHTML='';
+  $('col-cust-list').style.display='none';$('col-search').value='';
+  $('col-submit').classList.add('btn-dis');
+  ITEM_MAP.forEach(([k])=>{const e=$('i-'+k);if(e)e.value=0;});
+  $('col-prev').style.display='none'; $('ch-dest-area').style.display='none';
+  $('col-region-sel').style.display='none';
+  $('region-free-input').value='';
+  $('region-free-suggest').style.display='none';
+  curRegionTab='other'; switchRegionTab('other');
+  buildRegionTabs();
+}
+
+function buildRegionTabs(){
+  REGIONS=ls_get(LS.REGIONS,REGIONS);
+  CUSTOMERS=ls_get(LS.CUSTOMERS,CUSTOMERS);
+  // 大阪市区
+  $('osaka-ku-btns').innerHTML=OSAKA_KU.map(ku=>`<button class="rku-btn" onclick="selectRegion('大阪市${ku}')">${ku}</button>`).join('');
+  // 京都
+  $('kyoto-btns').innerHTML=KYOTO_AREAS.map(r=>`<button class="rku-btn" onclick="selectRegion('${r}')">${r.replace('京都市','').replace('市','市')}</button>`).join('');
+  // その他（REGIONS から 大阪市区・京都以外）
+  const osakeKuFull=OSAKA_KU.map(k=>`大阪市${k}`);
+  const others=REGIONS.filter(r=>!osakeKuFull.includes(r)&&!KYOTO_AREAS.includes(r));
+  $('other-region-btns').innerHTML=others.length
+    ?others.map(r=>`<button class="rku-btn" onclick="selectRegion('${r.replace(/'/g,"\\'")}')">${r}</button>`).join('')
+    :'<span style="color:var(--light);font-size:11px;">管理システムで地域を登録してください</span>';
+}
+
+function switchRegionTab(t){
+  curRegionTab=t;
+  ['osaka','kyoto','other','free'].forEach(id=>{
+    $('rtab-'+id).classList.toggle('on',id===t);
+    $('rtab-content-'+id).style.display=id===t?'block':'none';
+  });
+}
+
+function selectRegion(r){
+  colRegion=r;
+  $('col-region-name').textContent=r;
+  $('col-region-sel').style.display='flex';
+  $('col-cust-area').style.display='block';
+  $('col-cust-sel').style.display='none';
+  $('col-search').value='';
+  colCustId=null;colCustName='';
+  showCustList();
+}
+
+function clearRegion(){
+  colRegion='';colCustId=null;colCustName='';
+  $('col-region-sel').style.display='none';
+  $('col-cust-area').style.display='none';
+  $('col-cust-sel').style.display='none';
+  $('col-cust-list').style.display='none';
+  $('col-search').value='';
+}
+
+function onFreeRegionInput(){
+  const q=$('region-free-input').value.trim();
+  if(!q){$('region-free-suggest').style.display='none';return;}
+  REGIONS=ls_get(LS.REGIONS,REGIONS);
+  // 登録済み地域 + 大阪市区 + 京都 から候補
+  const allR=[...new Set([...REGIONS,...OSAKA_KU.map(k=>`大阪市${k}`),...KYOTO_AREAS])];
+  const hits=allR.filter(r=>r.includes(q)).slice(0,8);
+  if(!hits.length){
+    // 完全手打ちとして直接選択ボタン表示
+    $('region-free-suggest').style.display='block';
+    $('region-free-suggest').innerHTML=`<button class="cust-item" onclick="selectRegion('${q.replace(/'/g,"\\'")}')">「${q}」で確定</button>`;
+    return;
+  }
+  $('region-free-suggest').style.display='block';
+  $('region-free-suggest').innerHTML=hits.map(r=>`<button class="cust-item" onclick="selectRegion('${r.replace(/'/g,"\\'")}');$('region-free-input').value='';$('region-free-suggest').style.display='none';">${r}</button>`).join('');
+}
+
+// 顧客リスト表示（履歴優先 + 検索絞り込み）
+function showCustList(){
+  if(!colRegion){$('col-cust-list').style.display='none';return;}
+  CUSTOMERS=ls_get(LS.CUSTOMERS,CUSTOMERS);
+  CUST_HIST=ls_get(LS.CUST_HIST,[]);
+  const q=$('col-search').value.trim().toLowerCase();
+  // 対象地域の顧客
+  const regionCusts=CUSTOMERS.filter(c=>c.region===colRegion);
+  // 検索あり → 名前絞り込み
+  let list;
+  if(q){
+    list=regionCusts.filter(c=>c.name.toLowerCase().includes(q));
+    $('col-cust-list').innerHTML=list.length
+      ?list.map(c=>custItemHtml(c,false)).join('')
+      :'<div style="padding:10px 12px;color:var(--light);font-size:11.5px;">該当なし</div>';
+    $('col-cust-list').style.display='block';
+    return;
+  }
+  // 検索なし → 履歴（この地域でよく使う）を先頭に表示
+  const histIds=CUST_HIST.filter(h=>h.region===colRegion).sort((a,b)=>b.count-a.count).map(h=>h.id);
+  const histCusts=histIds.map(id=>regionCusts.find(c=>c.id===id)).filter(Boolean);
+  const restCusts=regionCusts.filter(c=>!histIds.includes(c.id));
+  let html='';
+  if(histCusts.length){
+    html+=`<div class="cust-hist-label">⭐ よく使う</div>`;
+    html+=histCusts.map(c=>custItemHtml(c,true)).join('');
+    if(restCusts.length) html+=`<div class="cust-hist-label">すべての顧客</div>`;
+  }
+  html+=restCusts.map(c=>custItemHtml(c,false)).join('');
+  $('col-cust-list').innerHTML=html||'<div style="padding:10px 12px;color:var(--light);font-size:11.5px;">この地域の顧客がいません</div>';
+  $('col-cust-list').style.display='block';
+}
+
+function custItemHtml(c,isHist){
+  return `<button class="cust-item" onclick="selCust(${c.id},'${c.name.replace(/'/g,"\\'")}','${c.region.replace(/'/g,"\\'")}')">${isHist?'⭐ ':''}${c.name}</button>`;
+}
+
+function selCust(id,name,region){
+  colCustId=id;colCustName=name;colRegion=region;
+  $('col-search').value='';$('col-cust-list').style.display='none';
+  $('col-cust-sel').style.display='block';
+  $('col-cust-sel').innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;"><div><div style="color:var(--sage);font-weight:700;font-size:12px;">${name}</div><div style="color:var(--light);font-size:10px;">${region}</div></div><button onclick="clrCust()" style="background:none;border:1px solid var(--brd);color:var(--mid);border-radius:6px;padding:2px 8px;cursor:pointer;font-size:10px;font-family:var(--sans);">変更</button></div>`;
+  updPrev();
+}
+
+function clrCust(){
+  colCustId=null;colCustName='';
+  $('col-search').value='';$('col-cust-sel').style.display='none';
+  showCustList(); updPrev();
+}
+
+// 顧客使用履歴を記録
+function recordCustHist(id,name,region){
+  CUST_HIST=ls_get(LS.CUST_HIST,[]);
+  const ex=CUST_HIST.find(h=>h.id===id&&h.region===region);
+  if(ex){ex.count++;ex.lastUsed=Date.now();}
+  else{CUST_HIST.push({id,name,region,count:1,lastUsed:Date.now()});}
+  // 地域ごとに上位10件のみ保持
+  const byReg={};
+  CUST_HIST.forEach(h=>{if(!byReg[h.region])byReg[h.region]=[];byReg[h.region].push(h);});
+  const trimmed=[];
+  Object.values(byReg).forEach(arr=>trimmed.push(...arr.sort((a,b)=>b.count-a.count).slice(0,10)));
+  CUST_HIST=trimmed;ls_set(LS.CUST_HIST,CUST_HIST);
+}
+const iN=k=>Math.max(0,parseInt($('i-'+k)?.value)||0);
+function iStep(k,d){const e=$('i-'+k);if(!e)return;e.value=Math.max(0,(parseInt(e.value)||0)+d);updPrev();}
+function updPrev(){
+  const tot=ITEM_MAP.reduce((s,[k])=>s+iN(k),0);
+  $('ch-dest-area').style.display=iN('ch')>0?'block':'none';
+  if(tot>0){$('col-prev').style.display='block';$('prev-tot').textContent=tot;}else $('col-prev').style.display='none';
+  const h=$('col-add-hint');
+  if(!colCustId){h.style.display='block';h.textContent='顧客を選択してください';}
+  else if(!tot){h.style.display='block';h.textContent='数量を1以上入力してください';}
+  else h.style.display='none';
+}
+function addRows(){
+  if(!colCustId){toast('顧客を選択してください','err');return;}
+  const newRows=[];
+  ITEM_MAP.forEach(([k,mkey])=>{const q=iN(k);if(!q)return;newRows.push({customerId:colCustId,customerName:colCustName,region:colRegion,masterKey:mkey,label:mkey.replace(/_/g,' '),qty:q,unit:UNIT[mkey].u,destination:k==='ch'?($('ch-dest')?.value||''):'',});});
+  if(!newRows.length){toast('数量を1以上入力してください','err');return;}
+  // 履歴記録
+  recordCustHist(colCustId,colCustName,colRegion);
+  colRows=[...colRows,...newRows]; renderRows();
+  ITEM_MAP.forEach(([k])=>{const e=$('i-'+k);if(e)e.value=0;});
+  if($('ch-dest'))$('ch-dest').value=''; $('col-prev').style.display='none'; $('ch-dest-area').style.display='none';
+  $('col-cust-sel').style.display='none'; $('col-search').value=''; colCustId=null; colCustName='';
+  clearRegion();
+  toast(`${newRows.length}件の明細を追加しました`);
+  $('col-submit').classList.toggle('btn-dis',colRows.length===0);
+}
+function renderRows(){
+  $('col-rows-card').style.display=colRows.length?'block':'none';
+  $('col-rows-lbl').textContent=`入力済み明細（${colRows.length}件）`;
+  $('col-rows-list').innerHTML=colRows.map((r,i)=>`<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:6px 0;border-bottom:1px solid var(--div);"><div><div style="color:var(--light);font-size:9.5px;">${r.region}</div><div style="font-weight:700;font-size:12px;">${r.customerName}</div><div style="color:var(--mid);font-size:11px;">${r.label} × ${r.qty}${r.unit}</div>${r.destination?`<div style="color:var(--amber);font-size:10px;">→ ${r.destination}</div>`:''}</div><button onclick="delRow(${i})" style="background:rgba(139,74,58,.07);border:none;color:var(--rust);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:10px;flex-shrink:0;margin-left:6px;">削除</button></div>`).join('');
+  $('col-submit').classList.toggle('btn-dis',colRows.length===0);
+}
+function delRow(i){colRows.splice(i,1);renderRows();}
+function submitCol(){
+  if(!colRows.length){toast('明細を1件以上追加してください','err');return;}
+  const rec={id:Date.now(),type:'collection',driver:{...driver},date:$('col-date').value,rows:colRows,note:$('col-note').value||'',submittedAt:new Date().toISOString()};
+  COL_LOGS.push(rec); fbSet('col_logs',COL_LOGS);
+  lastResult=rec; showDone();
+}
+
+// ══ 完了 ══
+function showDone(){
+  const r=lastResult;
+  $('done-title').style.color=r.type==='yuupack'?'var(--slate)':'var(--sage)';
+  $('done-time').textContent=new Date(r.submittedAt).toLocaleString('ja-JP');
+  const rows=r.type==='yuupack'?[
+    ['担当者',r.driver.name],['事業','ゆうパック宅配'],['日付',fmtD(r.date)],
+    ['持出個数',`${r.form.mochidashi}個`],['配達完了',`${r.form.kanryo}個`],
+    ['夜間',`${r.form.yakan||0}個`],
+    ...(r.form.tenso?[['転送還付',`${r.form.tenso}個`]]:[]),
+    ...(r.form.mochimodoiri?[['持ち戻り',`${r.form.mochimodoiri}個`]]:[]),
+    ['集荷',`${r.form.shukka||0}個`],
+  ]:[['担当者',r.driver.name],['事業','集荷事業'],['日付',fmtD(r.date)],['明細',`${r.rows.length}件`]];
+  $('done-sum').innerHTML=rows.map(([k,v])=>`<div class="r"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('');
+  show('scr-done'); toast('日報を提出しました');
+}
+function doEdit(){
+  if(!lastResult)return;
+  if(lastResult.type==='yuupack'){
+    const f=lastResult.form;
+    $('yp-m').value=f.mochidashi;$('yp-k').value=f.kanryo;$('yp-y').value=f.yakan;
+    $('yp-t').value=f.tenso;$('yp-mo').value=f.mochimodoiri;$('yp-yo').value=f['翌日廻し'];
+    $('yp-s').value=f.shukka;$('yp-date').value=lastResult.date; valYP(); show('scr-yp');
+  }else{colRows=[...lastResult.rows];renderRows();$('col-date').value=lastResult.date;show('scr-col');}
+}
+
+// ══ 管理画面 ══
+function openAdm(){
+  // PIN認証
+  admCode=''; [0,1,2,3].forEach(i=>$('am'+i).classList.remove('on'));
+  $('pin-m-err').textContent=''; $('pin-m-desc').textContent='管理者PINを入力';
+  pendingAction='openAdm';
+  $('pin-modal').classList.add('on');
+}
+function closeAdm(){$('adm-overlay').classList.remove('on');}
+function closeAdmOutside(e){if(e.target===$('adm-overlay'))closeAdm();}
+
+function admTab(t){
+  document.querySelectorAll('.adm-tab').forEach(b=>b.classList.remove('on'));
+  event.currentTarget.classList.add('on');
+  document.querySelectorAll('.adm-panel').forEach(p=>p.classList.remove('on'));
+  $('panel-'+t).classList.add('on');
+  if(t==='cust')renderCustList();
+  if(t==='emp')renderEmpList();
+  if(t==='office')renderOfficeList();
+  if(t==='log')renderLogList();
+  if(t==='csv')renderCsvStat();
+  if(t==='pin')renderPinInfo();
+}
+
+// 顧客管理
+function renderCustList(){
+  $('cust-count').textContent=`${CUSTOMERS.length}社`;
+  $('cust-list').innerHTML=CUSTOMERS.length?CUSTOMERS.map((c,i)=>
+    `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;${i?'border-top:1px solid var(--div);':''}background:${i%2?'var(--page)':'var(--card)'};">
+      <div><div style="font-size:12px;font-weight:600;">${c.customerNo?`<span style="font-family:var(--mono);font-size:10px;color:var(--light);margin-right:5px;">${c.customerNo}</span>`:''}${c.name}</div><div style="font-size:10px;color:var(--light);">${c.region}</div></div>
+      <button class="del-btn" onclick="delCust(${c.id})">削除</button>
+    </div>`
+  ).join(''):'<div style="padding:12px;color:var(--light);font-size:11px;text-align:center;">登録顧客なし</div>';
+}
+function addCust(){
+  const customerNo=$('new-cust-no').value.trim();
+  const name=$('new-cust-name').value.trim(), region=$('new-cust-region').value.trim();
+  if(!name||!region){toast('顧客名と地域を入力してください','err');return;}
+  if(CUSTOMERS.find(c=>c.name===name)){toast('同名の顧客が既に存在します','err');return;}
+  if(customerNo&&CUSTOMERS.find(c=>c.customerNo===customerNo)){toast('その顧客番号は既に使用されています','err');return;}
+  CUSTOMERS.push({id:Date.now(),customerNo:customerNo||'',name,region});
+  fbSet('customers',CUSTOMERS);
+  $('new-cust-no').value='';$('new-cust-name').value=''; $('new-cust-region').value='';
+  renderCustList(); refreshRegions(); toast(`「${name}」を登録しました`);
+}
+function delCust(id){
+  const c=CUSTOMERS.find(x=>x.id===id);
+  if(!confirm(`「${c?.name}」を削除しますか？`))return;
+  CUSTOMERS=CUSTOMERS.filter(x=>x.id!==id); fbSet('customers',CUSTOMERS);
+  renderCustList(); refreshRegions(); toast('顧客を削除しました');
+}
+
+// 社員管理
+let selectedEmpType=null; // 'delivery_営業所名' or 'collection'
+
+function buildEmpTypeChips(){
+  const wrap=$('emp-type-chips');
+  if(!wrap)return;
+  OFFICES=ls_get(LS.OFFICES,OFFICES);
+  const delOffices=OFFICES.map(o=>o.name);
+  wrap.innerHTML='';
+  delOffices.forEach(name=>{
+    const chip=document.createElement('button');
+    chip.type='button';
+    chip.textContent='🚛 '+name;
+    chip.style.cssText=`padding:5px 12px;border-radius:6px;border:1px solid var(--brd);background:${selectedEmpType==='delivery_'+name?'var(--slate)':'var(--inp)'};color:${selectedEmpType==='delivery_'+name?'#fff':'var(--ink)'};font-size:11px;cursor:pointer;font-family:var(--sans);transition:all .15s;`;
+    chip.onclick=()=>{
+      selectedEmpType='delivery_'+name;
+      buildEmpTypeChips();
+      $('emp-office-wrap').style.display='none';
+    };
+    wrap.appendChild(chip);
+  });
+  const colChip=document.createElement('button');
+  colChip.type='button';
+  colChip.textContent='📦 集荷';
+  colChip.style.cssText=`padding:5px 12px;border-radius:6px;border:1px solid var(--brd);background:${selectedEmpType==='collection'?'var(--sage)':'var(--inp)'};color:${selectedEmpType==='collection'?'#fff':'var(--ink)'};font-size:11px;cursor:pointer;font-family:var(--sans);transition:all .15s;`;
+  colChip.onclick=()=>{
+    selectedEmpType='collection';
+    buildEmpTypeChips();
+    $('emp-office-wrap').style.display='none';
+  };
+  wrap.appendChild(colChip);
+}
+
+function renderEmpList(){
+  $('emp-count').textContent=`${DRIVERS.length}名`;
+  // datalist更新
+  const offices=[...new Set(DRIVERS.map(d=>d.office))];
+  $('office-list').innerHTML=offices.map(o=>`<option value="${o}">`).join('');
+  buildEmpTypeChips();
+  $('emp-list').innerHTML=DRIVERS.length?DRIVERS.map((d,i)=>
+    `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;${i?'border-top:1px solid var(--div);':''}background:${i%2?'var(--page)':'var(--card)'};">
+      <div>
+        <div style="font-size:12px;font-weight:600;">${d.name} <span style="font-family:var(--mono);font-size:10px;color:var(--mid);">[${d.id}]</span></div>
+        <div style="font-size:10px;color:var(--light);">${d.office}　<span style="padding:1px 5px;border-radius:3px;font-size:9px;font-weight:700;background:${d.officeType==='collection'?'rgba(107,124,106,.12)':'rgba(96,112,128,.1)'};color:${d.officeType==='collection'?'var(--sage)':'var(--slate)'};">${d.officeType==='collection'?'集荷':'宅配'}</span></div>
+      </div>
+      <button class="del-btn" onclick="delEmp('${d.id}')">削除</button>
+    </div>`
+  ).join(''):'<div style="padding:12px;color:var(--light);font-size:11px;text-align:center;">登録社員なし</div>';
+}
+function addEmp(){
+  const id=$('new-emp-id').value.trim(), name=$('new-emp-name').value.trim();
+  if(!id||!name){toast('社員番号と氏名を入力してください','err');return;}
+  if(!/^\d{4,6}$/.test(id)){toast('社員番号は4〜6桁の数字で入力してください','err');return;}
+  if(!selectedEmpType){toast('担当種別を選択してください','err');return;}
+  if(DRIVERS.find(d=>d.id===id)){toast('その社員番号は既に使用されています','err');return;}
+  const isCol=selectedEmpType==='collection';
+  const office=isCol?'集荷':selectedEmpType.replace('delivery_','');
+  DRIVERS.push({id,name,company:'',officeType:isCol?'collection':'delivery',office}); fbSet('drivers',DRIVERS);
+  $('new-emp-id').value=''; $('new-emp-name').value='';
+  selectedEmpType=null; buildEmpTypeChips();
+  renderEmpList(); toast(`「${name}」を登録しました`);
+}
+function delEmp(id){
+  const d=DRIVERS.find(x=>x.id===id);
+  if(!confirm(`「${d?.name}」を削除しますか？`))return;
+  DRIVERS=DRIVERS.filter(x=>x.id!==id); fbSet('drivers',DRIVERS);
+  renderEmpList(); toast('社員を削除しました');
+}
+
+// ══ 営業所管理 ══
+function renderOfficeList(){
+  // DRIVERSから現存する営業所名を自動マージ
+  const fromDrivers=[...new Set(DRIVERS.map(d=>d.office))];
+  fromDrivers.forEach(name=>{
+    if(!OFFICES.find(o=>o.name===name)){
+      OFFICES.push({id:Date.now()+Math.random(),name,addr:''});
+      fbSet('offices',OFFICES);
+    }
+  });
+
+  $('office-count').textContent=`${OFFICES.length}拠点`;
+
+  // 各営業所の所属社員数・顧客地域数をカウント
+  $('office-list-adm').innerHTML=OFFICES.length
+    ? OFFICES.map((o,i)=>{
+        const empCnt=DRIVERS.filter(d=>d.office===o.name).length;
+        const hasDriver=empCnt>0;
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 12px;${i?'border-top:1px solid var(--div);':''}background:${i%2?'var(--page)':'var(--card)'};">
+          <div>
+            <div style="font-size:12.5px;font-weight:700;">${o.name}</div>
+            <div style="font-size:10px;color:var(--light);">${o.addr||'所在地未登録'}　<span style="color:${empCnt?'var(--slate)':'var(--light)'};">社員 ${empCnt}名</span></div>
+          </div>
+          <button class="del-btn" onclick="delOffice(${o.id})" ${hasDriver?'title="所属社員がいます"':''}>削除</button>
+        </div>`;
+      }).join('')
+    : '<div style="padding:12px;color:var(--light);font-size:11px;text-align:center;">登録営業所なし</div>';
+
+  // サマリー表示
+  const totalEmp=DRIVERS.length;
+  const unassigned=DRIVERS.filter(d=>!OFFICES.find(o=>o.name===d.office)).length;
+  $('office-summary').innerHTML=`
+    <div style="background:var(--inp);border-radius:8px;padding:10px 12px;font-size:10.5px;color:var(--mid);">
+      全社員 <strong style="color:var(--ink);">${totalEmp}名</strong> ／ 営業所 <strong style="color:var(--ink);">${OFFICES.length}拠点</strong>
+      ${unassigned?`<span style="color:var(--rust);margin-left:6px;">⚠ 未割当社員 ${unassigned}名</span>`:''}
+    </div>`;
+
+  // 社員管理の営業所datalistも更新
+  const dl=$('office-list');
+  if(dl) dl.innerHTML=OFFICES.map(o=>`<option value="${o.name}">`).join('');
+}
+
+function addOffice(){
+  const name=$('new-office-name').value.trim();
+  const addr=$('new-office-addr').value.trim();
+  if(!name){toast('営業所名を入力してください','err');return;}
+  if(OFFICES.find(o=>o.name===name)){toast('同名の営業所が既に存在します','err');return;}
+  OFFICES.push({id:Date.now(),name,addr});
+  fbSet('offices',OFFICES);
+  $('new-office-name').value=''; $('new-office-addr').value='';
+  renderOfficeList(); toast(`「${name}」を登録しました`);
+}
+
+function delOffice(id){
+  const o=OFFICES.find(x=>x.id===id);
+  const empCnt=DRIVERS.filter(d=>d.office===o?.name).length;
+  if(empCnt>0){
+    if(!confirm(`「${o?.name}」には社員が${empCnt}名います。\n削除しますか？（社員の営業所情報は残ります）`))return;
+  }else{
+    if(!confirm(`「${o?.name}」を削除しますか？`))return;
+  }
+  OFFICES=OFFICES.filter(x=>x.id!==id); fbSet('offices',OFFICES);
+  renderOfficeList(); toast('営業所を削除しました');
+}
+
+// PIN変更
+function renderPinInfo(){
+  // 表示はマスク
+  $('cur-sec-pin').textContent='●●●●'; $('cur-adm-pin').textContent='●●●●';
+}
+function changePin(type){
+  const n1=$(type==='sec'?'new-sec-pin':'new-adm-pin').value;
+  const n2=$(type==='sec'?'new-sec-pin2':'new-adm-pin2').value;
+  if(!/^\d{4}$/.test(n1)){toast('PINは4桁の数字で入力してください','err');return;}
+  if(n1!==n2){toast('PINが一致しません','err');return;}
+  if(type==='sec'){SEC_PIN=n1;fbSet('sec_pin',n1);$('new-sec-pin').value='';$('new-sec-pin2').value='';}
+  else{ADM_PIN=n1;fbSet('adm_pin',n1);$('new-adm-pin').value='';$('new-adm-pin2').value='';}
+  toast(`${type==='sec'?'セキュリティ':'管理者'}PINを変更しました`);
+}
+
+// CSV
+function renderCsvStat(){
+  $('csv-stat').innerHTML=`宅配日報 <strong>${YP_LOGS.length}</strong>件　／　集荷日報 <strong>${COL_LOGS.length}</strong>件 が保存済みです`;
+}
+function doExport(t){
+  YP_LOGS=ls_get(LS.YP_LOGS,[]); COL_LOGS=ls_get(LS.COL_LOGS,[]);
+  const dt=new Date().toISOString().slice(0,10);
+  if(t==='yp'||t==='both') exportCSV(makeYPCSV(), `宅配日報_${dt}.csv`);
+  if(t==='col'||t==='both') setTimeout(()=>exportCSV(makeColCSV(),`集荷日報_${dt}.csv`),t==='both'?600:0);
+  toast(`CSV出力しました（${t==='yp'?'宅配':t==='col'?'集荷':'宅配+集荷'}）`);
+}
+function makeYPCSV(){
+  const h='日付,営業所,従事員名,区分,持ち出し,完了,夜間,転送還付,持ち戻り,翌日廻し,集荷,備考,検証';
+  const rows=YP_LOGS.map(r=>{
+    const f=r.form; const sum=f.kanryo+f.tenso+f.mochimodoiri+f['翌日廻し'];
+    return [r.date,r.driver.office,r.driver.name,'社員',f.mochidashi,f.kanryo,f.yakan,f.tenso,f.mochimodoiri,f['翌日廻し'],f.shukka,f.notes||'',f.mochidashi===sum?'OK':'NG'].join(',');
+  });
+  return [h,...rows].join('\n');
+}
+function makeColCSV(){
+  const h='日付,営業所,従事員名,顧客番号,顧客名,地域,品目,数量,単位';
+  const rows=[];
+  COL_LOGS.forEach(r=>r.rows.forEach(row=>rows.push([r.date,r.driver.office,r.driver.name,
+      (()=>{const cu=CUSTOMERS.find(x=>x.name===row.customerName);return cu?.customerNo||'';})(),
+      row.customerName,row.region,row.masterKey,row.qty,row.unit].join(','))));
+  return [h,...rows].join('\n');
+}
+function exportCSV(csv,fname){
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=fname; a.click(); URL.revokeObjectURL(a.href);
+}
+
+// 日報一覧
+function renderLogList(){
+  const all=[...YP_LOGS.map(r=>({...r,label:'宅配'})),...COL_LOGS.map(r=>({...r,label:'集荷'}))].sort((a,b)=>b.id-a.id);
+  if(!all.length){$('log-list').innerHTML='<div style="padding:16px;color:var(--light);font-size:11px;text-align:center;">提出済み日報はありません</div>';return;}
+  $('log-list').innerHTML=all.map((r,i)=>`
+    <div style="padding:9px 0;${i?'border-top:1px solid var(--div);':''}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+        <div>
+          <div style="font-size:11.5px;font-weight:700;">${fmtD(r.date)} <span style="font-size:10px;font-weight:400;color:var(--mid);">${r.driver.name}</span></div>
+          <div style="font-size:10px;color:var(--light);">${r.driver.office}</div>
+        </div>
+        <span style="background:${r.label==='宅配'?'rgba(96,112,128,.1)':'rgba(107,124,106,.1)'};color:${r.label==='宅配'?'var(--slate)':'var(--sage)'};padding:1px 7px;border-radius:4px;font-size:9.5px;font-weight:700;">${r.label}</span>
+      </div>
+      ${r.label==='宅配'?`<div style="font-size:10px;color:var(--mid);margin-top:3px;">持出: ${r.form.mochidashi}　完了: ${r.form.kanryo}　夜間: ${r.form.yakan||0}　集荷: ${r.form.shukka||0}</div>`:`<div style="font-size:10px;color:var(--mid);margin-top:3px;">明細 ${r.rows.length}件</div>`}
+      <div style="font-size:9.5px;color:var(--light);margin-top:1px;">${new Date(r.submittedAt).toLocaleString('ja-JP')}</div>
+    </div>`
+  ).join('');
+}
+function clearLogs(){
+  if(!confirm('提出済み日報を全件削除しますか？\n（この操作は元に戻せません）'))return;
+  YP_LOGS=[]; COL_LOGS=[]; fbSet('yp_logs',[]); fbSet('col_logs',[]);
+  renderLogList(); toast('日報を全件削除しました');
+}
+
+// ══ PIN認証モーダル ══
+let admCode='', pendingAction=null;
+function closePinModal(){$('pin-modal').classList.remove('on');admCode='';pendingAction=null;}
+function admKey(k){
+  ADM_PIN=ls_get(LS.ADM_PIN,'9999'); // 常に最新を取得
+  if(k==='DEL'){admCode=admCode.slice(0,-1);}else if(admCode.length<4){admCode+=k;}
+  [0,1,2,3].forEach(i=>$('am'+i).classList.toggle('on',i<admCode.length));
+  $('pin-m-err').textContent='';
+  if(admCode.length===4){
+    setTimeout(()=>{
+      if(admCode===ADM_PIN){
+        closePinModal();
+        if(pendingAction==='openAdm'){
+          $('adm-overlay').classList.add('on');
+          renderCsvStat();
+        }
+      }else{
+        $('pin-m-err').textContent='コードが違います';
+        admCode=''; [0,1,2,3].forEach(i=>$('am'+i).classList.remove('on'));
+      }
+    },150);
+  }
+}
+
+// ══ Toast ══
+function toast(msg,t='ok'){
+  const el=$('toast'),ico=$('t-ico'),ms=$('t-msg');
+  ico.textContent=t==='err'?'⚠':t==='info'?'ℹ':'✓';
+  el.style.borderLeft=`4px solid ${t==='err'?'var(--rust)':t==='info'?'var(--slate)':'var(--ok)'}`;
+  ms.textContent=msg; el.classList.add('on');
+  setTimeout(()=>el.classList.remove('on'),2800);
+}
+</script>
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('./sw.js')
+      .then(()=>console.log('SW registered'))
+      .catch(e=>console.log('SW error',e));
+  });
+}
+</script>
+</body>
+</html>
