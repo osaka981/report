@@ -167,6 +167,7 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
   <button class="nav-tab" onclick="navTab('region',this)">📍 地域管理</button>
   <button class="nav-tab" onclick="navTab('pin',this)">🔐 PIN設定</button>
   <button class="nav-tab" onclick="navTab('analysis',this)">📈 分析</button>
+  <button class="nav-tab" onclick="navTab('att',this);setAttMonth('this')">⏰ 勤怠</button>
   <button class="nav-tab" id="nav-detail" style="display:none;" onclick="navTab('detail',this)">🔍 詳細</button>
 </div>
 
@@ -401,6 +402,53 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
   </div>
 
   <!-- 詳細ページ -->
+
+  <!-- 勤怠管理パネル -->
+  <div class="panel" id="panel-att">
+    <div class="card">
+      <div class="card-title">⏰ 勤怠管理
+        <span class="badge" id="att-badge">-</span>
+        <button onclick="renderAtt()" style="margin-left:auto;background:none;border:1px solid var(--brd);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;color:var(--mid);">🔄 更新</button>
+      </div>
+      <!-- フィルター -->
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
+        <div>
+          <span style="font-size:11px;color:var(--mid);">日付</span>
+          <input type="date" id="att-from" class="fi" style="font-size:11px;padding:4px 8px;margin-left:4px;" oninput="renderAtt()">
+          <span style="font-size:11px;color:var(--mid);margin:0 4px;">〜</span>
+          <input type="date" id="att-to" class="fi" style="font-size:11px;padding:4px 8px;" oninput="renderAtt()">
+        </div>
+        <div>
+          <span style="font-size:11px;color:var(--mid);">担当者</span>
+          <select id="att-driver-filter" class="fi" style="font-size:11px;padding:4px 8px;margin-left:4px;" onchange="renderAtt()">
+            <option value="">全員</option>
+          </select>
+        </div>
+        <button onclick="setAttMonth('this')" style="background:none;border:1px solid var(--brd);border-radius:5px;padding:4px 10px;font-size:11px;cursor:pointer;color:var(--mid);">今月</button>
+        <button onclick="setAttMonth('last')" style="background:none;border:1px solid var(--brd);border-radius:5px;padding:4px 10px;font-size:11px;cursor:pointer;color:var(--mid);">先月</button>
+      </div>
+      <!-- 一覧テーブル -->
+      <div style="overflow-x:auto;">
+        <table class="tbl" id="att-tbl">
+          <thead>
+            <tr>
+              <th>日付</th>
+              <th>担当者</th>
+              <th>区分</th>
+              <th>出勤</th>
+              <th>退勤</th>
+              <th>稼働時間</th>
+              <th>GPS状況</th>
+              <th>帰社修正</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="att-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <div class="panel" id="panel-detail">
     <button class="back-link" onclick="closeDetail()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
@@ -482,6 +530,7 @@ const LS={
   DRIVERS:'nikki_drivers',CUSTOMERS:'nikki_customers',
   OFFICES:'nikki_offices',REGIONS:'nikki_regions',
   YP_LOGS:'nikki_yp_logs',COL_LOGS:'nikki_col_logs',
+  ATT_LOGS:'nikki_att_logs',
 };
 
 // ── Firebase設定を自動注入（セットアップ不要） ──
@@ -523,7 +572,7 @@ async function initFirebase() {
 async function syncFromFirebase() {
   if (!fbDB) return;
   const { ref, get } = window._fbImports;
-  const keys = ['drivers','customers','offices','regions','yp_logs','col_logs','sec_pin','adm_pin'];
+  const keys = ['drivers','customers','offices','regions','yp_logs','col_logs','att_logs','sec_pin','adm_pin'];
   for (const k of keys) {
     try {
       const snap = await get(ref(fbDB, 'nikki/' + k));
@@ -540,6 +589,7 @@ async function syncFromFirebase() {
   REGIONS   = ls_get(LS.REGIONS, REGIONS);
   YP_LOGS   = ls_get(LS.YP_LOGS, []);
   COL_LOGS  = ls_get(LS.COL_LOGS, []);
+  ATT_LOGS  = ls_get(LS.ATT_LOGS, []);
 }
 
 async function fbSet(key, value) {
@@ -562,6 +612,12 @@ function setupRealtimeSync() {
     if (!snap.exists()) return;
     COL_LOGS = snap.val() || [];
     fbSet('col_logs', COL_LOGS);
+  });
+  onValue(ref(fbDB, 'nikki/att_logs'), snap => {
+    if (!snap.exists()) return;
+    ATT_LOGS = snap.val() || [];
+    ls_set(LS.ATT_LOGS, ATT_LOGS);
+    if(document.getElementById('panel-att')?.classList.contains('on')) renderAtt();
   });
 }
 
@@ -625,6 +681,7 @@ const load=()=>({
   ]),
   YP_LOGS:ls_get(LS.YP_LOGS,[]),
   COL_LOGS:ls_get(LS.COL_LOGS,[]),
+  ATT_LOGS:ls_get(LS.ATT_LOGS,[]),
 });
 
 // ══ CSV日付フィルター ══
@@ -1483,6 +1540,175 @@ if('serviceWorker' in navigator){
       .catch(e=>console.log('SW error',e));
   });
 }
+
+// ══ 勤怠管理 ══
+function fmtTime(iso){
+  if(!iso)return'-';
+  return new Date(iso).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
+}
+function fmtMin(m){
+  if(m==null)return'-';
+  return Math.floor(m/60)+'h'+String(m%60).padStart(2,'0')+'m';
+}
+function attKyuyoLabel(kyuyo){
+  const map={
+    '時間給':'パート（事務）',
+    '時間単価':'個人事業主（時間単価）',
+    '個数制（歩合）':'歩合',
+    '月給':'月給',
+    '保証':'保証あり',
+  };
+  return map[kyuyo]||kyuyo||'-';
+}
+function attGpsLabel(gps, officeCoords){
+  if(!gps)return'<span style="color:var(--light)">未取得</span>';
+  if(!officeCoords)return`<span style="color:var(--mid)">${gps.lat.toFixed(4)},${gps.lng.toFixed(4)}</span>`;
+  const dist=calcAttDist(gps.lat,gps.lng,officeCoords.lat,officeCoords.lng);
+  const dm=Math.round(dist);
+  if(dm<=100) return`<span style="color:var(--ok)">✅ ${dm}m</span>`;
+  if(dm<=500) return`<span style="color:var(--amber)">⚠️ ${dm}m</span>`;
+  return`<span style="color:var(--rust)">🚨 ${dm}m</span>`;
+}
+function calcAttDist(lat1,lng1,lat2,lng2){
+  const R=6371000,r=Math.PI/180;
+  const dLat=(lat2-lat1)*r,dLng=(lng2-lng1)*r;
+  const a=Math.sin(dLat/2)**2+Math.cos(lat1*r)*Math.cos(lat2*r)*Math.sin(dLng/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+const ATT_OFFICE_COORDS={
+  '本社':    {lat:34.5783,lng:135.4892},
+  '大阪西':  {lat:34.6865,lng:135.4897},
+  '西成':    {lat:34.6334,lng:135.4939},
+  '浜寺':    {lat:34.5571,lng:135.4371},
+  '藤井寺':  {lat:34.5720,lng:135.5966},
+};
+function getOfficeCoord(office){
+  for(const k of Object.keys(ATT_OFFICE_COORDS)){
+    if((office||'').includes(k)) return ATT_OFFICE_COORDS[k];
+  }
+  return ATT_OFFICE_COORDS['本社'];
+}
+function setAttMonth(mode){
+  const now=new Date();
+  const y=now.getFullYear(),m=now.getMonth();
+  if(mode==='this'){
+    $('att-from').value=`${y}-${String(m+1).padStart(2,'0')}-01`;
+    $('att-to').value=`${y}-${String(m+1).padStart(2,'0')}-${String(new Date(y,m+1,0).getDate()).padStart(2,'0')}`;
+  } else {
+    const lm=m===0?12:m,ly=m===0?y-1:y;
+    $('att-from').value=`${ly}-${String(lm).padStart(2,'0')}-01`;
+    $('att-to').value=`${ly}-${String(lm).padStart(2,'0')}-${String(new Date(ly,lm,0).getDate()).padStart(2,'0')}`;
+  }
+  renderAtt();
+}
+function renderAtt(){
+  const D=load();
+  const ATT=ls_get(LS.ATT_LOGS,[]);
+  const from=$('att-from')?.value||'';
+  const to=$('att-to')?.value||'';
+  const driverFilter=$('att-driver-filter')?.value||'';
+  // ドライバーフィルタ選択肢を更新
+  const sel=$('att-driver-filter');
+  if(sel){
+    const cur=sel.value;
+    sel.innerHTML='<option value="">全員</option>';
+    D.DRIVERS.forEach(d=>{
+      const o=document.createElement('option');
+      o.value=d.id; o.textContent=d.name;
+      if(d.id===cur)o.selected=true;
+      sel.appendChild(o);
+    });
+  }
+  // フィルタリング
+  let rows=[...ATT];
+  if(from) rows=rows.filter(r=>r.date>=from);
+  if(to)   rows=rows.filter(r=>r.date<=to);
+  if(driverFilter) rows=rows.filter(r=>r.driverId===driverFilter);
+  rows.sort((a,b)=>b.date.localeCompare(a.date)||(b.clockIn||'').localeCompare(a.clockIn||''));
+  // バッジ更新
+  const badge=$('att-badge');
+  if(badge) badge.textContent=rows.length+'件';
+  // テーブル描画
+  const tbody=$('att-tbody');
+  if(!tbody) return;
+  if(rows.length===0){
+    tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--light);padding:24px;">データがありません</td></tr>';
+    return;
+  }
+  tbody.innerHTML=rows.map(r=>{
+    const drv=D.DRIVERS.find(d=>d.id===r.driverId)||{name:r.driverName||'-',office:'-',kyuyo:r.kyuyo};
+    const kyuyo=r.kyuyo||drv.kyuyo||'';
+    const needTime=kyuyo==='時間給'||kyuyo==='時間単価';
+    const isColJikan=kyuyo==='時間単価'&&drv.officeType==='collection';
+    const oc=getOfficeCoord(drv.office);
+    const gpsLabel=r.clockOut?attGpsLabel(r.clockOutGps,oc):'<span style="color:var(--light)">退勤前</span>';
+    const adjTime=r.adjustedOut?`<span style="color:var(--amber)">${fmtTime(r.adjustedOut)}</span>`:'<span style="color:var(--light)">-</span>';
+    const workDisp=needTime&&r.workMin!=null
+      ?`<span style="color:var(--clay);font-weight:700;">${fmtMin(r.workMin)}</span>`
+      :'<span style="color:var(--light)">-</span>';
+    const editBtn=isColJikan
+      ?`<button onclick="openAttEdit('${r.id}')" style="background:none;border:1px solid var(--amber);color:var(--amber);border-radius:5px;padding:2px 8px;font-size:10px;cursor:pointer;">修正</button>`
+      :'';
+    return `<tr>
+      <td style="font-family:var(--mono);font-size:11px;">${r.date||'-'}</td>
+      <td>${drv.name}</td>
+      <td><span style="font-size:10px;color:var(--mid);">${attKyuyoLabel(kyuyo)}</span></td>
+      <td style="font-family:var(--mono);font-size:11px;">${fmtTime(r.clockIn)}</td>
+      <td style="font-family:var(--mono);font-size:11px;">${r.clockOut?fmtTime(r.clockOut):'<span style="color:var(--amber)">未退勤</span>'}</td>
+      <td>${workDisp}</td>
+      <td style="font-size:11px;">${gpsLabel}</td>
+      <td style="font-size:11px;">${adjTime}</td>
+      <td>${editBtn}</td>
+    </tr>`;
+  }).join('');
+}
+
+// 帰社時刻修正モーダル（集荷時間単価のみ）
+function openAttEdit(attId){
+  const ATT=ls_get(LS.ATT_LOGS,[]);
+  const rec=ATT.find(a=>String(a.id)===String(attId));
+  if(!rec){alert('記録が見つかりません');return;}
+  const curAdj=rec.adjustedOut?new Date(rec.adjustedOut).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}):'';
+  const ci=rec.clockIn?new Date(rec.clockIn).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}):'-';
+  const co=rec.clockOut?new Date(rec.clockOut).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}):'-';
+  const newTime=prompt(
+    `【帰社時刻の修正】\n${rec.driverName} / ${rec.date}\n出勤: ${ci}　退勤(GPS): ${co}\n現在の帰社修正: ${curAdj||'なし'}\n\n実際の帰社時刻を入力してください（例: 17:30）\n※空欄のままOKで修正をクリア`,
+    curAdj
+  );
+  if(newTime===null)return; // キャンセル
+  const idx=ATT.findIndex(a=>String(a.id)===String(attId));
+  if(idx<0)return;
+  if(newTime.trim()===''){
+    // 修正クリア
+    ATT[idx].adjustedOut=null;
+    ATT[idx].workMin=null;
+  } else {
+    const [h,m]=newTime.trim().split(':').map(Number);
+    if(isNaN(h)||isNaN(m)){alert('時刻の形式が正しくありません（例: 17:30）');return;}
+    const base=new Date(rec.clockIn);
+    const adj=new Date(base);
+    adj.setHours(h,m,0,0);
+    ATT[idx].adjustedOut=adj.toISOString();
+    // 稼働時間再計算（15分丸め）
+    const rawMin=Math.round((adj-base)/60000);
+    const rounded=roundAtt15(Math.max(0,rawMin));
+    ATT[idx].workMin=rounded;
+  }
+  ls_set(LS.ATT_LOGS,ATT);
+  // Firebase書き込み
+  if(fbDB){
+    const {ref,set}=window._fbImports;
+    set(ref(fbDB,'nikki/att_logs'),ATT).catch(e=>console.error(e));
+  }
+  renderAtt();
+  alert('修正しました');
+}
+function roundAtt15(totalMin){
+  const base=Math.floor(totalMin/15)*15;
+  const rem=totalMin%15;
+  return rem<=7?base:base+15;
+}
+
 </script>
 </body>
 </html>
