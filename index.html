@@ -416,6 +416,15 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
       <!-- 出勤時刻表示 -->
       <div id="sel-clock-in" style="margin-top:8px;font-size:10px;color:var(--mid);text-align:center;font-family:var(--mono);display:none;"></div>
     </div>
+    <!-- 当月日報履歴 -->
+    <div class="card mb10" id="sel-history-card">
+      <div style="font-size:10px;font-weight:700;color:var(--mid);letter-spacing:.08em;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;">
+        <span>当月の日報履歴</span>
+        <span style="font-size:9px;color:var(--light);">訂正はボタンから</span>
+      </div>
+      <div id="sel-history-list" style="max-height:200px;overflow-y:auto;"></div>
+    </div>
+
     <!-- 業務ボタン（パートは非表示） -->
     <div id="sel-biz-area">
       <button class="biz-btn" id="btn-yp" onclick="selectBiz('yp')">
@@ -611,6 +620,33 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
   </div>
 </div>
 
+<!-- 訂正確認モーダル -->
+<div id="m-correct" style="display:none;position:fixed;inset:0;z-index:8000;background:rgba(44,40,37,.55);display:none;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:var(--card);border-radius:14px;width:100%;max-width:360px;border:1px solid var(--brd);overflow:hidden;">
+    <div style="background:var(--amber);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;">
+      <div style="color:#fff;font-weight:700;font-size:14px;">✏️ 日報の訂正確認</div>
+      <button onclick="closeCorrectModal()" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;">×</button>
+    </div>
+    <div style="padding:16px;">
+      <!-- 対象情報 -->
+      <div id="correct-target-info" style="background:var(--inp);border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:var(--mid);"></div>
+      <!-- 変更内容 -->
+      <div id="correct-diff-area" style="margin-bottom:12px;"></div>
+      <!-- 訂正理由 -->
+      <div class="lbl" style="margin-bottom:4px;">訂正理由<span style="color:var(--rust);margin-left:4px;">必須</span></div>
+      <textarea id="correct-reason" class="fi" rows="2" placeholder="例：入力漏れのため・夜間件数を誤って入力したため" style="font-size:12px;resize:none;"></textarea>
+      <!-- 警告 -->
+      <div style="background:rgba(139,74,58,.07);border:1px solid rgba(139,74,58,.2);border-radius:7px;padding:8px 10px;margin-top:10px;font-size:10px;color:var(--rust);">
+        ⚠️ 虚偽・不正な訂正は支払い対象外になる場合があります。訂正履歴はすべて記録されます。
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px;">
+        <button onclick="closeCorrectModal()" class="btn-main btn-ghost" style="flex:1;font-size:12px;">キャンセル</button>
+        <button onclick="applyCorrection()" class="btn-main" style="flex:2;background:var(--amber);color:#faf8f5;font-size:12px;">訂正を確定する</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- 完了 -->
 <div id="scr-done" class="screen">
   <div class="topbar"><div class="tb-eye">軽貨物運送　日報システム</div><div id="done-title" class="tb-title" style="color:var(--ok)">提出完了</div><div class="tb-sub">お疲れさまでした</div></div>
@@ -784,6 +820,7 @@ const LS={
   CUST_HIST:'nikki_cust_hist',
   YP_LOGS:'nikki_yp_logs', COL_LOGS:'nikki_col_logs',
   ATT_LOGS:'nikki_att_logs',
+  EDIT_LOGS:'nikki_edit_logs',
 };
 
 // ── Firebase設定を自動注入（セットアップ不要） ──
@@ -863,7 +900,7 @@ function saveFbConfig() {
 async function syncFromFirebase() {
   if (!fbDB) return;
   const { ref, get } = window._fbImports;
-  const keys = ['drivers','customers','offices','regions','yp_logs','col_logs','att_logs','sec_pin','adm_pin'];
+  const keys = ['drivers','customers','offices','regions','yp_logs','col_logs','att_logs','edit_logs','sec_pin','adm_pin'];
   for (const k of keys) {
     try {
       const snap = await get(ref(fbDB, 'nikki/' + k));
@@ -1345,6 +1382,7 @@ function renderPersonalStats(d){
   $('stat-yp-count').textContent=ypCnt||'0';
   $('stat-col-count').textContent=colCnt||'0';
   $('stat-work-days').textContent=days||'0';
+  renderHistoryList(d);
 }
 
 // ══ 退勤処理 ══
@@ -1710,6 +1748,165 @@ function doEdit(){
     $('yp-t').value=f.tenso;$('yp-mo').value=f.mochimodoiri;$('yp-yo').value=f['翌日廻し'];
     $('yp-s').value=f.shukka;$('yp-date').value=lastResult.date; valYP(); show('scr-yp');
   }else{colRows=[...lastResult.rows];renderRows();$('col-date').value=lastResult.date;show('scr-col');}
+}
+
+
+// ══ 日報訂正機能 ══
+let correctTarget = null; // 訂正対象の日報レコード
+let correctPendingData = null; // 訂正後のデータ（doEditから来る場合）
+
+// 訂正確認モーダルを開く（過去日報から）
+function openCorrectModal(logId, logType){
+  const logs = logType==='yuupack' ? ls_get(LS.YP_LOGS,[]) : ls_get(LS.COL_LOGS,[]);
+  const rec = logs.find(r=>String(r.id)===String(logId));
+  if(!rec){ toast('日報データが見つかりません','err'); return; }
+  correctTarget = {rec, logType, mode:'edit'};
+  correctPendingData = null;
+
+  // 対象情報表示
+  const info = $('correct-target-info');
+  if(info){
+    const typeLabel = logType==='yuupack'?'宅配日報':'集荷日報';
+    const subTime = new Date(rec.submittedAt).toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
+    info.innerHTML = `<strong>${rec.driver?.name||'-'}</strong>　${fmtD(rec.date)}　${typeLabel}<br><span style="font-size:10px;">提出：${subTime}</span>`;
+  }
+
+  // 変更内容エリア（編集フォームに誘導）
+  const diffArea = $('correct-diff-area');
+  if(diffArea && logType==='yuupack'){
+    const f = rec.form||{};
+    diffArea.innerHTML = `
+      <div style="font-size:11px;color:var(--mid);margin-bottom:6px;">現在の提出内容：</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px;">
+        <div style="background:var(--inp);border-radius:6px;padding:6px 8px;">
+          <div style="font-size:9px;color:var(--light);">持出</div>
+          <div style="font-weight:700;">${f.mochidashi||0}個</div>
+        </div>
+        <div style="background:var(--inp);border-radius:6px;padding:6px 8px;">
+          <div style="font-size:9px;color:var(--light);">完了</div>
+          <div style="font-weight:700;">${f.kanryo||0}個</div>
+        </div>
+        <div style="background:var(--inp);border-radius:6px;padding:6px 8px;">
+          <div style="font-size:9px;color:var(--light);">夜間</div>
+          <div style="font-weight:700;">${f.yakan||0}個</div>
+        </div>
+        <div style="background:var(--inp);border-radius:6px;padding:6px 8px;">
+          <div style="font-size:9px;color:var(--light);">転送</div>
+          <div style="font-weight:700;">${f.tenso||0}個</div>
+        </div>
+      </div>
+      <div style="font-size:10px;color:var(--amber);margin-top:8px;">※「訂正を確定する」後、内容を修正して再提出してください</div>`;
+  } else if(diffArea){
+    diffArea.innerHTML = `<div style="font-size:11px;color:var(--mid);">明細${rec.rows?.length||0}件の集荷日報を訂正します。</div>`;
+  }
+
+  $('correct-reason').value = '';
+  $('m-correct').style.display = 'flex';
+}
+
+function closeCorrectModal(){
+  $('m-correct').style.display = 'none';
+  correctTarget = null;
+  correctPendingData = null;
+}
+
+// 訂正を確定する
+function applyCorrection(){
+  const reason = $('correct-reason')?.value.trim();
+  if(!reason){ toast('訂正理由を入力してください','err'); return; }
+  if(!correctTarget){ closeCorrectModal(); return; }
+
+  const {rec, logType} = correctTarget;
+
+  // 訂正履歴をFirebaseに保存
+  const editLog = {
+    id: Date.now(),
+    editedAt: new Date().toISOString(),
+    editedBy: driver?.id || '-',
+    editedByName: driver?.name || '-',
+    source: 'driver',
+    targetId: rec.id,
+    targetDate: rec.date,
+    targetStaff: rec.driver?.name || '-',
+    logType,
+    reason,
+    before: logType==='yuupack' ? {...(rec.form||{})} : {rows: rec.rows?.length||0},
+  };
+  const editLogs = ls_get('nikki_edit_logs', []);
+  editLogs.push(editLog);
+  ls_set('nikki_edit_logs', editLogs);
+  fbSet('edit_logs', editLogs);
+
+  closeCorrectModal();
+
+  // 編集画面へ遷移
+  if(logType==='yuupack'){
+    const f = rec.form||{};
+    $('yp-m').value=f.mochidashi||0;
+    $('yp-k').value=f.kanryo||0;
+    $('yp-y').value=f.yakan||0;
+    $('yp-t').value=f.tenso||0;
+    $('yp-mo').value=f.mochimodoiri||0;
+    $('yp-yo').value=f['翌日廻し']||0;
+    $('yp-s').value=f.shukka||0;
+    $('yp-date').value=rec.date;
+    valYP();
+    // 再提出時は既存レコードを削除（上書き）
+    YP_LOGS = ls_get(LS.YP_LOGS,[]).filter(r=>String(r.id)!==String(rec.id));
+    ls_set(LS.YP_LOGS, YP_LOGS);
+    show('scr-yp');
+    toast('内容を修正して再提出してください','info');
+  } else {
+    colRows = [...(rec.rows||[])];
+    renderRows();
+    $('col-date').value = rec.date;
+    COL_LOGS = ls_get(LS.COL_LOGS,[]).filter(r=>String(r.id)!==String(rec.id));
+    ls_set(LS.COL_LOGS, COL_LOGS);
+    show('scr-col');
+    toast('内容を修正して再提出してください','info');
+  }
+}
+
+// 当月日報履歴を描画（個人ページ）
+function renderHistoryList(d){
+  if(!d) return;
+  const histEl = $('sel-history-list');
+  if(!histEl) return;
+  const mon = new Date().toISOString().slice(0,7);
+  const yp = ls_get(LS.YP_LOGS,[]).filter(r=>r.driver?.id===d.id && r.date?.startsWith(mon));
+  const col = ls_get(LS.COL_LOGS,[]).filter(r=>r.driver?.id===d.id && r.date?.startsWith(mon));
+
+  // 日付降順でまとめる
+  const all = [
+    ...yp.map(r=>({...r, _label:'宅配', _color:'var(--slate)'})),
+    ...col.map(r=>({...r, _label:'集荷', _color:'var(--sage)'})),
+  ].sort((a,b)=>b.date.localeCompare(a.date));
+
+  if(!all.length){
+    histEl.innerHTML='<div style="padding:10px;text-align:center;color:var(--light);font-size:11px;">今月の日報はまだありません</div>';
+    return;
+  }
+
+  // 訂正済み（edit_logs）チェック
+  const editLogs = ls_get('nikki_edit_logs',[]);
+
+  histEl.innerHTML = all.map(r=>{
+    const subTime = new Date(r.submittedAt).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
+    const kanryo = r.type==='yuupack' ? `完了${r.form?.kanryo||0}個` : `明細${r.rows?.length||0}件`;
+    const hasEdit = editLogs.some(e=>String(e.targetId)===String(r.id));
+    const editBadge = hasEdit ? '<span style="font-size:9px;background:rgba(154,122,58,.15);color:var(--amber);border-radius:4px;padding:1px 5px;margin-left:4px;">訂正済</span>' : '';
+    return `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--div);">
+      <div style="min-width:48px;font-size:11px;font-weight:700;color:${r._color};">${r._label}</div>
+      <div style="flex:1;">
+        <div style="font-size:12px;font-weight:700;">${fmtD(r.date)} ${editBadge}</div>
+        <div style="font-size:10px;color:var(--light);">${kanryo}　${subTime}提出</div>
+      </div>
+      <button onclick="openCorrectModal('${r.id}','${r.type}')"
+        style="background:none;border:1px solid var(--amber);color:var(--amber);border-radius:6px;padding:4px 8px;font-size:10px;cursor:pointer;white-space:nowrap;">
+        訂正
+      </button>
+    </div>`;
+  }).join('');
 }
 
 // ══ 管理画面 ══
