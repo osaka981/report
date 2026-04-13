@@ -366,9 +366,25 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
         <div style="color:var(--light);font-size:11px;margin-top:2px;">社員番号を入力してください</div>
       </div>
       <div class="lbl">社員番号</div>
-      <input type="tel" id="emp-id" class="fi" style="font-size:18px;font-weight:700;text-align:center;letter-spacing:.25em;font-family:var(--mono);" placeholder="" oninput="$('login-err').style.display='none'">
+      <input type="tel" id="emp-id" class="fi" style="font-size:18px;font-weight:700;text-align:center;letter-spacing:.25em;font-family:var(--mono);" placeholder="" oninput="$('login-err').style.display='none';filterIdList()">
       <div id="login-err" style="display:none;background:rgba(139,74,58,.07);border:1px solid rgba(139,74,58,.22);border-radius:6px;padding:6px 10px;color:var(--rust);font-size:11px;margin-top:6px;"></div>
       <button class="btn-main mt8" style="background:var(--clay);color:#faf8f5;" onclick="doLogin()">ログイン</button>
+    </div>
+
+    <!-- IDリスト -->
+    <div class="card mb12">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div style="font-size:11px;font-weight:700;color:var(--mid);">IDリスト</div>
+        <button onclick="toggleIdList()" id="idlist-toggle-btn" style="background:none;border:1px solid var(--brd);border-radius:5px;padding:3px 10px;font-size:10px;color:var(--mid);cursor:pointer;">▼ 表示</button>
+      </div>
+      <div id="idlist-wrap" style="display:none;">
+        <!-- 郵便局フィルター -->
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;" id="idlist-filter-btns"></div>
+        <!-- 検索 -->
+        <input type="text" id="idlist-search" class="fi" placeholder="名前で絞り込み..." oninput="filterIdList()" style="font-size:12px;margin-bottom:8px;">
+        <!-- リスト -->
+        <div id="idlist-body" style="max-height:240px;overflow-y:auto;border:1px solid var(--brd);border-radius:7px;"></div>
+      </div>
     </div>
 
   </div>
@@ -1068,6 +1084,154 @@ function startFace(){
   });
 }
 
+
+// ══ IDリスト機能 ══
+let idListOpen = false;
+let idListFilter = '';
+
+// 郵便局コード→名称マップ
+function getOfficeLabel(office){
+  if(!office) return 'その他';
+  const map={
+    '西成':'西成郵便局','浜寺':'浜寺郵便局',
+    '藤井寺':'藤井寺郵便局','大阪西':'大阪西郵便局',
+    '集荷':'集荷','本社':'本社・事務所',
+  };
+  for(const k of Object.keys(map)){
+    if(office.includes(k)) return map[k];
+  }
+  return office;
+}
+
+function getOfficeColor(office){
+  if(!office) return 'var(--stone)';
+  if(office.includes('西成')) return 'var(--slate)';
+  if(office.includes('浜寺')) return 'var(--sage)';
+  if(office.includes('藤井寺')) return 'var(--amber)';
+  if(office.includes('大阪西')) return 'var(--clay)';
+  if(office.includes('集荷')) return 'var(--ok)';
+  return 'var(--mid)';
+}
+
+// ID表示（先頭0省略）
+function displayId(id){
+  if(!id) return '';
+  // 先頭が0の場合は省略（内部5桁→表示4桁）
+  return String(id).replace(/^0+/, '') || id;
+}
+
+function toggleIdList(){
+  idListOpen = !idListOpen;
+  const wrap = $('idlist-wrap');
+  const btn = $('idlist-toggle-btn');
+  if(wrap) wrap.style.display = idListOpen ? 'block' : 'none';
+  if(btn) btn.textContent = idListOpen ? '▲ 非表示' : '▼ 表示';
+  if(idListOpen) renderIdList();
+}
+
+function filterIdList(){
+  if(!idListOpen) return;
+  renderIdList();
+}
+
+function renderIdList(){
+  const drivers = DRIVERS || [];
+  const search = ($('idlist-search')?.value || $('emp-id')?.value || '').toLowerCase();
+  const activeFilter = document.querySelector('.idlist-filter-btn.active')?.dataset?.office || '';
+
+  // 郵便局フィルターボタン生成
+  const filterWrap = $('idlist-filter-btns');
+  if(filterWrap && filterWrap.children.length === 0){
+    const offices = [...new Set(drivers.map(d=>getOfficeLabel(d.office)))].sort();
+    // 「全員」ボタン
+    const allBtn = document.createElement('button');
+    allBtn.className = 'idlist-filter-btn active';
+    allBtn.dataset.office = '';
+    allBtn.textContent = '全員';
+    allBtn.onclick = () => setIdListFilter('');
+    allBtn.style.cssText = 'padding:4px 10px;border-radius:14px;border:1px solid var(--brd);background:var(--clay);color:#faf8f5;font-size:10px;cursor:pointer;';
+    filterWrap.appendChild(allBtn);
+    offices.forEach(o => {
+      const btn = document.createElement('button');
+      btn.className = 'idlist-filter-btn';
+      btn.dataset.office = o;
+      btn.textContent = o;
+      btn.onclick = () => setIdListFilter(o);
+      btn.style.cssText = 'padding:4px 10px;border-radius:14px;border:1px solid var(--brd);background:var(--inp);color:var(--mid);font-size:10px;cursor:pointer;';
+      filterWrap.appendChild(btn);
+    });
+  }
+
+  // フィルタリング
+  let list = drivers.filter(d => {
+    const offLabel = getOfficeLabel(d.office);
+    const matchOffice = !activeFilter || offLabel === activeFilter;
+    const matchSearch = !search ||
+      d.name?.toLowerCase().includes(search) ||
+      displayId(d.id).includes(search) ||
+      d.id?.includes(search);
+    return matchOffice && matchSearch;
+  });
+
+  // ソート：郵便局→ID順
+  list.sort((a,b) => {
+    const oa = getOfficeLabel(a.office), ob = getOfficeLabel(b.office);
+    if(oa !== ob) return oa.localeCompare(ob, 'ja');
+    return (a.id||'').localeCompare(b.id||'');
+  });
+
+  const body = $('idlist-body');
+  if(!body) return;
+
+  if(list.length === 0){
+    body.innerHTML = '<div style="padding:12px;text-align:center;color:var(--light);font-size:11px;">該当なし</div>';
+    return;
+  }
+
+  body.innerHTML = list.map(d => {
+    const dispId = displayId(d.id);
+    const color = getOfficeColor(d.office);
+    const offLabel = getOfficeLabel(d.office);
+    const kyuLabel = {
+      '個数制（歩合）':'歩合','時間単価':'時間単価',
+      '時間給':'時間給','日額':'日額','月給':'月給',
+    }[d.kyuyo] || '';
+    return `<div onclick="selectDriverId('${d.id}')"
+      style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--div);cursor:pointer;transition:background .1s;"
+      onmouseover="this.style.background='var(--inp)'" onmouseout="this.style.background=''">
+      <div style="font-family:var(--mono);font-size:14px;font-weight:700;color:${color};min-width:44px;">${dispId}</div>
+      <div style="flex:1;">
+        <div style="font-size:13px;font-weight:700;">${d.name}</div>
+        <div style="font-size:10px;color:var(--light);">${offLabel}${kyuLabel?' ／ '+kyuLabel:''}</div>
+      </div>
+      <div style="font-size:9px;color:var(--light);">タップで入力</div>
+    </div>`;
+  }).join('');
+}
+
+function setIdListFilter(office){
+  document.querySelectorAll('.idlist-filter-btn').forEach(btn => {
+    const isActive = btn.dataset.office === office;
+    btn.style.background = isActive ? 'var(--clay)' : 'var(--inp)';
+    btn.style.color = isActive ? '#faf8f5' : 'var(--mid)';
+    btn.classList.toggle('active', isActive);
+  });
+  renderIdList();
+}
+
+function selectDriverId(id){
+  const dispId = displayId(id);
+  const empId = $('emp-id');
+  if(empId){
+    empId.value = dispId;
+    $('login-err').style.display = 'none';
+  }
+  // リストを閉じる
+  toggleIdList();
+  // IDを入力したらそのままログインできるようスクロール
+  empId?.scrollIntoView({behavior:'smooth', block:'center'});
+}
+
 // ══ 勤怠ユーティリティ ══
 // 給与形態から勤怠タイプを判定
 function attType(d){
@@ -1119,9 +1283,12 @@ function getDriverOfficeCoord(d){
 // ══ ログイン ══
 let todayAttId = null; // 本日の勤怠ID
 function doLogin(){
-  const id=$('emp-id').value.trim();
-  const d=DRIVERS.find(x=>x.id===id);
+  const rawId=$('emp-id').value.trim();
+  // 先頭0省略入力に対応（例：6036→06036）
+  const padId = rawId.length===4 ? '0'+rawId : rawId;
+  const d=DRIVERS.find(x=>x.id===rawId||x.id===padId);
   if(!d){$('login-err').textContent='社員番号が見つかりません';$('login-err').style.display='block';return;}
+  const id=d.id;
   driver=d;
   const now=new Date();
   const dt=now.toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric',weekday:'short'});
@@ -1163,7 +1330,17 @@ function doLogin(){
   show('scr-select');
 }
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&$('scr-login').classList.contains('on'))doLogin();});
-function doLogout(){driver=null;todayAttId=null;clockOutGps=null;$('emp-id').value='';show('scr-login');secReset();}
+function doLogout(){
+  driver=null;todayAttId=null;clockOutGps=null;
+  $('emp-id').value='';
+  // IDリストをリセット
+  idListOpen=false;
+  const wrap=$('idlist-wrap');
+  const btn=$('idlist-toggle-btn');
+  if(wrap)wrap.style.display='none';
+  if(btn)btn.textContent='▼ 表示';
+  show('scr-login');secReset();
+}
 function goTop(){renderPersonalStats(driver);show('scr-select');}
 function goBack(){renderPersonalStats(driver);show('scr-select');}
 function selectBiz(t){
