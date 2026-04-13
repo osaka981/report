@@ -1707,7 +1707,7 @@ function buildRegionTabs(){
   const others=REGIONS.filter(r=>!osakeKuFull.includes(r)&&!KYOTO_AREAS.includes(r));
   $('other-region-btns').innerHTML=others.length
     ?others.map(r=>`<button class="rku-btn" onclick="selectRegion('${r.replace(/'/g,"\\'")}')">${r}</button>`).join('')
-    :'<span style="color:var(--light);font-size:11px;">管理システムで地域を登録してください</span>';
+    :'<span style="color:var(--light);font-size:11px;">経営管理システムで顧客を登録すると自動表示されます</span>';
 }
 
 function switchRegionTab(t){
