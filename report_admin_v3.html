@@ -308,7 +308,32 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
           </select>
         </div>
       </div>
-      <button class="btn btn-slate" onclick="addEmp()">登録する</button>
+      <!-- 暫定登録オプション -->
+      <div id="temp-driver-area" style="margin-top:10px;background:rgba(154,122,58,.07);border:1px solid rgba(154,122,58,.25);border-radius:7px;padding:10px;display:none;">
+        <div style="font-size:11px;font-weight:700;color:var(--amber);margin-bottom:8px;">⚠️ 暫定登録設定（郵便局ID発行待ちの場合）</div>
+        <div class="form-row col2" style="margin-bottom:8px;">
+          <div>
+            <div class="lbl">暫定期間（開始）</div>
+            <input type="date" id="temp-start" class="fi" style="font-size:12px;">
+          </div>
+          <div>
+            <div class="lbl">暫定期間（終了予定）</div>
+            <input type="date" id="temp-end" class="fi" style="font-size:12px;">
+          </div>
+        </div>
+        <div>
+          <div class="lbl">合算先ドライバーID（照合で自動分割される）</div>
+          <input type="text" id="temp-merge-id" class="fi" placeholder="例：9001（役員）" maxlength="6" style="font-size:12px;">
+          <div style="font-size:9px;color:var(--light);margin-top:3px;">郵便局CSVで合算されているドライバーのIDを入力してください</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:10px;">
+        <button class="btn btn-slate" onclick="addEmp()">登録する</button>
+        <label style="font-size:11px;cursor:pointer;display:flex;align-items:center;gap:5px;">
+          <input type="checkbox" id="is-temp-driver" onchange="toggleTempArea(this.checked)">
+          暫定登録として扱う
+        </label>
+      </div>
     </div>
   </div>
 
@@ -1090,7 +1115,11 @@ function renderEmpList(){
       <td style="color:var(--mid);font-size:11px;">${d.company||'—'}</td>
       <td>${badge} <span style="font-size:11px;">${d.office}</span></td>
       <td style="font-size:11px;color:${kbnColor};">${kyuLabel}</td>
-      <td><button class="btn-del" onclick="delEmp('${d.id}')">削除</button></td>
+      <td style="white-space:nowrap;">
+        ${d.isTemp?`<span style="background:rgba(154,122,58,.15);color:var(--amber);font-size:9px;padding:1px 5px;border-radius:4px;margin-right:4px;">暫定${d.tempEnd?' 〜'+d.tempEnd.slice(5):''}</span>`:''}
+        ${d.isTemp?`<button class="btn-del" style="background:rgba(22,160,133,.1);color:var(--ok);border-color:rgba(22,160,133,.3);" onclick="endTempDriver('${d.id}')">期間終了</button> `:''}
+        <button class="btn-del" onclick="delEmp('${d.id}')">削除</button>
+      </td>
     </tr>`;
   }).join(''):'<tr><td colspan="6" style="text-align:center;padding:16px;color:var(--light);">登録ドライバーなし</td></tr>';
 }
@@ -1106,10 +1135,25 @@ function addEmp(){
   const isCol=selectedOfficeType==='collection';
   const kbn=$('new-emp-kbn').value||'個人事業主（歩合）';
   const kyuyo=$('new-emp-kyuyo').value||'個数制（歩合）';
-  D.DRIVERS.push({id,name,company,officeType:isCol?'collection':'delivery',office:isCol?'集荷':selectedOfficeType.replace('delivery_',''),kbn,kyuyo});
+  // 暫定登録情報
+  const isTemp=$('is-temp-driver')?.checked||false;
+  const tempData = isTemp ? {
+    isTemp: true,
+    tempStart: $('temp-start')?.value||'',
+    tempEnd: $('temp-end')?.value||'',
+    tempMergeId: $('temp-merge-id')?.value.trim()||'',
+  } : {};
+
+  D.DRIVERS.push({id,name,company,officeType:isCol?'collection':'delivery',office:isCol?'集荷':selectedOfficeType.replace('delivery_',''),kbn,kyuyo,...tempData});
   fbSet('drivers',D.DRIVERS);
   $('new-emp-id').value='';$('new-emp-name').value='';$('new-emp-company').value='';
-  selectedOfficeType=null;buildEmpForm();renderEmpList();toast(`「${name}」を登録しました`);
+  if($('is-temp-driver'))$('is-temp-driver').checked=false;
+  if($('temp-driver-area'))$('temp-driver-area').style.display='none';
+  if($('temp-start'))$('temp-start').value='';
+  if($('temp-end'))$('temp-end').value='';
+  if($('temp-merge-id'))$('temp-merge-id').value='';
+  selectedOfficeType=null;buildEmpForm();renderEmpList();
+  toast(`「${name}」を${isTemp?'暫定':''}登録しました`);
 }
 function delEmp(id){
   const D=load(),d=D.DRIVERS.find(x=>x.id===id);
@@ -1734,6 +1778,46 @@ function openAdminEditLog(editId){
     renderEditLogs();
     alert('コメントを保存しました');
   }
+}
+
+
+// ══ 暫定ドライバー管理 ══
+function toggleTempArea(checked){
+  const area=$('temp-driver-area');
+  if(area) area.style.display=checked?'block':'none';
+  if(checked){
+    // デフォルトで今日から1ヶ月
+    const today=new Date();
+    const nextM=new Date(today);
+    nextM.setMonth(nextM.getMonth()+1);
+    if($('temp-start'))$('temp-start').value=today.toISOString().slice(0,10);
+    if($('temp-end'))$('temp-end').value=nextM.toISOString().slice(0,10);
+  }
+}
+
+// 暫定ドライバー一覧を取得（期間中のもの）
+function getTempDrivers(targetDate){
+  const D=load();
+  const dateStr=targetDate||new Date().toISOString().slice(0,10);
+  return D.DRIVERS.filter(d=>{
+    if(!d.isTemp) return false;
+    if(d.tempStart&&d.tempStart>dateStr) return false;
+    if(d.tempEnd&&d.tempEnd<dateStr) return false;
+    return true;
+  });
+}
+
+// 暫定期間を終了（正式登録完了後）
+function endTempDriver(driverId){
+  const D=load();
+  const d=D.DRIVERS.find(x=>x.id===driverId);
+  if(!d) return;
+  if(!confirm(`「${d.name}」の暫定期間を終了しますか？\n合算先への自動分割が無効になります。`)) return;
+  d.isTemp=false;
+  d.tempEnd=new Date().toISOString().slice(0,10);
+  fbSet('drivers',D.DRIVERS);
+  renderEmpList();
+  toast(`「${d.name}」の暫定期間を終了しました`);
 }
 
 
