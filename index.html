@@ -459,6 +459,23 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
   </div>
   <div class="p16">
     <div class="card mb8"><div class="row-hd"><div class="row-ico" style="background:rgba(44,40,37,.07)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ink)" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><span class="row-lbl">日付</span></div><input type="date" id="yp-date" class="fi"></div>
+    <!-- 郵便局選択 -->
+    <div class="card mb8" id="yp-post-card">
+      <div class="row-hd">
+        <div class="row-ico" style="background:rgba(96,112,128,.1)">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--slate)" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        </div>
+        <span class="row-lbl" style="color:var(--slate)">郵便局</span>
+        <span id="yp-post-unknown-badge" style="display:none;margin-left:auto;font-size:9px;background:rgba(154,122,58,.15);color:var(--amber);border-radius:4px;padding:2px 6px;">未確定</span>
+      </div>
+      <!-- 郵便局ボタン群 -->
+      <div id="yp-post-btns" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;"></div>
+      <!-- その他の場合の手入力 -->
+      <div id="yp-post-other-area" style="display:none;margin-top:8px;">
+        <input type="text" id="yp-post-other-input" class="fi" placeholder="郵便局名を入力（例：西成郵便局）" style="font-size:12px;">
+        <div style="font-size:9px;color:var(--light);margin-top:4px;">※後で管理者が正式な郵便局に修正します</div>
+      </div>
+    </div>
     <div class="card mb8" id="yp-card-m"><div class="row-hd"><div class="row-ico" style="background:rgba(44,40,37,.07)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ink)" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/></svg></div><span class="row-lbl">持出個数</span></div><div class="stpr"><button class="sbtn" onclick="ypStep('m',-1)">−</button><input type="number" id="yp-m" class="sval" min="0" value="0" oninput="valYP()"><button class="sbtn p" onclick="ypStep('m',1)">＋</button></div></div>
     <div class="card mb8" id="yp-card-k"><div class="row-hd"><div class="row-ico" style="background:rgba(107,124,106,.11)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--sage)" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div><span class="row-lbl" style="color:var(--sage)">配達完了数</span></div><div class="stpr"><button class="sbtn" onclick="ypStep('k',-1)">−</button><input type="number" id="yp-k" class="sval" min="0" value="0" oninput="valYP()"><button class="sbtn p" style="background:var(--sage)" onclick="ypStep('k',1)">＋</button></div></div>
     <div class="card mb8"><div class="row-hd"><div class="row-ico" style="background:rgba(96,112,128,.1)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--slate)" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></div><span class="row-lbl" style="color:var(--slate)">夜間配達（20時以降）</span><span class="tag" style="background:rgba(96,112,128,.1);color:var(--slate);margin-left:auto;">内計</span></div><div class="stpr"><button class="sbtn" onclick="ypStep('y',-1)">−</button><input type="number" id="yp-y" class="sval" min="0" value="0" oninput="valYP()"><button class="sbtn p" style="background:var(--slate)" onclick="ypStep('y',1)">＋</button></div><div id="yp-y-err" class="xs mt8" style="color:var(--rust);display:none;">⚠ 完了数を超えています</div></div>
@@ -1358,9 +1375,96 @@ document.addEventListener('keydown',e=>{if(e.key==='Enter'&&$('scr-login').class
 function doLogout(){driver=null;todayAttId=null;clockOutGps=null;$('emp-id').value='';show('scr-login');secReset();}
 function goTop(){renderPersonalStats(driver);show('scr-select');}
 function goBack(){renderPersonalStats(driver);show('scr-select');}
+
+// ══ 宅配日報：郵便局選択 ══
+let selectedPostOffice = ''; // 選択中の郵便局
+
+function buildPostOfficeBtns(){
+  const wrap = $('yp-post-btns');
+  if(!wrap || !driver) return;
+
+  // ドライバーの全担当郵便局（メイン＋追加）
+  const offices = [driver.office];
+  (driver.subOffices||[]).forEach(o=>{ if(!offices.includes(o)) offices.push(o); });
+
+  wrap.innerHTML = '';
+
+  // 最後に使った郵便局を自動選択
+  const lastPost = localStorage.getItem('lastPostOffice_'+driver.id) || driver.office;
+  if(lastPost && offices.includes(lastPost)){
+    selectedPostOffice = lastPost;
+  } else {
+    selectedPostOffice = offices[0]||'';
+  }
+
+  // 各郵便局ボタン
+  offices.forEach(office=>{
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = office;
+    btn.dataset.office = office;
+    btn.className = 'yp-post-btn';
+    const isActive = office === selectedPostOffice;
+    btn.style.cssText = `padding:7px 12px;border-radius:8px;border:1.5px solid ${isActive?'var(--slate)':'var(--brd)'};background:${isActive?'var(--slate)':'var(--inp)'};color:${isActive?'#faf8f5':'var(--mid)'};font-size:12px;cursor:pointer;transition:all .15s;`;
+    btn.onclick = () => selectPostOffice(office);
+    wrap.appendChild(btn);
+  });
+
+  // 「その他」ボタン
+  const otherBtn = document.createElement('button');
+  otherBtn.type = 'button';
+  otherBtn.textContent = 'その他';
+  otherBtn.dataset.office = 'その他';
+  otherBtn.className = 'yp-post-btn';
+  otherBtn.style.cssText = 'padding:7px 12px;border-radius:8px;border:1.5px solid var(--brd);background:var(--inp);color:var(--light);font-size:12px;cursor:pointer;';
+  otherBtn.onclick = () => selectPostOffice('その他');
+  wrap.appendChild(otherBtn);
+
+  // 未確定バッジ更新
+  updatePostBadge();
+}
+
+function selectPostOffice(office){
+  selectedPostOffice = office;
+
+  // ボタンのスタイル更新
+  document.querySelectorAll('.yp-post-btn').forEach(btn=>{
+    const isActive = btn.dataset.office === office;
+    btn.style.border = `1.5px solid ${isActive?'var(--slate)':'var(--brd)'}`;
+    btn.style.background = isActive?'var(--slate)':'var(--inp)';
+    btn.style.color = isActive?'#faf8f5':(btn.dataset.office==='その他'?'var(--light)':'var(--mid)');
+  });
+
+  // その他の場合は手入力欄を表示
+  const otherArea = $('yp-post-other-area');
+  if(otherArea) otherArea.style.display = office==='その他' ? 'block' : 'none';
+
+  updatePostBadge();
+}
+
+function updatePostBadge(){
+  const badge = $('yp-post-unknown-badge');
+  if(badge) badge.style.display = selectedPostOffice==='その他' ? 'inline' : 'none';
+}
+
+function getSelectedPostOffice(){
+  if(selectedPostOffice==='その他'){
+    const input = $('yp-post-other-input')?.value.trim();
+    return input || 'その他（未確定）';
+  }
+  return selectedPostOffice;
+}
+
 function selectBiz(t){
-  if(t==='yp'){$('yp-sub').textContent=`${driver.name} ／ ${driver.office}`;ypReset();show('scr-yp');}
-  else{$('col-sub').textContent=`${driver.name} ／ ${driver.office}`;colReset();buildRegionTabs();show('scr-col');}
+  if(t==='yp'){
+    $('yp-sub').textContent=`${driver.name} ／ ${driver.office}`;
+    ypReset();
+    buildPostOfficeBtns(); // 郵便局選択ボタンを構築
+    show('scr-yp');
+  } else {
+    $('col-sub').textContent=`${driver.name} ／ ${driver.office}`;
+    colReset();buildRegionTabs();show('scr-col');
+  }
 }
 
 // ══ 個人ページ 実績集計 ══
@@ -1533,7 +1637,13 @@ function submitYP(){
     if(!confirm(`⚠ ${date} はすでに提出済みです（${prevTime}提出）。\n上書きしますか？\n※前回のデータは削除されます`))return;
     YP_LOGS.splice(dupIdx,1);
   }
+  const postOffice = getSelectedPostOffice();
+  // 最後に使った郵便局を記憶
+  if(postOffice && postOffice!=='その他（未確定）'){
+    localStorage.setItem('lastPostOffice_'+driver.id, postOffice);
+  }
   const rec={id:Date.now(),type:'yuupack',driver:{...driver},date,
+    postOffice, // 郵便局情報を追加
     form:{mochidashi:m,kanryo:k,yakan:y,tenso:t,mochimodoiri:mo,'翌日廻し':yo,shukka:ypN('yp-s'),notes:$('yp-note').value||''},
     submittedAt:new Date().toISOString()};
   YP_LOGS.push(rec); fbSet('yp_logs',YP_LOGS);
@@ -1746,7 +1856,11 @@ function doEdit(){
     const f=lastResult.form;
     $('yp-m').value=f.mochidashi;$('yp-k').value=f.kanryo;$('yp-y').value=f.yakan;
     $('yp-t').value=f.tenso;$('yp-mo').value=f.mochimodoiri;$('yp-yo').value=f['翌日廻し'];
-    $('yp-s').value=f.shukka;$('yp-date').value=lastResult.date; valYP(); show('scr-yp');
+    $('yp-s').value=f.shukka;$('yp-date').value=lastResult.date; valYP();
+    buildPostOfficeBtns();
+    // 以前の郵便局を復元
+    if(lastResult.postOffice) selectPostOffice(lastResult.postOffice);
+    show('scr-yp');
   }else{colRows=[...lastResult.rows];renderRows();$('col-date').value=lastResult.date;show('scr-col');}
 }
 
