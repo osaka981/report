@@ -314,6 +314,7 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
       <div class="pin-dots" id="pin-dots">
         <div class="pin-dot" id="pd0"></div><div class="pin-dot" id="pd1"></div>
         <div class="pin-dot" id="pd2"></div><div class="pin-dot" id="pd3"></div>
+        <div class="pin-dot" id="pd4"></div><div class="pin-dot" id="pd5"></div>
       </div>
       <div class="pin-err" id="pin-err"></div>
       <div class="numpad">
@@ -702,12 +703,12 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
         </div>
         <div class="edit-form mb12">
           <div style="font-size:11.5px;font-weight:700;margin-bottom:9px;color:var(--ink);">セキュリティPIN変更（ドライバー用）</div>
-          <div class="f2"><div><div class="lbl">新しいPIN（4桁）</div><input type="tel" id="new-sec-pin" class="fi fi-sm" maxlength="4" placeholder="****"></div><div><div class="lbl">確認入力</div><input type="tel" id="new-sec-pin2" class="fi fi-sm" maxlength="4" placeholder="****"></div></div>
+          <div class="f2"><div><div class="lbl">新しいPIN（6桁）</div><input type="tel" id="new-sec-pin" class="fi fi-sm" maxlength="6" placeholder="******"></div><div><div class="lbl">確認入力</div><input type="tel" id="new-sec-pin2" class="fi fi-sm" maxlength="6" placeholder="******"></div></div>
           <button class="btn-main mt8" style="background:var(--clay);color:#faf8f5;font-size:12px;" onclick="changePin('sec')">変更する</button>
         </div>
         <div class="edit-form">
           <div style="font-size:11.5px;font-weight:700;margin-bottom:9px;color:var(--ink);">管理者PIN変更</div>
-          <div class="f2"><div><div class="lbl">新しいPIN（4桁）</div><input type="tel" id="new-adm-pin" class="fi fi-sm" maxlength="4" placeholder="****"></div><div><div class="lbl">確認入力</div><input type="tel" id="new-adm-pin2" class="fi fi-sm" maxlength="4" placeholder="****"></div></div>
+          <div class="f2"><div><div class="lbl">新しいPIN（6桁）</div><input type="tel" id="new-adm-pin" class="fi fi-sm" maxlength="6" placeholder="******"></div><div><div class="lbl">確認入力</div><input type="tel" id="new-adm-pin2" class="fi fi-sm" maxlength="6" placeholder="******"></div></div>
           <button class="btn-main mt8" style="background:var(--slate);color:#faf8f5;font-size:12px;" onclick="changePin('adm')">変更する</button>
         </div>
       </div>
@@ -750,7 +751,7 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
       <div style="font-size:14px;font-weight:800;">管理者認証</div>
       <div style="color:var(--light);font-size:10.5px;margin-top:2px;" id="pin-m-desc">管理者PINを入力</div>
     </div>
-    <div class="adots" id="pin-m-dots"><div class="adot" id="am0"></div><div class="adot" id="am1"></div><div class="adot" id="am2"></div><div class="adot" id="am3"></div></div>
+    <div class="adots" id="pin-m-dots"><div class="adot" id="am0"></div><div class="adot" id="am1"></div><div class="adot" id="am2"></div><div class="adot" id="am3"></div><div class="adot" id="am4"></div><div class="adot" id="am5"></div></div>
     <div style="height:18px;text-align:center;color:var(--rust);font-size:10.5px;margin-bottom:10px;" id="pin-m-err"></div>
     <div class="a-numpad">
       <button class="ank" onclick="admKey('1')">1</button><button class="ank" onclick="admKey('2')">2</button><button class="ank" onclick="admKey('3')">3</button>
@@ -921,8 +922,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 // ══ データロード ══
-let SEC_PIN = ls_get(LS.SEC_PIN,'1234');
-let ADM_PIN = ls_get(LS.ADM_PIN,'9999');
+let SEC_PIN = ls_get(LS.SEC_PIN,'123456');
+let ADM_PIN = ls_get(LS.ADM_PIN,'999999');
 let DRIVERS = ls_get(LS.DRIVERS,[
   {id:'1001',name:'田中 太郎',officeType:'delivery',office:'西成',colAreas:[],kyuyo:'個数制（歩合）',kbn:'個人事業主（歩合）'},
   {id:'1002',name:'佐藤 次郎',officeType:'delivery',office:'浜寺',colAreas:[],kyuyo:'個数制（歩合）',kbn:'個人事業主（歩合）'},
@@ -1013,7 +1014,7 @@ function secReset(){
   const layer=$('sec-layer');
   layer.style.display='flex';
   requestAnimationFrame(()=>requestAnimationFrame(()=>layer.classList.remove('slide-up')));
-  pinCode=''; [0,1,2,3].forEach(i=>$('pd'+i).classList.remove('on'));
+  pinCode=''; [0,1,2,3,4,5].forEach(i=>$('pd'+i).classList.remove('on'));
   $('pin-err').textContent='';
   secTab('pin'); // リセット時もPINがデフォルト
 }
@@ -1028,18 +1029,18 @@ function secTab(t){
 // PINコード認証
 let pinCode='';
 function pinKey(k){
-  SEC_PIN=ls_get(LS.SEC_PIN,'1234'); // 常に最新を取得
-  if(k==='DEL'){pinCode=pinCode.slice(0,-1);}else if(pinCode.length<4){pinCode+=k;}
-  [0,1,2,3].forEach(i=>$('pd'+i).classList.toggle('on',i<pinCode.length));
+  SEC_PIN=ls_get(LS.SEC_PIN,'123456'); // 常に最新を取得
+  if(k==='DEL'){pinCode=pinCode.slice(0,-1);}else if(pinCode.length<6){pinCode+=k;}
+  [0,1,2,3,4,5].forEach(i=>$('pd'+i).classList.toggle('on',i<pinCode.length));
   $('pin-err').textContent='';
-  if(pinCode.length===4){
+  if(pinCode.length===6){
     setTimeout(()=>{
       if(pinCode===SEC_PIN){secAuth();}
       else{
         $('pin-err').textContent='コードが違います';
         $('pin-dots').classList.add('shake');
         setTimeout(()=>$('pin-dots').classList.remove('shake'),400);
-        pinCode=''; [0,1,2,3].forEach(i=>$('pd'+i).classList.remove('on'));
+        pinCode=''; [0,1,2,3,4,5].forEach(i=>$('pd'+i).classList.remove('on'));
       }
     },150);
   }
@@ -1559,7 +1560,7 @@ function doEdit(){
 // ══ 管理画面 ══
 function openAdm(){
   // PIN認証
-  admCode=''; [0,1,2,3].forEach(i=>$('am'+i).classList.remove('on'));
+  admCode=''; [0,1,2,3,4,5].forEach(i=>$('am'+i).classList.remove('on'));
   $('pin-m-err').textContent=''; $('pin-m-desc').textContent='管理者PINを入力';
   pendingAction='openAdm';
   $('pin-modal').classList.add('on');
@@ -1750,7 +1751,7 @@ function renderPinInfo(){
 function changePin(type){
   const n1=$(type==='sec'?'new-sec-pin':'new-adm-pin').value;
   const n2=$(type==='sec'?'new-sec-pin2':'new-adm-pin2').value;
-  if(!/^\d{4}$/.test(n1)){toast('PINは4桁の数字で入力してください','err');return;}
+  if(!/^\d{4}$/.test(n1)){toast('PINは6桁の数字で入力してください','err');return;}
   if(n1!==n2){toast('PINが一致しません','err');return;}
   if(type==='sec'){SEC_PIN=n1;fbSet('sec_pin',n1);$('new-sec-pin').value='';$('new-sec-pin2').value='';}
   else{ADM_PIN=n1;fbSet('adm_pin',n1);$('new-adm-pin').value='';$('new-adm-pin2').value='';}
@@ -1817,11 +1818,11 @@ function clearLogs(){
 let admCode='', pendingAction=null;
 function closePinModal(){$('pin-modal').classList.remove('on');admCode='';pendingAction=null;}
 function admKey(k){
-  ADM_PIN=ls_get(LS.ADM_PIN,'9999'); // 常に最新を取得
-  if(k==='DEL'){admCode=admCode.slice(0,-1);}else if(admCode.length<4){admCode+=k;}
-  [0,1,2,3].forEach(i=>$('am'+i).classList.toggle('on',i<admCode.length));
+  ADM_PIN=ls_get(LS.ADM_PIN,'999999'); // 常に最新を取得
+  if(k==='DEL'){admCode=admCode.slice(0,-1);}else if(admCode.length<6){admCode+=k;}
+  [0,1,2,3,4,5].forEach(i=>$('am'+i).classList.toggle('on',i<admCode.length));
   $('pin-m-err').textContent='';
-  if(admCode.length===4){
+  if(admCode.length===6){
     setTimeout(()=>{
       if(admCode===ADM_PIN){
         closePinModal();
@@ -1831,7 +1832,7 @@ function admKey(k){
         }
       }else{
         $('pin-m-err').textContent='コードが違います';
-        admCode=''; [0,1,2,3].forEach(i=>$('am'+i).classList.remove('on'));
+        admCode=''; [0,1,2,3,4,5].forEach(i=>$('am'+i).classList.remove('on'));
       }
     },150);
   }
