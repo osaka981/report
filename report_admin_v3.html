@@ -168,6 +168,7 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
   <button class="nav-tab" onclick="navTab('pin',this)">🔐 PIN設定</button>
   <button class="nav-tab" onclick="navTab('analysis',this)">📈 分析</button>
   <button class="nav-tab" onclick="navTab('att',this);setAttMonth('this')">⏰ 勤怠</button>
+  <button class="nav-tab" onclick="navTab('edit',this);renderEditLogs()">✏️ 訂正履歴</button>
   <button class="nav-tab" id="nav-detail" style="display:none;" onclick="navTab('detail',this)">🔍 詳細</button>
 </div>
 
@@ -482,6 +483,53 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
     </div>
   </div>
 
+
+  <!-- 訂正履歴パネル -->
+  <div class="panel" id="panel-edit">
+    <div class="card">
+      <div class="card-title">✏️ 訂正履歴
+        <span class="badge" id="edit-badge">-</span>
+        <button onclick="renderEditLogs()" style="margin-left:auto;background:none;border:1px solid var(--brd);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;color:var(--mid);">🔄 更新</button>
+      </div>
+      <!-- フィルター -->
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
+        <div>
+          <span style="font-size:11px;color:var(--mid);">日付</span>
+          <input type="date" id="edit-from" class="fi" style="font-size:11px;padding:4px 8px;margin-left:4px;" oninput="renderEditLogs()">
+          <span style="font-size:11px;color:var(--mid);margin:0 4px;">〜</span>
+          <input type="date" id="edit-to" class="fi" style="font-size:11px;padding:4px 8px;" oninput="renderEditLogs()">
+        </div>
+        <div>
+          <span style="font-size:11px;color:var(--mid);">訂正者</span>
+          <select id="edit-who-filter" class="fi" style="font-size:11px;padding:4px 8px;margin-left:4px;" onchange="renderEditLogs()">
+            <option value="">全員</option>
+            <option value="driver">ドライバー本人</option>
+            <option value="admin">管理者</option>
+          </select>
+        </div>
+        <button onclick="setEditMonth('this')" style="background:none;border:1px solid var(--brd);border-radius:5px;padding:4px 10px;font-size:11px;cursor:pointer;color:var(--mid);">今月</button>
+        <button onclick="setEditMonth('last')" style="background:none;border:1px solid var(--brd);border-radius:5px;padding:4px 10px;font-size:11px;cursor:pointer;color:var(--mid);">先月</button>
+      </div>
+      <!-- 一覧 -->
+      <div style="overflow-x:auto;">
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th>訂正日時</th>
+              <th>訂正者</th>
+              <th>対象者</th>
+              <th>対象日付</th>
+              <th>種別</th>
+              <th>訂正理由</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="edit-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <div class="panel" id="panel-detail">
     <button class="back-link" onclick="closeDetail()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
@@ -564,6 +612,7 @@ const LS={
   OFFICES:'nikki_offices',REGIONS:'nikki_regions',
   YP_LOGS:'nikki_yp_logs',COL_LOGS:'nikki_col_logs',
   ATT_LOGS:'nikki_att_logs',
+  EDIT_LOGS:'nikki_edit_logs',
 };
 
 // ── Firebase設定を自動注入（セットアップ不要） ──
@@ -605,7 +654,7 @@ async function initFirebase() {
 async function syncFromFirebase() {
   if (!fbDB) return;
   const { ref, get } = window._fbImports;
-  const keys = ['drivers','customers','offices','regions','yp_logs','col_logs','att_logs','sec_pin','adm_pin'];
+  const keys = ['drivers','customers','offices','regions','yp_logs','col_logs','att_logs','edit_logs','sec_pin','adm_pin'];
   for (const k of keys) {
     try {
       const snap = await get(ref(fbDB, 'nikki/' + k));
@@ -623,6 +672,7 @@ async function syncFromFirebase() {
   YP_LOGS   = ls_get(LS.YP_LOGS, []);
   COL_LOGS  = ls_get(LS.COL_LOGS, []);
   ATT_LOGS  = ls_get(LS.ATT_LOGS, []);
+  EDIT_LOGS = ls_get(LS.EDIT_LOGS, []);
 }
 
 async function fbSet(key, value) {
@@ -651,6 +701,12 @@ function setupRealtimeSync() {
     ATT_LOGS = snap.val() || [];
     ls_set(LS.ATT_LOGS, ATT_LOGS);
     if(document.getElementById('panel-att')?.classList.contains('on')) renderAtt();
+  });
+  onValue(ref(fbDB, 'nikki/edit_logs'), snap => {
+    if (!snap.exists()) return;
+    EDIT_LOGS = snap.val() || [];
+    ls_set(LS.EDIT_LOGS, EDIT_LOGS);
+    if(document.getElementById('panel-edit')?.classList.contains('on')) renderEditLogs();
   });
 }
 
@@ -715,6 +771,7 @@ const load=()=>({
   YP_LOGS:ls_get(LS.YP_LOGS,[]),
   COL_LOGS:ls_get(LS.COL_LOGS,[]),
   ATT_LOGS:ls_get(LS.ATT_LOGS,[]),
+  EDIT_LOGS:ls_get(LS.EDIT_LOGS,[]),
 });
 
 // ══ CSV日付フィルター ══
@@ -1583,6 +1640,102 @@ if('serviceWorker' in navigator){
       .catch(e=>console.log('SW error',e));
   });
 }
+
+// ══ 訂正履歴管理 ══
+function setEditMonth(mode){
+  const now=new Date();
+  const y=now.getFullYear(),m=now.getMonth();
+  if(mode==='this'){
+    $('edit-from').value=`${y}-${String(m+1).padStart(2,'0')}-01`;
+    $('edit-to').value=`${y}-${String(m+1).padStart(2,'0')}-${String(new Date(y,m+1,0).getDate()).padStart(2,'0')}`;
+  } else {
+    const lm=m===0?12:m,ly=m===0?y-1:y;
+    $('edit-from').value=`${ly}-${String(lm).padStart(2,'0')}-01`;
+    $('edit-to').value=`${ly}-${String(lm).padStart(2,'0')}-${String(new Date(ly,lm,0).getDate()).padStart(2,'0')}`;
+  }
+  renderEditLogs();
+}
+
+function renderEditLogs(){
+  const EDIT=ls_get(LS.EDIT_LOGS,[]);
+  const from=$('edit-from')?.value||'';
+  const to=$('edit-to')?.value||'';
+  const whoFilter=$('edit-who-filter')?.value||'';
+
+  // フィルタリング
+  let rows=[...EDIT];
+  if(from) rows=rows.filter(r=>(r.editedAt||'').slice(0,10)>=from);
+  if(to)   rows=rows.filter(r=>(r.editedAt||'').slice(0,10)<=to);
+  if(whoFilter) rows=rows.filter(r=>r.source===whoFilter);
+  rows.sort((a,b)=>b.editedAt?.localeCompare(a.editedAt)||0);
+
+  const badge=$('edit-badge');
+  if(badge) badge.textContent=rows.length+'件';
+
+  const tbody=$('edit-tbody');
+  if(!tbody) return;
+  if(!rows.length){
+    tbody.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--light);padding:24px;">訂正履歴がありません</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML=rows.map(r=>{
+    const dt=r.editedAt?new Date(r.editedAt).toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'-';
+    const whoLabel=r.source==='admin'
+      ?`<span style="color:var(--rust);font-weight:700;">管理者</span>`
+      :`<span style="color:var(--slate);">${r.editedByName||'ドライバー'}</span>`;
+    const typeLabel=r.logType==='yuupack'
+      ?`<span style="color:var(--slate);font-size:10px;">宅配</span>`
+      :`<span style="color:var(--sage);font-size:10px;">集荷</span>`;
+    const adminBtn=`<button onclick="openAdminEditLog('${r.id}')" style="background:none;border:1px solid var(--amber);color:var(--amber);border-radius:5px;padding:2px 8px;font-size:10px;cursor:pointer;">修正</button>`;
+
+    return `<tr>
+      <td style="font-size:11px;font-family:var(--mono);">${dt}</td>
+      <td>${whoLabel}</td>
+      <td style="font-weight:700;font-size:12px;">${r.targetStaff||'-'}</td>
+      <td style="font-family:var(--mono);font-size:11px;">${r.targetDate||'-'}</td>
+      <td>${typeLabel}</td>
+      <td style="font-size:11px;color:var(--mid);max-width:200px;">${r.reason||'-'}</td>
+      <td>${adminBtn}</td>
+    </tr>`;
+  }).join('');
+}
+
+// 管理者側から訂正履歴の内容を確認・追記修正
+function openAdminEditLog(editId){
+  const EDIT=ls_get(LS.EDIT_LOGS,[]);
+  const rec=EDIT.find(e=>String(e.id)===String(editId));
+  if(!rec){ alert('記録が見つかりません'); return; }
+
+  const dt=rec.editedAt?new Date(rec.editedAt).toLocaleString('ja-JP'):'不明';
+  const info=[
+    `対象者：${rec.targetStaff||'-'}`,
+    `対象日：${rec.targetDate||'-'}`,
+    `訂正日時：${dt}`,
+    `訂正者：${rec.editedByName||'-'}（${rec.source==='admin'?'管理者':'ドライバー本人'}）`,
+    `種別：${rec.logType==='yuupack'?'宅配日報':'集荷日報'}`,
+    `現在の理由：${rec.reason||'なし'}`,
+    '',
+    '管理者コメントを追記する場合は入力してください（空欄でキャンセル）：',
+  ].join('\n');
+
+  const comment=prompt(info, rec.adminComment||'');
+  if(comment===null) return;
+
+  const idx=EDIT.findIndex(e=>String(e.id)===String(editId));
+  if(idx>=0){
+    EDIT[idx].adminComment=comment;
+    EDIT[idx].adminCheckedAt=new Date().toISOString();
+    ls_set(LS.EDIT_LOGS,EDIT);
+    if(fbDB){
+      const {ref,set}=window._fbImports;
+      set(ref(fbDB,'nikki/edit_logs'),EDIT).catch(e=>console.error(e));
+    }
+    renderEditLogs();
+    alert('コメントを保存しました');
+  }
+}
+
 
 // ══ 区分→給与形態の自動連動 ══
 function syncKyuyoFromKbn(kbn){
