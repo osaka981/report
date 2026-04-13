@@ -366,23 +366,20 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
         <div style="color:var(--light);font-size:11px;margin-top:2px;">社員番号を入力してください</div>
       </div>
       <div class="lbl">社員番号</div>
-      <input type="tel" id="emp-id" class="fi" style="font-size:18px;font-weight:700;text-align:center;letter-spacing:.25em;font-family:var(--mono);" placeholder="" oninput="$('login-err').style.display='none';filterIdList()">
+      <input type="tel" id="emp-id" class="fi" style="font-size:18px;font-weight:700;text-align:center;letter-spacing:.25em;font-family:var(--mono);" placeholder="" oninput="$('login-err').style.display='none'">
       <div id="login-err" style="display:none;background:rgba(139,74,58,.07);border:1px solid rgba(139,74,58,.22);border-radius:6px;padding:6px 10px;color:var(--rust);font-size:11px;margin-top:6px;"></div>
       <button class="btn-main mt8" style="background:var(--clay);color:#faf8f5;" onclick="doLogin()">ログイン</button>
     </div>
 
-    <!-- IDリスト -->
+    <!-- IDリスト（試し入力・運用確認用） -->
     <div class="card mb12">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
         <div style="font-size:11px;font-weight:700;color:var(--mid);">IDリスト</div>
         <button onclick="toggleIdList()" id="idlist-toggle-btn" style="background:none;border:1px solid var(--brd);border-radius:5px;padding:3px 10px;font-size:10px;color:var(--mid);cursor:pointer;">▼ 表示</button>
       </div>
       <div id="idlist-wrap" style="display:none;">
-        <!-- 郵便局フィルター -->
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;" id="idlist-filter-btns"></div>
-        <!-- 検索 -->
         <input type="text" id="idlist-search" class="fi" placeholder="名前で絞り込み..." oninput="filterIdList()" style="font-size:12px;margin-bottom:8px;">
-        <!-- リスト -->
         <div id="idlist-body" style="max-height:240px;overflow-y:auto;border:1px solid var(--brd);border-radius:7px;"></div>
       </div>
     </div>
@@ -1085,11 +1082,10 @@ function startFace(){
 }
 
 
-// ══ IDリスト機能 ══
-let idListOpen = false;
-let idListFilter = '';
 
-// 郵便局コード→名称マップ
+// ══ IDリスト機能（試し入力・運用確認用） ══
+let idListOpen = false;
+
 function getOfficeLabel(office){
   if(!office) return 'その他';
   const map={
@@ -1113,10 +1109,8 @@ function getOfficeColor(office){
   return 'var(--mid)';
 }
 
-// ID表示（先頭0省略）
 function displayId(id){
   if(!id) return '';
-  // 先頭が0の場合は省略（内部5桁→表示4桁）
   return String(id).replace(/^0+/, '') || id;
 }
 
@@ -1136,14 +1130,12 @@ function filterIdList(){
 
 function renderIdList(){
   const drivers = DRIVERS || [];
-  const search = ($('idlist-search')?.value || $('emp-id')?.value || '').toLowerCase();
+  const search = ($('idlist-search')?.value || '').toLowerCase();
   const activeFilter = document.querySelector('.idlist-filter-btn.active')?.dataset?.office || '';
 
-  // 郵便局フィルターボタン生成
   const filterWrap = $('idlist-filter-btns');
   if(filterWrap && filterWrap.children.length === 0){
     const offices = [...new Set(drivers.map(d=>getOfficeLabel(d.office)))].sort();
-    // 「全員」ボタン
     const allBtn = document.createElement('button');
     allBtn.className = 'idlist-filter-btn active';
     allBtn.dataset.office = '';
@@ -1162,7 +1154,6 @@ function renderIdList(){
     });
   }
 
-  // フィルタリング
   let list = drivers.filter(d => {
     const offLabel = getOfficeLabel(d.office);
     const matchOffice = !activeFilter || offLabel === activeFilter;
@@ -1173,7 +1164,6 @@ function renderIdList(){
     return matchOffice && matchSearch;
   });
 
-  // ソート：郵便局→ID順
   list.sort((a,b) => {
     const oa = getOfficeLabel(a.office), ob = getOfficeLabel(b.office);
     if(oa !== ob) return oa.localeCompare(ob, 'ja');
@@ -1220,17 +1210,15 @@ function setIdListFilter(office){
 }
 
 function selectDriverId(id){
-  const dispId = displayId(id);
   const empId = $('emp-id');
   if(empId){
-    empId.value = dispId;
+    empId.value = displayId(id);
     $('login-err').style.display = 'none';
   }
-  // リストを閉じる
   toggleIdList();
-  // IDを入力したらそのままログインできるようスクロール
   empId?.scrollIntoView({behavior:'smooth', block:'center'});
 }
+
 
 // ══ 勤怠ユーティリティ ══
 // 給与形態から勤怠タイプを判定
@@ -1330,17 +1318,7 @@ function doLogin(){
   show('scr-select');
 }
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&$('scr-login').classList.contains('on'))doLogin();});
-function doLogout(){
-  driver=null;todayAttId=null;clockOutGps=null;
-  $('emp-id').value='';
-  // IDリストをリセット
-  idListOpen=false;
-  const wrap=$('idlist-wrap');
-  const btn=$('idlist-toggle-btn');
-  if(wrap)wrap.style.display='none';
-  if(btn)btn.textContent='▼ 表示';
-  show('scr-login');secReset();
-}
+function doLogout(){driver=null;todayAttId=null;clockOutGps=null;$('emp-id').value='';show('scr-login');secReset();}
 function goTop(){renderPersonalStats(driver);show('scr-select');}
 function goBack(){renderPersonalStats(driver);show('scr-select');}
 function selectBiz(t){
