@@ -972,8 +972,28 @@ function setupRealtimeSync() {
   });
   onValue(ref(fbDB, 'nikki/customers'), snap => {
     if (!snap.exists()) return;
-    CUSTOMERS = snap.val() || CUSTOMERS;
-    fbSet('customers', CUSTOMERS);
+    // Firebase顧客データを経営管理システムのフォーマットに対応
+    const fbCusts = snap.val() || CUSTOMERS;
+    if(Array.isArray(fbCusts) && fbCusts.length){
+      // custNo・region・colPrices付きの完全データに更新
+      CUSTOMERS = fbCusts.map(fc=>({
+        id: fc.id,
+        custNo: fc.custNo||'',
+        name: fc.name||'',
+        region: fc.region||'',
+        start: fc.start||'',
+        colPrices: fc.colPrices||{},
+      })).filter(c=>c.name);
+      ls_set(LS.CUSTOMERS, CUSTOMERS);
+      // REGIONS も更新
+      const fbRegions=[...new Set(CUSTOMERS.map(c=>c.region).filter(Boolean))].sort();
+      if(fbRegions.length){
+        REGIONS=[...new Set([...REGIONS,...fbRegions])].sort();
+        ls_set(LS.REGIONS, REGIONS);
+      }
+    } else {
+      CUSTOMERS = fbCusts || CUSTOMERS;
+    }
   });
 }
 
@@ -1673,6 +1693,11 @@ function colReset(){
 function buildRegionTabs(){
   REGIONS=ls_get(LS.REGIONS,REGIONS);
   CUSTOMERS=ls_get(LS.CUSTOMERS,CUSTOMERS);
+  // 経営管理の顧客データから地域を自動追加
+  const custRegions=[...new Set(CUSTOMERS.map(c=>c.region).filter(Boolean))];
+  if(custRegions.length){
+    REGIONS=[...new Set([...REGIONS,...custRegions])].sort();
+  }
   // 大阪市区
   $('osaka-ku-btns').innerHTML=OSAKA_KU.map(ku=>`<button class="rku-btn" onclick="selectRegion('大阪市${ku}')">${ku}</button>`).join('');
   // 京都
