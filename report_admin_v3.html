@@ -2013,5 +2013,92 @@ function roundAtt15(totalMin){
 }
 
 </script>
+
+<script>
+// ══ 年月日入力 Enter→次セクション移動 ══
+(function initDateEnterNav(){
+  function onDateKeydown(e){
+    if(e.key!=='Enter') return;
+    e.preventDefault();
+    const inp=e.target;
+    const isMonth=inp.type==='month';
+    const val=inp.value||'';
+    const parts=val.split('-');
+    const year=parts[0]||'';
+    const mon=parts[1]||'';
+
+    let sec=parseInt(inp.dataset.section||'0');
+
+    if(isMonth){
+      if(sec===0&&year.length===4){
+        inp.dataset.section='1';
+        inp.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true,cancelable:true}));
+      } else {
+        inp.dataset.section='0';
+        moveFocus(inp);
+      }
+    } else {
+      if(sec===0&&year.length===4){
+        inp.dataset.section='1';
+        inp.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true,cancelable:true}));
+      } else if(sec===1&&mon.length===2){
+        inp.dataset.section='2';
+        inp.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true,cancelable:true}));
+      } else {
+        inp.dataset.section='0';
+        moveFocus(inp);
+      }
+    }
+  }
+
+  function moveFocus(inp){
+    const focusable=[
+      'input:not([disabled]):not([type=hidden])',
+      'select:not([disabled])',
+      'textarea:not([disabled])',
+      'button:not([disabled])'
+    ].join(',');
+    const all=[...document.querySelectorAll(focusable)];
+    const idx=all.indexOf(inp);
+    if(idx>=0&&idx<all.length-1){
+      const next=all[idx+1];
+      next.focus();
+      if(next.type!=='date'&&next.type!=='month'){
+        try{next.select();}catch(ex){}
+      }
+    }
+  }
+
+  function onDateFocus(e){ e.target.dataset.section='0'; }
+
+  function attach(inp){
+    if(inp.dataset.dateNavBound) return;
+    inp.addEventListener('keydown',onDateKeydown);
+    inp.addEventListener('focus',onDateFocus);
+    inp.dataset.dateNavBound='1';
+  }
+
+  function attachAll(){
+    document.querySelectorAll('input[type="date"],input[type="month"]').forEach(attach);
+  }
+
+  const obs=new MutationObserver(mutations=>{
+    mutations.forEach(m=>{
+      m.addedNodes.forEach(n=>{
+        if(n.nodeType!==1) return;
+        if(n.matches&&n.matches('input[type="date"],input[type="month"]')) attach(n);
+        n.querySelectorAll&&n.querySelectorAll('input[type="date"],input[type="month"]').forEach(attach);
+      });
+    });
+  });
+  obs.observe(document.body,{childList:true,subtree:true});
+
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',attachAll);
+  } else {
+    attachAll();
+  }
+})();
+</script>
 </body>
 </html>
