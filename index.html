@@ -217,6 +217,81 @@ textarea.fi{resize:none;}
 .cust-item+.cust-item{border-top:1px solid var(--div);}
 .cust-item:active{background:var(--inp);}
 .cust-hist-label{padding:5px 12px 3px;font-size:9.5px;color:var(--light);font-weight:700;letter-spacing:.1em;background:var(--inp);border-bottom:1px solid var(--div);}
+
+/* ══ 集荷入力 新UI ══ */
+/* 追加ボタン */
+.col-add-btn{display:flex;align-items:center;gap:6px;padding:9px 12px;border-radius:8px;border:1.5px dashed var(--brd);font-size:12px;color:var(--mid);background:transparent;cursor:pointer;width:100%;box-sizing:border-box;margin-bottom:6px;}
+.col-add-ico{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;}
+.col-add-route{border-color:rgba(74,122,155,.4);color:var(--slate);}
+.col-add-ico-r{background:rgba(74,122,155,.12);color:var(--slate);}
+.col-add-indiv{border-color:rgba(90,138,90,.4);color:var(--sage);}
+.col-add-ico-i{background:rgba(90,138,90,.12);color:var(--sage);}
+.col-add-charter{border-color:rgba(154,106,42,.4);color:var(--amber);}
+.col-add-ico-c{background:rgba(154,106,42,.12);color:var(--amber);}
+/* ブロック */
+.col-block{border-radius:10px;margin-bottom:10px;overflow:hidden;}
+.col-block-route{border:1.5px solid rgba(74,122,155,.5);}
+.col-block-indiv{border:1.5px solid rgba(90,138,90,.5);}
+.col-block-charter{border:1.5px solid rgba(154,106,42,.5);}
+/* ブロックヘッダー */
+.col-block-hdr{padding:9px 12px;display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;}
+.col-block-hdr-route{background:rgba(74,122,155,.08);}
+.col-block-hdr-indiv{background:rgba(90,138,90,.08);}
+.col-block-hdr-charter{background:rgba(154,106,42,.08);}
+.col-block-title{font-size:12px;font-weight:700;flex:1;}
+.col-block-title-r{color:var(--slate);}
+.col-block-title-i{color:var(--sage);}
+.col-block-title-c{color:var(--amber);}
+.col-block-tag{font-size:9px;padding:2px 6px;border-radius:10px;}
+.col-tag-r{background:rgba(74,122,155,.12);color:var(--slate);}
+.col-tag-i{background:rgba(90,138,90,.12);color:var(--sage);}
+.col-tag-c{background:rgba(154,106,42,.12);color:var(--amber);}
+.col-block-chev{font-size:10px;color:var(--light);flex-shrink:0;transition:transform .2s;}
+/* 顧客行 */
+.col-cust-row{border-top:1px solid var(--div);}
+.col-cust-row-rest{background:rgba(232,160,48,.07);border-top:1px solid rgba(232,160,48,.2);}
+.col-cust-hdr{padding:8px 10px;display:flex;align-items:center;gap:5px;cursor:pointer;}
+.col-cdot{width:8px;height:8px;border-radius:2px;flex-shrink:0;}
+.col-cdot-b{background:var(--slate);}
+.col-cdot-r{background:var(--amber);}
+.col-cnm{font-size:12px;color:var(--ink);flex:1;}
+.col-cnm-rest{font-size:12px;color:var(--amber);flex:1;}
+.col-rest-badge{font-size:9px;background:var(--amber);color:#fff;padding:1px 5px;border-radius:3px;}
+.col-snote{font-size:9px;color:var(--light);}
+.col-tog-wrap{display:flex;gap:2px;flex-shrink:0;}
+.col-tog{font-size:9px;padding:3px 7px;border-radius:4px;border:none;cursor:pointer;}
+.col-tog-on-b{background:var(--slate);color:#fff;}
+.col-tog-on-r{background:var(--amber);color:#fff;}
+.col-tog-off{background:var(--inp);color:var(--light);}
+/* 品目エリア */
+.col-iw{background:rgba(44,40,37,.03);padding:10px 10px 8px;}
+.col-igl{font-size:9px;color:var(--light);letter-spacing:.3px;margin-bottom:6px;padding-bottom:2px;border-bottom:1px solid var(--div);}
+/* 2列グリッド */
+.col-g2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;}
+/* 品目セル */
+.col-ic{background:var(--card);border:1px solid var(--brd);border-radius:8px;padding:8px 6px 6px;display:flex;flex-direction:column;align-items:center;}
+.col-il{font-size:10px;color:var(--mid);font-weight:500;margin-bottom:6px;}
+/* 横並びコントロール：±小・数字大 */
+.col-irow{display:flex;align-items:center;justify-content:center;gap:3px;width:100%;}
+.col-ibm{width:24px;height:38px;border-radius:6px;border:none;font-size:18px;cursor:pointer;background:var(--inp);color:var(--mid);display:flex;align-items:center;justify-content:center;flex-shrink:0;line-height:1;}
+.col-ibp-b{width:24px;height:38px;border-radius:6px;border:none;font-size:18px;cursor:pointer;background:rgba(74,122,155,.15);color:var(--slate);display:flex;align-items:center;justify-content:center;flex-shrink:0;line-height:1;}
+.col-ibp-g{width:24px;height:38px;border-radius:6px;border:none;font-size:18px;cursor:pointer;background:rgba(90,138,90,.15);color:var(--sage);display:flex;align-items:center;justify-content:center;flex-shrink:0;line-height:1;}
+.col-inum{flex:1;min-width:0;height:38px;border:1.5px solid rgba(74,122,155,.3);border-radius:6px;text-align:center;font-size:18px;font-weight:700;color:var(--ink);background:var(--card);-moz-appearance:textfield;}
+.col-inum-z{flex:1;min-width:0;height:38px;border:1px solid var(--brd);border-radius:6px;text-align:center;font-size:18px;color:var(--light);background:var(--inp);-moz-appearance:textfield;}
+.col-inum::-webkit-inner-spin-button,.col-inum-z::-webkit-inner-spin-button{-webkit-appearance:none;}
+.col-inum-g{border-color:rgba(90,138,90,.3);}
+/* 140・160折りたたみ */
+.col-fold-trigger{display:flex;align-items:center;justify-content:center;gap:4px;padding:5px 0 3px;cursor:pointer;}
+.col-fold-lbl{font-size:10px;color:var(--slate);}
+.col-fold-chev{font-size:9px;color:var(--slate);transition:transform .15s;}
+/* 削除ゾーン */
+.col-dz{padding:8px 12px;border-top:1px solid rgba(196,68,68,.12);background:rgba(196,68,68,.03);display:flex;align-items:center;justify-content:center;}
+.col-dbtn{font-size:11px;color:#c44;background:none;border:1px solid rgba(196,68,68,.3);border-radius:6px;padding:5px 16px;cursor:pointer;}
+/* チャーター入力 */
+.col-charter-body{background:var(--card);padding:12px;border-top:1px solid var(--div);}
+.col-charter-frow{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+/* モーダル表示切替 */
+#col-del-modal.show,#col-sub-modal.show{display:flex!important;}
 </style>
 <link rel="manifest" href="./manifest-app.json">
 <link rel="apple-touch-icon" href="./icon-app-192.png">
@@ -500,89 +575,83 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
     <div class="tb-sub" id="col-sub"></div>
   </div>
   <div class="p16">
-    <div class="card mb8"><div class="row-hd"><div class="row-ico" style="background:rgba(44,40,37,.07)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ink)" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><span class="row-lbl">日付</span></div><input type="date" id="col-date" class="fi"></div>
+
+    <!-- 一時保存バナー -->
+    <div id="col-draft-banner" style="display:none;background:rgba(74,122,155,.12);border:1.5px solid rgba(74,122,155,.35);border-radius:10px;padding:10px 14px;margin-bottom:10px;">
+      <div style="font-size:11px;font-weight:700;color:var(--slate);margin-bottom:6px;">前回の入力が残っています</div>
+      <div style="font-size:10px;color:var(--mid);margin-bottom:8px;" id="col-draft-info"></div>
+      <div style="display:flex;gap:8px;">
+        <button onclick="loadColDraft()" style="font-size:11px;background:var(--slate);color:#fff;border:none;border-radius:6px;padding:5px 14px;cursor:pointer;">続きから</button>
+        <button onclick="clearColDraft()" style="font-size:11px;background:none;border:1px solid var(--brd);color:var(--mid);border-radius:6px;padding:5px 14px;cursor:pointer;">破棄</button>
+      </div>
+    </div>
+
+    <!-- 日付 -->
     <div class="card mb8">
-      <div class="row-hd"><div class="row-ico" style="background:rgba(44,40,37,.07)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ink)" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div><span class="row-lbl">顧客選択</span></div>
-
-      <!-- ① 地域選択（タブ式） -->
-      <div class="lbl" style="margin-bottom:6px;">① 地域</div>
-      <div style="display:flex;border:1px solid var(--brd);border-radius:7px;overflow:hidden;margin-bottom:8px;background:var(--inp);">
-        <button id="rtab-other" class="rtab on" onclick="switchRegionTab('other')">その他</button>
-        <button id="rtab-osaka" class="rtab" onclick="switchRegionTab('osaka')">大阪市区</button>
-        <button id="rtab-kyoto" class="rtab" onclick="switchRegionTab('kyoto')">京都</button>
-        <button id="rtab-free" class="rtab" onclick="switchRegionTab('free')">手打ち</button>
-      </div>
-
-      <!-- その他（登録済み地域）→先頭に移動 -->
-      <div id="rtab-content-other" class="rtab-content">
-        <div id="other-region-btns" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px;"></div>
-      </div>
-      <!-- 大阪市区グリッド -->
-      <div id="rtab-content-osaka" class="rtab-content" style="display:none;">
-        <div id="osaka-ku-btns" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px;"></div>
-      </div>
-      <!-- 京都グリッド -->
-      <div id="rtab-content-kyoto" class="rtab-content" style="display:none;">
-        <div id="kyoto-btns" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px;"></div>
-      </div>
-      <!-- 手打ち -->
-      <div id="rtab-content-free" class="rtab-content" style="display:none;">
-        <input type="text" id="region-free-input" class="fi fi-sm" placeholder="地域名を入力..." oninput="onFreeRegionInput()" style="margin-bottom:6px;">
-        <div id="region-free-suggest" style="border:1px solid var(--brd);border-radius:7px;overflow:hidden;display:none;margin-bottom:6px;"></div>
-      </div>
-
-      <!-- 選択中の地域表示 -->
-      <div id="col-region-sel" style="display:none;background:rgba(96,112,128,.08);border:1px solid rgba(96,112,128,.2);border-radius:7px;padding:6px 11px;margin-bottom:8px;font-size:12px;display:flex;align-items:center;justify-content:space-between;">
-        <span>📍 <strong id="col-region-name"></strong></span>
-        <button onclick="clearRegion()" style="background:none;border:none;color:var(--light);cursor:pointer;font-size:13px;line-height:1;">×</button>
-      </div>
-
-      <!-- ② 顧客検索（履歴 + 手打ち） -->
-      <div id="col-cust-area" style="display:none;">
-        <div class="lbl" style="margin-bottom:6px;">② 顧客名</div>
-        <!-- 検索ボックス -->
-        <div style="position:relative;margin-bottom:6px;">
-          <input type="text" id="col-search" class="fi fi-sm" placeholder="顧客名で絞り込み（空欄でよく使う顧客を表示）" oninput="showCustList()" onfocus="showCustList()">
-        </div>
-        <!-- 顧客リスト（履歴 + 検索結果） -->
-        <div id="col-cust-list" style="display:none;border:1px solid var(--brd);border-radius:8px;overflow:hidden;max-height:220px;overflow-y:auto;margin-bottom:6px;"></div>
-      </div>
-
-      <!-- 選択済み顧客 -->
-      <div id="col-cust-sel" style="display:none;background:rgba(107,124,106,.08);border:1px solid rgba(107,124,106,.22);border-radius:8px;padding:8px 11px;"></div>
+      <div class="row-hd"><div class="row-ico" style="background:rgba(44,40,37,.07)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ink)" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><span class="row-lbl">日付</span></div>
+      <input type="date" id="col-date" class="fi">
     </div>
-    <div class="card mb8"><div class="row-hd"><div class="row-ico" style="background:rgba(44,40,37,.07)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ink)" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div><span class="row-lbl">品目・数量</span></div>
-      <div style="background:#f0f4f8;border-radius:8px;padding:10px;margin-bottom:8px;"><div style="color:var(--slate);font-weight:700;font-size:10px;margin-bottom:6px;">ゆうパック</div>
-        <div class="irow"><span class="ir-lbl">60サイズ</span><div class="ir-ctrl"><button class="ib" onclick="iStep('y60',-1)">−</button><input type="number" id="i-y60" class="iv" min="0" value="0" oninput="updPrev()"><button class="ib p" onclick="iStep('y60',1)">＋</button></div></div>
-        <div class="irow"><span class="ir-lbl">80サイズ</span><div class="ir-ctrl"><button class="ib" onclick="iStep('y80',-1)">−</button><input type="number" id="i-y80" class="iv" min="0" value="0" oninput="updPrev()"><button class="ib p" onclick="iStep('y80',1)">＋</button></div></div>
-        <div class="irow"><span class="ir-lbl">100サイズ</span><div class="ir-ctrl"><button class="ib" onclick="iStep('y100',-1)">−</button><input type="number" id="i-y100" class="iv" min="0" value="0" oninput="updPrev()"><button class="ib p" onclick="iStep('y100',1)">＋</button></div></div>
-        <div class="irow"><span class="ir-lbl">120サイズ</span><div class="ir-ctrl"><button class="ib" onclick="iStep('y120',-1)">−</button><input type="number" id="i-y120" class="iv" min="0" value="0" oninput="updPrev()"><button class="ib p" onclick="iStep('y120',1)">＋</button></div></div>
-        <div class="irow"><span class="ir-lbl">140サイズ</span><div class="ir-ctrl"><button class="ib" onclick="iStep('y140',-1)">−</button><input type="number" id="i-y140" class="iv" min="0" value="0" oninput="updPrev()"><button class="ib p" onclick="iStep('y140',1)">＋</button></div></div>
-        <div class="irow" style="border-bottom:none;"><span class="ir-lbl">160サイズ</span><div class="ir-ctrl"><button class="ib" onclick="iStep('y160',-1)">−</button><input type="number" id="i-y160" class="iv" min="0" value="0" oninput="updPrev()"><button class="ib p" onclick="iStep('y160',1)">＋</button></div></div>
+
+    <!-- 集荷入力エリア -->
+    <div class="card mb8">
+      <div class="row-hd"><div class="row-ico" style="background:rgba(44,40,37,.07)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ink)" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div><span class="row-lbl">集荷入力</span></div>
+      <div id="col-blocks-wrap"></div>
+
+      <!-- ルートを追加 -->
+      <button class="col-add-btn col-add-route" onclick="addRouteBlock()">
+        <span class="col-add-ico col-add-ico-r">＋</span>ルートを追加
+      </button>
+      <!-- 顧客個別を追加 -->
+      <button class="col-add-btn col-add-indiv" onclick="openCustAddPanel()">
+        <span class="col-add-ico col-add-ico-i">＋</span>顧客個別を追加
+      </button>
+      <!-- 顧客選択パネル -->
+      <div id="col-cust-add-panel" style="display:none;background:rgba(90,138,90,.07);border:1.5px solid rgba(90,138,90,.3);border-radius:10px;padding:12px;margin-bottom:6px;">
+        <div style="font-size:11px;font-weight:700;color:var(--sage);margin-bottom:8px;">顧客を選択して追加</div>
+        <input type="text" id="col-cust-add-search" class="fi fi-sm" placeholder="顧客名・地域で検索（例：ゆっく、東亜、港区）" oninput="filterCustAddPanel(this.value)" style="margin-bottom:6px;">
+        <div id="col-cust-add-list" style="display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto;"></div>
       </div>
-      <div style="background:#f0f5f0;border-radius:8px;padding:10px;margin-bottom:8px;"><div style="color:var(--sage);font-weight:700;font-size:10px;margin-bottom:6px;">ゆうパケット</div>
-        <div class="irow"><span class="ir-lbl">通常</span><div class="ir-ctrl"><button class="ib" onclick="iStep('pk1',-1)">−</button><input type="number" id="i-pk1" class="iv" min="0" value="0" oninput="updPrev()"><button class="ib p" onclick="iStep('pk1',1)">＋</button></div></div>
-        <div class="irow" style="border-bottom:none;"><span class="ir-lbl">7cm以上</span><div class="ir-ctrl"><button class="ib" onclick="iStep('pk2',-1)">−</button><input type="number" id="i-pk2" class="iv" min="0" value="0" oninput="updPrev()"><button class="ib p" onclick="iStep('pk2',1)">＋</button></div></div>
-      </div>
-      <div style="background:var(--inp);border-radius:8px;padding:10px;margin-bottom:8px;"><div style="color:var(--stone);font-weight:700;font-size:10px;margin-bottom:6px;">その他</div>
-        <div class="irow"><span class="ir-lbl">クリックポスト</span><div class="ir-ctrl"><button class="ib" onclick="iStep('cp',-1)">−</button><input type="number" id="i-cp" class="iv" min="0" value="0" oninput="updPrev()"><button class="ib p" onclick="iStep('cp',1)">＋</button></div></div>
-        <div class="irow"><span class="ir-lbl">ケース</span><div class="ir-ctrl"><button class="ib" onclick="iStep('ke',-1)">−</button><input type="number" id="i-ke" class="iv" min="0" value="0" oninput="updPrev()"><button class="ib p" onclick="iStep('ke',1)">＋</button></div></div>
-        <div class="irow" style="border-bottom:none;"><span class="ir-lbl">定形外(ゆうメール)</span><div class="ir-ctrl"><button class="ib" onclick="iStep('te',-1)">−</button><input type="number" id="i-te" class="iv" min="0" value="0" oninput="updPrev()"><button class="ib p" onclick="iStep('te',1)">＋</button></div></div>
-      </div>
-      <div style="background:#faf6ee;border-radius:8px;padding:10px;margin-bottom:11px;"><div style="color:var(--amber);font-weight:700;font-size:10px;margin-bottom:6px;">チャーター</div>
-        <div class="irow" style="border-bottom:none;"><span class="ir-lbl">件数</span><div class="ir-ctrl"><button class="ib" onclick="iStep('ch',-1)">−</button><input type="number" id="i-ch" class="iv" min="0" value="0" oninput="updPrev()"><button class="ib p" onclick="iStep('ch',1)">＋</button></div></div>
-        <div id="ch-dest-area" style="display:none;margin-top:8px;"><div class="lbl">到着場所</div><input type="text" id="ch-dest" class="fi fi-sm" placeholder="例: ○○倉庫"></div>
-      </div>
-      <div id="col-prev" style="display:none;background:rgba(107,124,106,.08);border:1px solid rgba(107,124,106,.2);border-radius:8px;padding:8px 12px;margin-bottom:8px;"><div class="sm">合計：<strong id="prev-tot">0</strong>個・件</div></div>
-      <button id="col-add-btn" class="btn-main" onclick="addRows()" style="background:var(--sage);color:#faf8f5;">＋ まとめて明細に追加</button>
-      <div id="col-add-hint" class="xs muted mt8" style="text-align:center;display:none;"></div>
+      <!-- チャーターを追加 -->
+      <button class="col-add-btn col-add-charter" onclick="addCharterBlock()">
+        <span class="col-add-ico col-add-ico-c">＋</span>チャーターを追加
+      </button>
     </div>
-    <div id="col-rows-card" class="card mb8" style="display:none;"><div class="row-hd"><div class="row-ico" style="background:rgba(44,40,37,.07)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ink)" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></div><span class="row-lbl" id="col-rows-lbl">入力済み明細（0件）</span></div><div id="col-rows-list"></div></div>
-    <div class="card mb8"><div class="row-hd"><div class="row-ico" style="background:rgba(136,128,120,.09)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--stone)" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div><span class="row-lbl" style="color:var(--stone)">備考</span></div><textarea id="col-note" class="fi" rows="3" placeholder="トラブル・特記事項など"></textarea></div>
+
+    <!-- 備考 -->
+    <div class="card mb8">
+      <div class="row-hd"><div class="row-ico" style="background:rgba(136,128,120,.09)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--stone)" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div><span class="row-lbl" style="color:var(--stone)">備考</span></div>
+      <textarea id="col-note" class="fi" rows="3" placeholder="トラブル・特記事項など"></textarea>
+    </div>
+
     <button id="col-submit" class="btn-main btn-dis" onclick="submitCol()" style="background:var(--sage);color:#faf8f5;">日報を提出する</button>
     <div style="height:28px;"></div>
   </div>
 </div>
+
+<!-- 集荷入力 削除確認モーダル -->
+<div id="col-del-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:8000;align-items:center;justify-content:center;">
+  <div style="background:var(--card);border-radius:14px;padding:20px;max-width:300px;width:90%;text-align:center;">
+    <div style="font-size:14px;font-weight:700;color:var(--ink);margin-bottom:6px;">削除の確認</div>
+    <div style="font-size:12px;color:var(--mid);margin-bottom:16px;line-height:1.6;" id="col-del-msg"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <button onclick="closeColDelModal()" style="padding:10px;border-radius:8px;background:var(--inp);border:none;font-size:13px;color:var(--mid);cursor:pointer;">キャンセル</button>
+      <button id="col-del-ok-btn" style="padding:10px;border-radius:8px;background:#c44;border:none;font-size:13px;color:#fff;cursor:pointer;">削除する</button>
+    </div>
+  </div>
+</div>
+
+<!-- 集荷入力 提出確認モーダル -->
+<div id="col-sub-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:8000;align-items:center;justify-content:center;">
+  <div style="background:var(--card);border-radius:14px;padding:20px;max-width:300px;width:90%;text-align:center;">
+    <div style="font-size:14px;font-weight:700;color:var(--ink);margin-bottom:6px;">提出の確認</div>
+    <div style="font-size:12px;color:var(--mid);margin-bottom:16px;line-height:1.6;" id="col-sub-msg"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <button onclick="closeColSubModal()" style="padding:10px;border-radius:8px;background:var(--inp);border:none;font-size:13px;color:var(--mid);cursor:pointer;">戻る</button>
+      <button onclick="doSubmitCol()" style="padding:10px;border-radius:8px;background:var(--sage);border:none;font-size:13px;color:#fff;cursor:pointer;">提出する</button>
+    </div>
+  </div>
+</div>
+
 
 <!-- 退勤確認画面 -->
 <div id="scr-clockout" class="screen">
@@ -838,6 +907,7 @@ const LS={
   YP_LOGS:'nikki_yp_logs', COL_LOGS:'nikki_col_logs',
   ATT_LOGS:'nikki_att_logs',
   EDIT_LOGS:'nikki_edit_logs',
+  COL_ROUTES:'nikki_col_routes',
 };
 
 // ── Firebase設定を自動注入（セットアップ不要） ──
@@ -970,6 +1040,12 @@ function setupRealtimeSync() {
     DRIVERS = snap.val() || DRIVERS;
     fbSet('drivers', DRIVERS);
   });
+  onValue(ref(fbDB, 'nikki/col_routes'), snap => {
+    if(snap.exists()){
+      COL_ROUTES = snap.val()||[];
+      ls_set(LS.COL_ROUTES, COL_ROUTES);
+    }
+  });
   onValue(ref(fbDB, 'nikki/customers'), snap => {
     if (!snap.exists()) return;
     // Firebase顧客データを経営管理システムのフォーマットに対応
@@ -1041,7 +1117,8 @@ let REGIONS = ls_get(LS.REGIONS,[
 let CUST_HIST = ls_get(LS.CUST_HIST,[]); // [{id, name, region, count, lastUsed}]
 let YP_LOGS = ls_get(LS.YP_LOGS,[]);
 let COL_LOGS = ls_get(LS.COL_LOGS,[]);
-let ATT_LOGS = ls_get(LS.ATT_LOGS,[]); // 勤怠ログ {id,driverId,clockIn,clockInGps,clockOut,clockOutGps,adjustedOut,workMin}
+let ATT_LOGS = ls_get(LS.ATT_LOGS,[]); // 勤怠ログ
+let COL_ROUTES = ls_get(LS.COL_ROUTES,[]); // 集荷ルートマスタ（経営管理から同期） {id,driverId,clockIn,clockInGps,clockOut,clockOutGps,adjustedOut,workMin}
 // 営業所マスタ：DRIVERSから自動生成して初期値として使用
 let OFFICES = ls_get(LS.OFFICES,(()=>{
   const names=[...new Set([
@@ -1673,191 +1750,499 @@ function submitYP(){
 // ══ 集荷 ══
 let curRegionTab='other';
 
+// ══ 集荷入力 新UI ══
+
+// ── データモデル ──
+// colBlocks: [{type:'route'|'indiv'|'charter', id, routeId?, routeName?, custId?, custName?, region?, customers?:[{id,name,region,rest,items:{...},open}], charterData?:{custName,from,to,content}}]
+let colBlocks = [];
+let colBlockIdSeq = 0;
+
+// ── 一時保存 ──
+const COL_DRAFT_KEY = 'col_input_draft';
+function saveColDraft(){
+  const draft = {
+    date: $('col-date')?.value || '',
+    note: $('col-note')?.value || '',
+    blocks: colBlocks,
+    savedAt: new Date().toISOString()
+  };
+  try{ localStorage.setItem(COL_DRAFT_KEY, JSON.stringify(draft)); }catch(e){}
+}
+function loadColDraft(){
+  try{
+    const d = JSON.parse(localStorage.getItem(COL_DRAFT_KEY)||'null');
+    if(!d) return;
+    if($('col-date')) $('col-date').value = d.date||today();
+    if($('col-note')) $('col-note').value = d.note||'';
+    colBlocks = d.blocks||[];
+    colBlockIdSeq = colBlocks.reduce((m,b)=>Math.max(m,b.id||0),0)+1;
+    renderColBlocks();
+    updateColSubmitBtn();
+    hideDraftBanner();
+    toast('前回の入力を復元しました');
+  }catch(e){}
+}
+function clearColDraft(){
+  localStorage.removeItem(COL_DRAFT_KEY);
+  hideDraftBanner();
+}
+function checkColDraft(){
+  try{
+    const d = JSON.parse(localStorage.getItem(COL_DRAFT_KEY)||'null');
+    if(!d||!d.blocks?.length) return;
+    const info = $('col-draft-info');
+    if(info) info.textContent = `${fmtD(d.date)} 保存 (${d.blocks.length}件のブロック)`;
+    const banner = $('col-draft-banner');
+    if(banner) banner.style.display='block';
+  }catch(e){}
+}
+function hideDraftBanner(){
+  const b=$('col-draft-banner');
+  if(b) b.style.display='none';
+}
+
+// ── リセット ──
 function colReset(){
-  colRows=[];colCustId=null;colCustName='';colRegion='';
-  $('col-date').value=today();$('col-note').value='';
-  $('col-cust-area').style.display='none';
-  $('col-cust-sel').style.display='none';
-  $('col-rows-card').style.display='none';$('col-rows-list').innerHTML='';
-  $('col-cust-list').style.display='none';$('col-search').value='';
-  $('col-submit').classList.add('btn-dis');
-  ITEM_MAP.forEach(([k])=>{const e=$('i-'+k);if(e)e.value=0;});
-  $('col-prev').style.display='none'; $('ch-dest-area').style.display='none';
-  $('col-region-sel').style.display='none';
-  $('region-free-input').value='';
-  $('region-free-suggest').style.display='none';
-  curRegionTab='other'; switchRegionTab('other');
+  colBlocks=[]; colBlockIdSeq=0;
+  if($('col-date')) $('col-date').value=today();
+  if($('col-note')) $('col-note').value='';
+  const p=$('col-cust-add-panel');if(p) p.style.display='none';
+  renderColBlocks();
+  updateColSubmitBtn();
+  checkColDraft();
   buildRegionTabs();
 }
 
-function buildRegionTabs(){
-  REGIONS=ls_get(LS.REGIONS,REGIONS);
-  CUSTOMERS=ls_get(LS.CUSTOMERS,CUSTOMERS);
-  // 経営管理の顧客データから地域を自動追加
-  const custRegions=[...new Set(CUSTOMERS.map(c=>c.region).filter(Boolean))];
-  if(custRegions.length){
-    REGIONS=[...new Set([...REGIONS,...custRegions])].sort();
+// ── ルートを追加 ──
+function addRouteBlock(){
+  // 担当者に紐づくルートを取得
+  const routes = getMyRoutes();
+  if(!routes.length){
+    toast('集荷ルートが登録されていません。\n経営管理システムでルートを登録してください。','err');
+    return;
   }
-  // 大阪市区
-  $('osaka-ku-btns').innerHTML=OSAKA_KU.map(ku=>`<button class="rku-btn" onclick="selectRegion('大阪市${ku}')">${ku}</button>`).join('');
-  // 京都
-  $('kyoto-btns').innerHTML=KYOTO_AREAS.map(r=>`<button class="rku-btn" onclick="selectRegion('${r}')">${r.replace('京都市','').replace('市','市')}</button>`).join('');
-  // その他（REGIONS から 大阪市区・京都以外）
-  const osakeKuFull=OSAKA_KU.map(k=>`大阪市${k}`);
-  const others=REGIONS.filter(r=>!osakeKuFull.includes(r)&&!KYOTO_AREAS.includes(r));
-  $('other-region-btns').innerHTML=others.length
-    ?others.map(r=>`<button class="rku-btn" onclick="selectRegion('${r.replace(/'/g,"\\'")}')">${r}</button>`).join('')
-    :'<span style="color:var(--light);font-size:11px;">経営管理システムで顧客を登録すると自動表示されます</span>';
+  if(routes.length===1){
+    // ルートが1件だけなら即追加
+    addRouteBlockById(routes[0]);
+    return;
+  }
+  // 複数ある場合はルート選択シートを表示
+  openRouteSelectSheet(routes);
 }
 
-function switchRegionTab(t){
-  curRegionTab=t;
-  ['osaka','kyoto','other','free'].forEach(id=>{
-    $('rtab-'+id).classList.toggle('on',id===t);
-    $('rtab-content-'+id).style.display=id===t?'block':'none';
+function getMyRoutes(){
+  // COL_ROUTESから担当者に紐づくルートを取得
+  const myId = driver?.id;
+  const routes = ls_get(LS.COL_ROUTES,[]);
+  if(!routes.length) return [];
+  // 担当者IDが一致するルートを返す
+  return routes.filter(r=>{
+    if(!r.staffIds||!r.staffIds.length) return true; // 全員対象
+    return r.staffIds.includes(myId)||r.staffIds.includes(String(myId));
   });
 }
 
-function selectRegion(r){
-  colRegion=r;
-  $('col-region-name').textContent=r;
-  $('col-region-sel').style.display='flex';
-  $('col-cust-area').style.display='block';
-  $('col-cust-sel').style.display='none';
-  $('col-search').value='';
-  colCustId=null;colCustName='';
-  showCustList();
+function addRouteBlockById(r){
+  const id=colBlockIdSeq++;
+  const custs=(r.customers||[]).map((cu,i)=>({
+    id:cu.id||cu.custId||i,
+    name:cu.name||cu.custName||String(cu),
+    region:cu.region||'',
+    rest:false,items:{},open:i===0
+  }));
+  colBlocks.push({type:'route',id,routeId:r.id,routeName:r.name,tag:'車建',customers:custs});
+  renderColBlocks(); saveColDraft(); updateColSubmitBtn();
 }
 
-function clearRegion(){
-  colRegion='';colCustId=null;colCustName='';
-  $('col-region-sel').style.display='none';
-  $('col-cust-area').style.display='none';
-  $('col-cust-sel').style.display='none';
-  $('col-cust-list').style.display='none';
-  $('col-search').value='';
+function openRouteSelectSheet(routes){
+  // ルート選択シートをボトムシート形式で表示
+  let html=`<div style="position:fixed;bottom:0;left:0;right:0;background:var(--card);border-radius:14px 14px 0 0;padding:16px;z-index:8500;box-shadow:0 -4px 24px rgba(0,0,0,.15);" id="route-select-sheet">
+    <div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:12px;">集荷ルートを選択</div>
+    <div style="display:flex;flex-direction:column;gap:6px;">
+    ${routes.map(r=>`<button onclick="addRouteBlockById(${JSON.stringify(r).replace(/"/g,'&quot;')});closeRouteSheet()"
+      style="padding:10px 14px;background:rgba(74,122,155,.08);border:1.5px solid rgba(74,122,155,.3);border-radius:8px;text-align:left;cursor:pointer;">
+      <div style="font-size:12px;font-weight:700;color:var(--slate);">${r.name}</div>
+      <div style="font-size:10px;color:var(--mid);margin-top:2px;">${(r.customers||[]).length}社 / 車建</div>
+    </button>`).join('')}
+    </div>
+    <button onclick="closeRouteSheet()" style="margin-top:10px;width:100%;padding:10px;background:var(--inp);border:none;border-radius:8px;font-size:13px;color:var(--mid);cursor:pointer;">キャンセル</button>
+  </div>
+  <div style="position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:8400;" onclick="closeRouteSheet()"></div>`;
+  const div=document.createElement('div');div.id='route-sheet-wrap';div.innerHTML=html;
+  document.body.appendChild(div);
+}
+function closeRouteSheet(){
+  document.getElementById('route-sheet-wrap')?.remove();
 }
 
-function onFreeRegionInput(){
-  const q=$('region-free-input').value.trim();
-  if(!q){$('region-free-suggest').style.display='none';return;}
-  REGIONS=ls_get(LS.REGIONS,REGIONS);
-  // 登録済み地域 + 大阪市区 + 京都 から候補
-  const allR=[...new Set([...REGIONS,...OSAKA_KU.map(k=>`大阪市${k}`),...KYOTO_AREAS])];
-  const hits=allR.filter(r=>r.includes(q)).slice(0,8);
-  if(!hits.length){
-    // 完全手打ちとして直接選択ボタン表示
-    $('region-free-suggest').style.display='block';
-    $('region-free-suggest').innerHTML=`<button class="cust-item" onclick="selectRegion('${q.replace(/'/g,"\\'")}')">「${q}」で確定</button>`;
+// ── 顧客個別を追加 ──
+function openCustAddPanel(){
+  const p=$('col-cust-add-panel');
+  if(!p) return;
+  p.style.display = p.style.display==='none'?'block':'none';
+  if(p.style.display==='block'){
+    renderCustAddList('');
+    $('col-cust-add-search')?.focus();
+  }
+}
+function renderCustAddList(q){
+  const list=$('col-cust-add-list');
+  if(!list) return;
+  const custs = CUSTOMERS.filter(c=>!q||matchZenHan(c.name,q)||matchZenHan(c.region||'',q));
+  if(!custs.length){
+    list.innerHTML='<div style="padding:8px;color:var(--light);font-size:11px;">該当なし</div>';
     return;
   }
-  $('region-free-suggest').style.display='block';
-  $('region-free-suggest').innerHTML=hits.map(r=>`<button class="cust-item" onclick="selectRegion('${r.replace(/'/g,"\\'")}');$('region-free-input').value='';$('region-free-suggest').style.display='none';">${r}</button>`).join('');
+  list.innerHTML=custs.slice(0,20).map(cu=>`
+    <div onclick="addIndivBlock(${cu.id},'${(cu.name||'').replace(/'/g,"\'")}','${(cu.region||'').replace(/'/g,"\'")}',this)"
+      style="padding:8px 10px;background:var(--card);border:0.5px solid var(--brd);border-radius:7px;font-size:12px;color:var(--ink);cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
+      <span>${cu.custNo?`<span style="font-size:9px;color:var(--amber);margin-right:4px;">[${cu.custNo}]</span>`:''}${cu.name||''}</span>
+      <span style="font-size:10px;color:var(--light);">${cu.region||''}</span>
+    </div>`).join('');
+}
+function filterCustAddPanel(q){
+  renderCustAddList(toHankaku(q.trim().toLowerCase()));
+}
+function addIndivBlock(custId,custName,region){
+  const id=colBlockIdSeq++;
+  colBlocks.push({type:'indiv',id,custId,custName,region,items:{},open:true});
+  const p=$('col-cust-add-panel');if(p) p.style.display='none';
+  if($('col-cust-add-search')) $('col-cust-add-search').value='';
+  renderColBlocks(); saveColDraft(); updateColSubmitBtn();
 }
 
-// 顧客リスト表示（履歴優先 + 検索絞り込み）
-function showCustList(){
-  if(!colRegion){$('col-cust-list').style.display='none';return;}
-  CUSTOMERS=ls_get(LS.CUSTOMERS,CUSTOMERS);
-  CUST_HIST=ls_get(LS.CUST_HIST,[]);
-  const q=$('col-search').value.trim().toLowerCase();
-  // 対象地域の顧客
-  const regionCusts=CUSTOMERS.filter(c=>c.region===colRegion);
-  // 検索あり → 名前絞り込み
-  let list;
-  if(q){
-    list=regionCusts.filter(c=>c.name.toLowerCase().includes(q));
-    $('col-cust-list').innerHTML=list.length
-      ?list.map(c=>custItemHtml(c,false)).join('')
-      :'<div style="padding:10px 12px;color:var(--light);font-size:11.5px;">該当なし</div>';
-    $('col-cust-list').style.display='block';
-    return;
+// ── チャーターを追加 ──
+function addCharterBlock(){
+  const id=colBlockIdSeq++;
+  colBlocks.push({type:'charter',id,charterData:{custName:'',from:'',to:'',content:''},open:true});
+  renderColBlocks(); saveColDraft(); updateColSubmitBtn();
+}
+
+// ── ブロック全体を再描画 ──
+function renderColBlocks(){
+  const wrap=$('col-blocks-wrap');
+  if(!wrap) return;
+  if(!colBlocks.length){ wrap.innerHTML=''; return; }
+  wrap.innerHTML = colBlocks.map(b=>renderBlock(b)).join('');
+}
+
+function renderBlock(b){
+  if(b.type==='route') return renderRouteBlock(b);
+  if(b.type==='indiv') return renderIndivBlock(b);
+  if(b.type==='charter') return renderCharterBlock(b);
+  return '';
+}
+
+// ── 品目入力グリッドHTML ──
+function itemsGridHtml(blockId, custIdx, items, color){
+  const btnClass = color==='g' ? 'col-ibp-g' : 'col-ibp-b';
+  const numClass = color==='g' ? 'col-inum col-inum-g' : 'col-inum';
+  const cell=(k,lbl,val)=>{
+    const v=items[k]||0;
+    const nc = v>0?(color==='g'?'col-inum col-inum-g':'col-inum'):'col-inum-z';
+    return `<div class="col-ic">
+      <div class="col-il">${lbl}</div>
+      <div class="col-irow">
+        <button class="col-ibm" onclick="colAdj('${blockId}',${custIdx},'${k}',-1)">−</button>
+        <input class="${nc}" type="number" value="${v}" min="0"
+          oninput="colNi(this,'${blockId}',${custIdx},'${k}')" onfocus="this.select()">
+        <button class="${btnClass}" onclick="colAdj('${blockId}',${custIdx},'${k}',1)">＋</button>
+      </div>
+    </div>`;
+  };
+  const fold140Id=`fold140-${blockId}-${custIdx}`;
+  const fold140ChevId=`foldchev-${blockId}-${custIdx}`;
+  const has140=(items['ゆうパック_140']||0)+(items['ゆうパック_160']||0)>0;
+  return `
+    <div class="col-igl">ゆうパック</div>
+    <div class="col-g2">
+      ${cell('ゆうパック_60','60サイズ',items)}
+      ${cell('ゆうパック_80','80サイズ',items)}
+      ${cell('ゆうパック_100','100サイズ',items)}
+      ${cell('ゆうパック_120','120サイズ',items)}
+    </div>
+    <div class="col-fold-trigger" onclick="colToggleFold('${fold140Id}','${fold140ChevId}')">
+      <span class="col-fold-lbl">140・160サイズ</span>
+      <span class="col-fold-chev" id="${fold140ChevId}">${has140?'▼ 閉じる':'▶ 展開'}</span>
+    </div>
+    <div id="${fold140Id}" style="display:${has140?'block':'none'};">
+      <div class="col-g2" style="margin-top:6px;">
+        ${cell('ゆうパック_140','140サイズ',items)}
+        ${cell('ゆうパック_160','160サイズ',items)}
+      </div>
+    </div>
+    <div class="col-igl" style="margin-top:8px;">ゆうパケット</div>
+    <div class="col-g2">
+      ${cell('ゆうパケット_通常','通常',items)}
+      ${cell('ゆうパケット_7cm以上','7cm〜',items)}
+    </div>
+    <div class="col-igl" style="margin-top:8px;">その他</div>
+    <div class="col-g2">
+      ${cell('クリックポスト','クリポス',items)}
+      ${cell('ケース','ケース',items)}
+      ${cell('定形外(ゆうメール)','定形外',items)}
+    </div>`;
+}
+
+// ── ルートブロック描画 ──
+function renderRouteBlock(b){
+  const chevStyle = b.open===false?'transform:rotate(-90deg)':'';
+  const bodyDisp = b.open===false?'none':'block';
+  const custRows = (b.customers||[]).map((cu,ci)=>{
+    const restStyle = cu.rest?'background:rgba(232,160,48,.07);border-top:1px solid rgba(232,160,48,.2);':'border-top:1px solid var(--div);';
+    const sumQty = Object.values(cu.items||{}).reduce((s,v)=>s+(parseInt(v)||0),0);
+    const sumNote = cu.rest?'':'(計'+sumQty+'個)';
+    const bodyHtml = cu.rest?'':
+      `<div id="cbody-${b.id}-${ci}" class="col-iw" style="display:${cu.open?'block':'none'};">
+        ${itemsGridHtml(b.id,ci,cu.items||{},'b')}
+       </div>`;
+    return `<div class="${cu.rest?'col-cust-row col-cust-row-rest':'col-cust-row'}">
+      <div class="col-cust-hdr" onclick="colToggleCust(${b.id},${ci})">
+        <div class="col-cdot ${cu.rest?'col-cdot-r':'col-cdot-b'}"></div>
+        <span class="${cu.rest?'col-cnm-rest':'col-cnm'}">${cu.name}</span>
+        ${cu.rest?'<span class="col-rest-badge">休業</span>':''}
+        <span class="col-snote" style="flex:1;margin-left:4px;">${cu.rest?'':sumNote}</span>
+        <div class="col-tog-wrap" onclick="event.stopPropagation()">
+          <button class="col-tog ${cu.rest?'col-tog-on-r':'col-tog-off'}" onclick="setColCustRest(${b.id},${ci},true,event)">休業</button>
+          <button class="col-tog ${!cu.rest?'col-tog-on-b':'col-tog-off'}" onclick="setColCustRest(${b.id},${ci},false,event)">入力</button>
+        </div>
+      </div>
+      ${bodyHtml}
+    </div>`;
+  }).join('');
+  return `<div class="col-block col-block-route" id="blk-${b.id}">
+    <div class="col-block-hdr col-block-hdr-route" onclick="colToggleBlock(${b.id})">
+      <span class="col-block-title col-block-title-r">${b.routeName||'ルート'}</span>
+      <span class="col-block-tag col-tag-r">${b.tag||'車建'}</span>
+      <span class="col-block-chev" id="blk-chev-${b.id}" style="${chevStyle}">▼</span>
+    </div>
+    <div id="blk-body-${b.id}" style="display:${bodyDisp};">
+      ${custRows}
+      <div class="col-dz"><button class="col-dbtn" onclick="confirmColDel(${b.id},'${(b.routeName||'ルート').replace(/'/g,"\'")}')">このルートを削除</button></div>
+    </div>
+  </div>`;
+}
+
+// ── 顧客個別ブロック描画 ──
+function renderIndivBlock(b){
+  const chevStyle = b.open===false?'transform:rotate(-90deg)':'';
+  const bodyDisp = b.open===false?'none':'block';
+  const sumQty = Object.values(b.items||{}).reduce((s,v)=>s+(parseInt(v)||0),0);
+  return `<div class="col-block col-block-indiv" id="blk-${b.id}">
+    <div class="col-block-hdr col-block-hdr-indiv" onclick="colToggleBlock(${b.id})">
+      <span class="col-block-title col-block-title-i">${b.custName||'顧客個別'}</span>
+      <span class="col-block-tag col-tag-i">顧客個別</span>
+      ${sumQty?`<span style="font-size:9px;color:var(--sage);margin-left:4px;">計${sumQty}個</span>`:''}
+      <span class="col-block-chev" id="blk-chev-${b.id}" style="${chevStyle}">▼</span>
+    </div>
+    <div id="blk-body-${b.id}" style="display:${bodyDisp};">
+      <div class="col-iw" style="border-top:none;">
+        ${itemsGridHtml(b.id,0,b.items||{},'g')}
+      </div>
+      <div class="col-dz"><button class="col-dbtn" onclick="confirmColDel(${b.id},'${(b.custName||'顧客').replace(/'/g,"\'")}')">この顧客を削除</button></div>
+    </div>
+  </div>`;
+}
+
+// ── チャーターブロック描画 ──
+function renderCharterBlock(b){
+  const chevStyle = b.open===false?'transform:rotate(-90deg)':'';
+  const bodyDisp = b.open===false?'none':'block';
+  const d = b.charterData||{};
+  return `<div class="col-block col-block-charter" id="blk-${b.id}">
+    <div class="col-block-hdr col-block-hdr-charter" onclick="colToggleBlock(${b.id})">
+      <span class="col-block-title col-block-title-c">${d.custName||'スポットチャーター'}</span>
+      <span class="col-block-tag col-tag-c">チャーター</span>
+      <span class="col-block-chev" id="blk-chev-${b.id}" style="${chevStyle}">▼</span>
+    </div>
+    <div id="blk-body-${b.id}" style="display:${bodyDisp};">
+      <div class="col-charter-body">
+        <div style="font-size:10px;color:var(--mid);margin-bottom:4px;">顧客名</div>
+        <input type="text" class="fi fi-sm" value="${d.custName||''}" placeholder="顧客名を入力（例：ゆっく、東亜）"
+          oninput="colChUpdate(${b.id},'custName',this.value)" autocomplete="off"
+          style="margin-bottom:8px;" id="ch-cust-${b.id}">
+        <div class="col-charter-frow" style="margin-bottom:8px;">
+          <div><div style="font-size:10px;color:var(--mid);margin-bottom:4px;">出発地点</div>
+            <input type="text" class="fi fi-sm" value="${d.from||''}" placeholder="例：西成区 倉庫"
+              oninput="colChUpdate(${b.id},'from',this.value)"></div>
+          <div><div style="font-size:10px;color:var(--mid);margin-bottom:4px;">行先</div>
+            <input type="text" class="fi fi-sm" value="${d.to||''}" placeholder="例：港区 倉庫B"
+              oninput="colChUpdate(${b.id},'to',this.value)"></div>
+        </div>
+        <div style="font-size:10px;color:var(--mid);margin-bottom:4px;">内容</div>
+        <input type="text" class="fi fi-sm" value="${d.content||''}" placeholder="例：精密機器・冷蔵品・緊急配送"
+          oninput="colChUpdate(${b.id},'content',this.value)">
+      </div>
+      <div class="col-dz"><button class="col-dbtn" onclick="confirmColDel(${b.id},'スポットチャーター')">このチャーターを削除</button></div>
+    </div>
+  </div>`;
+}
+
+// ── トグル操作 ──
+function colToggleBlock(bid){
+  const body=$('blk-body-'+bid), chev=$('blk-chev-'+bid);
+  if(!body)return;
+  const open=body.style.display!=='none';
+  body.style.display=open?'none':'block';
+  if(chev) chev.style.transform=open?'rotate(-90deg)':'rotate(0deg)';
+  const b=colBlocks.find(x=>x.id===bid);if(b) b.open=!open;
+  saveColDraft();
+}
+function colToggleCust(bid,ci){
+  const b=colBlocks.find(x=>x.id===bid);if(!b||!b.customers)return;
+  if(b.customers[ci].rest) return;
+  const el=$('cbody-'+bid+'-'+ci);if(!el)return;
+  const open=el.style.display!=='none';
+  el.style.display=open?'none':'block';
+  b.customers[ci].open=!open;
+  saveColDraft();
+}
+function colToggleFold(wrapId,chevId){
+  const w=$(wrapId),c=$(chevId);if(!w)return;
+  const open=w.style.display!=='none';
+  w.style.display=open?'none':'block';
+  if(c) c.textContent=open?'▶ 展開':'▼ 閉じる';
+}
+function setColCustRest(bid,ci,rest,e){
+  e&&e.stopPropagation();
+  const b=colBlocks.find(x=>x.id===bid);if(!b||!b.customers)return;
+  b.customers[ci].rest=rest;
+  renderColBlocks(); saveColDraft();
+}
+
+// ── 数量操作 ──
+function colAdj(bid,ci,key,d){
+  const b=colBlocks.find(x=>x.id===parseInt(bid));if(!b)return;
+  let items = b.type==='route' ? (b.customers[ci]?.items||{}) : (b.items||{});
+  items[key]=Math.max(0,(parseInt(items[key])||0)+d);
+  if(b.type==='route') b.customers[ci].items=items;
+  else b.items=items;
+  renderColBlocks(); saveColDraft(); updateColSubmitBtn();
+}
+function colNi(inp,bid,ci,key){
+  const v=inp.value.replace(/[^0-9]/g,'');
+  inp.value=v;
+  const b=colBlocks.find(x=>x.id===parseInt(bid));if(!b)return;
+  let items = b.type==='route' ? (b.customers[ci]?.items||{}) : (b.items||{});
+  items[key]=parseInt(v)||0;
+  if(b.type==='route') b.customers[ci].items=items;
+  else b.items=items;
+  inp.className=(parseInt(v)||0)>0?(b.type==='indiv'?'col-inum col-inum-g':'col-inum'):'col-inum-z';
+  saveColDraft(); updateColSubmitBtn();
+}
+function colChUpdate(bid,field,val){
+  const b=colBlocks.find(x=>x.id===bid);if(!b)return;
+  if(!b.charterData) b.charterData={};
+  b.charterData[field]=val;
+  if(field==='custName'){
+    const titleEl=$('blk-'+bid)?.querySelector('.col-block-title');
+    if(titleEl) titleEl.textContent=val||'スポットチャーター';
   }
-  // 検索なし → 履歴（この地域でよく使う）を先頭に表示
-  const histIds=CUST_HIST.filter(h=>h.region===colRegion).sort((a,b)=>b.count-a.count).map(h=>h.id);
-  const histCusts=histIds.map(id=>regionCusts.find(c=>c.id===id)).filter(Boolean);
-  const restCusts=regionCusts.filter(c=>!histIds.includes(c.id));
-  let html='';
-  if(histCusts.length){
-    html+=`<div class="cust-hist-label">⭐ よく使う</div>`;
-    html+=histCusts.map(c=>custItemHtml(c,true)).join('');
-    if(restCusts.length) html+=`<div class="cust-hist-label">すべての顧客</div>`;
-  }
-  html+=restCusts.map(c=>custItemHtml(c,false)).join('');
-  $('col-cust-list').innerHTML=html||'<div style="padding:10px 12px;color:var(--light);font-size:11.5px;">この地域の顧客がいません</div>';
-  $('col-cust-list').style.display='block';
+  saveColDraft();
 }
 
-function custItemHtml(c,isHist){
-  return `<button class="cust-item" onclick="selCust(${c.id},'${c.name.replace(/'/g,"\\'")}','${c.region.replace(/'/g,"\\'")}')">${isHist?'⭐ ':''}${c.name}</button>`;
+// ── 削除確認 ──
+let colDelTarget=null;
+function confirmColDel(bid,name){
+  colDelTarget=bid;
+  const msg=$('col-del-msg');if(msg) msg.textContent=`「${name}」を削除しますか？`;
+  const m=$('col-del-modal');if(m) m.style.display='flex';
+  const ok=$('col-del-ok-btn');
+  if(ok) ok.onclick=()=>{ doColDel(); closeColDelModal(); };
+}
+function doColDel(){
+  if(colDelTarget===null)return;
+  colBlocks=colBlocks.filter(b=>b.id!==colDelTarget);
+  colDelTarget=null;
+  renderColBlocks(); saveColDraft(); updateColSubmitBtn();
+}
+function closeColDelModal(){const m=$('col-del-modal');if(m) m.style.display='none';}
+function closeColSubModal(){const m=$('col-sub-modal');if(m) m.style.display='none';}
+
+// ── 提出 ──
+function updateColSubmitBtn(){
+  const btn=$('col-submit');if(!btn)return;
+  const hasData=colBlocks.some(b=>{
+    if(b.type==='route') return b.customers?.some(cu=>!cu.rest&&Object.values(cu.items||{}).some(v=>v>0));
+    if(b.type==='indiv') return Object.values(b.items||{}).some(v=>v>0);
+    if(b.type==='charter') return b.charterData?.custName||b.charterData?.content;
+    return false;
+  });
+  btn.classList.toggle('btn-dis',!hasData);
 }
 
-function selCust(id,name,region){
-  colCustId=id;colCustName=name;colRegion=region;
-  $('col-search').value='';$('col-cust-list').style.display='none';
-  $('col-cust-sel').style.display='block';
-  $('col-cust-sel').innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;"><div><div style="color:var(--sage);font-weight:700;font-size:12px;">${name}</div><div style="color:var(--light);font-size:10px;">${region}</div></div><button onclick="clrCust()" style="background:none;border:1px solid var(--brd);color:var(--mid);border-radius:6px;padding:2px 8px;cursor:pointer;font-size:10px;font-family:var(--sans);">変更</button></div>`;
-  updPrev();
-}
-
-function clrCust(){
-  colCustId=null;colCustName='';
-  $('col-search').value='';$('col-cust-sel').style.display='none';
-  showCustList(); updPrev();
-}
-
-// 顧客使用履歴を記録
-function recordCustHist(id,name,region){
-  CUST_HIST=ls_get(LS.CUST_HIST,[]);
-  const ex=CUST_HIST.find(h=>h.id===id&&h.region===region);
-  if(ex){ex.count++;ex.lastUsed=Date.now();}
-  else{CUST_HIST.push({id,name,region,count:1,lastUsed:Date.now()});}
-  // 地域ごとに上位10件のみ保持
-  const byReg={};
-  CUST_HIST.forEach(h=>{if(!byReg[h.region])byReg[h.region]=[];byReg[h.region].push(h);});
-  const trimmed=[];
-  Object.values(byReg).forEach(arr=>trimmed.push(...arr.sort((a,b)=>b.count-a.count).slice(0,10)));
-  CUST_HIST=trimmed;ls_set(LS.CUST_HIST,CUST_HIST);
-}
-const iN=k=>Math.max(0,parseInt($('i-'+k)?.value)||0);
-function iStep(k,d){const e=$('i-'+k);if(!e)return;e.value=Math.max(0,(parseInt(e.value)||0)+d);updPrev();}
-function updPrev(){
-  const tot=ITEM_MAP.reduce((s,[k])=>s+iN(k),0);
-  $('ch-dest-area').style.display=iN('ch')>0?'block':'none';
-  if(tot>0){$('col-prev').style.display='block';$('prev-tot').textContent=tot;}else $('col-prev').style.display='none';
-  const h=$('col-add-hint');
-  if(!colCustId){h.style.display='block';h.textContent='顧客を選択してください';}
-  else if(!tot){h.style.display='block';h.textContent='数量を1以上入力してください';}
-  else h.style.display='none';
-}
-function addRows(){
-  if(!colCustId){toast('顧客を選択してください','err');return;}
-  const newRows=[];
-  ITEM_MAP.forEach(([k,mkey])=>{const q=iN(k);if(!q)return;newRows.push({customerId:colCustId,customerName:colCustName,region:colRegion,masterKey:mkey,label:mkey.replace(/_/g,' '),qty:q,unit:UNIT[mkey].u,destination:k==='ch'?($('ch-dest')?.value||''):'',});});
-  if(!newRows.length){toast('数量を1以上入力してください','err');return;}
-  // 履歴記録
-  recordCustHist(colCustId,colCustName,colRegion);
-  colRows=[...colRows,...newRows]; renderRows();
-  ITEM_MAP.forEach(([k])=>{const e=$('i-'+k);if(e)e.value=0;});
-  if($('ch-dest'))$('ch-dest').value=''; $('col-prev').style.display='none'; $('ch-dest-area').style.display='none';
-  $('col-cust-sel').style.display='none'; $('col-search').value=''; colCustId=null; colCustName='';
-  clearRegion();
-  toast(`${newRows.length}件の明細を追加しました`);
-  $('col-submit').classList.toggle('btn-dis',colRows.length===0);
-}
-function renderRows(){
-  $('col-rows-card').style.display=colRows.length?'block':'none';
-  $('col-rows-lbl').textContent=`入力済み明細（${colRows.length}件）`;
-  $('col-rows-list').innerHTML=colRows.map((r,i)=>`<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:6px 0;border-bottom:1px solid var(--div);"><div><div style="color:var(--light);font-size:9.5px;">${r.region}</div><div style="font-weight:700;font-size:12px;">${r.customerName}</div><div style="color:var(--mid);font-size:11px;">${r.label} × ${r.qty}${r.unit}</div>${r.destination?`<div style="color:var(--amber);font-size:10px;">→ ${r.destination}</div>`:''}</div><button onclick="delRow(${i})" style="background:rgba(139,74,58,.07);border:none;color:var(--rust);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:10px;flex-shrink:0;margin-left:6px;">削除</button></div>`).join('');
-  $('col-submit').classList.toggle('btn-dis',colRows.length===0);
-}
-function delRow(i){colRows.splice(i,1);renderRows();}
 function submitCol(){
-  if(!colRows.length){toast('明細を1件以上追加してください','err');return;}
-  const rec={id:Date.now(),type:'collection',driver:{...driver},date:$('col-date').value,rows:colRows,note:$('col-note').value||'',submittedAt:new Date().toISOString()};
+  if(!colBlocks.length){toast('入力を追加してください','err');return;}
+  // 未入力チェック
+  const warnings=[];
+  colBlocks.forEach(b=>{
+    if(b.type==='route'){
+      const emptyActive=(b.customers||[]).filter(cu=>!cu.rest&&!Object.values(cu.items||{}).some(v=>v>0));
+      if(emptyActive.length) warnings.push(`${b.routeName}：${emptyActive.map(c=>c.name).join('・')}が未入力`);
+    }
+    if(b.type==='indiv'&&!Object.values(b.items||{}).some(v=>v>0)){
+      warnings.push(`${b.custName}：数量が未入力`);
+    }
+  });
+  const msg=$('col-sub-msg');
+  if(warnings.length&&msg){
+    msg.innerHTML=warnings.map(w=>`⚠️ ${w}`).join('<br>')+`<br><br>このまま提出しますか？`;
+    const m=$('col-sub-modal');if(m) m.style.display='flex';
+  } else {
+    doSubmitCol();
+  }
+}
+
+function doSubmitCol(){
+  closeColSubModal();
+  // colRowsの形式に変換してfirebaseに保存
+  const colRows=[];
+  colBlocks.forEach(b=>{
+    if(b.type==='route'){
+      (b.customers||[]).forEach(cu=>{
+        if(cu.rest){
+          colRows.push({customerId:cu.id,customerName:cu.name,region:cu.region||'',
+            masterKey:'route_rest',label:'休業',qty:0,unit:'',
+            routeId:b.routeId,routeName:b.routeName,isRest:true});
+        } else {
+          Object.entries(cu.items||{}).forEach(([k,v])=>{
+            if(!v) return;
+            colRows.push({customerId:cu.id,customerName:cu.name,region:cu.region||'',
+              masterKey:k,label:k.replace(/_/g,' '),qty:v,unit:'個',
+              routeId:b.routeId,routeName:b.routeName});
+          });
+        }
+      });
+    } else if(b.type==='indiv'){
+      Object.entries(b.items||{}).forEach(([k,v])=>{
+        if(!v) return;
+        colRows.push({customerId:b.custId,customerName:b.custName,region:b.region||'',
+          masterKey:k,label:k.replace(/_/g,' '),qty:v,unit:'個'});
+      });
+    } else if(b.type==='charter'){
+      const d=b.charterData||{};
+      if(d.custName||d.content){
+        colRows.push({customerId:0,customerName:d.custName||'',region:'',
+          masterKey:'チャーター',label:'チャーター',qty:1,unit:'件',
+          charterFrom:d.from||'',charterTo:d.to||'',charterContent:d.content||''});
+      }
+    }
+  });
+  const rec={id:Date.now(),type:'collection',driver:{...driver},date:$('col-date')?.value||today(),
+    rows:colRows,blocks:colBlocks,note:$('col-note')?.value||'',submittedAt:new Date().toISOString()};
   COL_LOGS.push(rec); fbSet('col_logs',COL_LOGS);
+  clearColDraft();
   lastResult=rec; showDone();
 }
+
+// ── 旧関数の互換（selectRegion等は未使用になるが残す） ──
+function buildRegionTabs(){
+  REGIONS=ls_get(LS.REGIONS,REGIONS);
+  CUSTOMERS=ls_get(LS.CUSTOMERS,CUSTOMERS);
+  const custRegions=[...new Set(CUSTOMERS.map(c=>c.region).filter(Boolean))];
+  if(custRegions.length){ REGIONS=[...new Set([...REGIONS,...custRegions])].sort(); }
+}
+
 
 // ══ 完了 ══
 function showDone(){
