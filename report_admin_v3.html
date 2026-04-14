@@ -1057,7 +1057,8 @@ function addCust(){
   if(!name||!region){toast('顧客名と地域を入力してください','err');return;}
   if(D.CUSTOMERS.find(c=>c.name===name)){toast('同名の顧客が既に存在します','err');return;}
   if(customerNo&&D.CUSTOMERS.find(c=>c.customerNo===customerNo)){toast('その顧客番号は既に使用されています','err');return;}
-  D.CUSTOMERS.push({id:Date.now(),customerNo:customerNo||'',name,region});fbSet('customers',D.CUSTOMERS);
+  const newCust={id:Date.now(),customerNo:customerNo||'',custNo:customerNo||'',name,region,colPrices:{}};
+  D.CUSTOMERS.push(newCust);fbSet('customers',D.CUSTOMERS);
   $('new-cust-no').value='';$('new-cust-name').value='';$('new-cust-region').value='';
   renderCustList();toast(`「${name}」を登録しました`);
 }
@@ -1144,7 +1145,12 @@ function addEmp(){
     tempMergeId: $('temp-merge-id')?.value.trim()||'',
   } : {};
 
-  D.DRIVERS.push({id,name,company,officeType:isCol?'collection':'delivery',office:isCol?'集荷':selectedOfficeType.replace('delivery_',''),kbn,kyuyo,...tempData});
+  D.DRIVERS.push({id,name,company,
+    officeType:isCol?'collection':'delivery',
+    office:isCol?'集荷':selectedOfficeType.replace('delivery_',''),
+    subOffices:[],  // 複数担当郵便局（経営管理と共通）
+    empNo:id,       // empNo = id で統一
+    kbn,kyuyo,...tempData});
   fbSet('drivers',D.DRIVERS);
   $('new-emp-id').value='';$('new-emp-name').value='';$('new-emp-company').value='';
   if($('is-temp-driver'))$('is-temp-driver').checked=false;
