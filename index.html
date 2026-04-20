@@ -551,6 +551,26 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
         <div style="font-size:9px;color:var(--light);margin-top:4px;">※後で管理者が正式な郵便局に修正します</div>
       </div>
     </div>
+
+    <!-- 宅配/集荷タブ -->
+    <div id="yp-biz-tabs" style="display:none;margin-bottom:10px;">
+      <div style="display:flex;gap:0;border-radius:10px;overflow:hidden;border:1.5px solid var(--brd);">
+        <button type="button" id="yp-btab-del" onclick="switchYpBiz('del')"
+          style="flex:1;padding:10px 8px;border:none;background:var(--slate);color:#faf8f5;font-size:12px;font-weight:700;cursor:pointer;">
+          🚛 宅配
+        </button>
+        <button type="button" id="yp-btab-col" onclick="switchYpBiz('col')"
+          style="flex:1;padding:10px 8px;border:none;background:var(--inp);color:var(--mid);font-size:12px;font-weight:700;cursor:pointer;border-left:1px solid var(--brd);">
+          📦 集荷
+        </button>
+      </div>
+      <div id="yp-btab-col-notice" class="xs mt8" style="display:none;color:var(--light);">
+        ※選択中の郵便局に集荷業務の権限がありません
+      </div>
+    </div>
+
+    <!-- 宅配入力エリア -->
+    <div id="yp-del-area">
     <div class="card mb8" id="yp-card-m"><div class="row-hd"><div class="row-ico" style="background:rgba(44,40,37,.07)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ink)" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/></svg></div><span class="row-lbl">持出個数</span></div><div class="stpr"><button class="sbtn" onclick="ypStep('m',-1)">−</button><input type="number" id="yp-m" class="sval" min="0" value="0" oninput="valYP()"><button class="sbtn p" onclick="ypStep('m',1)">＋</button></div></div>
     <div class="card mb8" id="yp-card-k"><div class="row-hd"><div class="row-ico" style="background:rgba(107,124,106,.11)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--sage)" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div><span class="row-lbl" style="color:var(--sage)">配達完了数</span></div><div class="stpr"><button class="sbtn" onclick="ypStep('k',-1)">−</button><input type="number" id="yp-k" class="sval" min="0" value="0" oninput="valYP()"><button class="sbtn p" style="background:var(--sage)" onclick="ypStep('k',1)">＋</button></div></div>
     <div class="card mb8"><div class="row-hd"><div class="row-ico" style="background:rgba(96,112,128,.1)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--slate)" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></div><span class="row-lbl" style="color:var(--slate)">夜間配達（20時以降）</span><span class="tag" style="background:rgba(96,112,128,.1);color:var(--slate);margin-left:auto;">内計</span></div><div class="stpr"><button class="sbtn" onclick="ypStep('y',-1)">−</button><input type="number" id="yp-y" class="sval" min="0" value="0" oninput="valYP()"><button class="sbtn p" style="background:var(--slate)" onclick="ypStep('y',1)">＋</button></div><div id="yp-y-err" class="xs mt8" style="color:var(--rust);display:none;">⚠ 完了数を超えています</div></div>
@@ -560,6 +580,23 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
     <div class="card mb8"><div class="row-hd"><div class="row-ico" style="background:rgba(139,111,94,.11)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--clay)" stroke-width="2"><path d="M22 12h-6l-2 3H10l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg></div><span class="row-lbl" style="color:var(--clay)">集荷</span></div><div class="stpr"><button class="sbtn" onclick="ypStep('s',-1)">−</button><input type="number" id="yp-s" class="sval" min="0" value="0"><button class="sbtn p" style="background:var(--clay)" onclick="ypStep('s',1)">＋</button></div></div>
     <div id="yp-vbox" class="vbox mb8" style="display:none;"><div class="lbl mb8">■ リアルタイム検証</div><div class="vrow"><span>① 持出</span><span id="v-m" class="fw7" style="font-family:var(--mono)">0</span></div><div class="vrow"><span>②完了＋③転送＋④持戻＋⑤翌日</span><span id="v-s" class="fw7" style="font-family:var(--mono)">0</span></div><div id="v-res" class="veq vwt">数値を入力してください</div></div>
     <div id="yp-sum" class="sumbox mb8" style="display:none;"><div class="sum-row"><div><div class="sum-big" id="s-rate">-</div><div class="sum-cap">配達率</div></div><div><div class="sum-big" style="color:var(--slate)" id="s-y">-</div><div class="sum-cap">夜間</div></div><div><div class="sum-big" style="color:var(--clay)" id="s-s">-</div><div class="sum-cap">集荷</div></div></div></div>
+    </div>
+    <!-- 集荷入力エリア (宅配事業内集荷) -->
+    <div id="yp-col-area" style="display:none;">
+      <div class="card mb8">
+        <div class="row-hd">
+          <div class="row-ico" style="background:rgba(139,111,94,.11)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--clay)" stroke-width="2"><path d="M22 12h-6l-2 3H10l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+          </div>
+          <span class="row-lbl" style="color:var(--clay)">定時集荷先</span>
+          <span id="yp-col-total-badge" class="tag" style="background:rgba(139,111,94,.12);color:var(--clay);margin-left:auto;">合計 0個</span>
+        </div>
+        <div id="yp-col-companies" style="display:flex;flex-direction:column;gap:6px;margin-top:8px;"></div>
+        <div id="yp-col-empty" style="display:none;padding:14px;text-align:center;color:var(--light);font-size:11px;">
+          この郵便局には定時集荷先が登録されていません
+        </div>
+      </div>
+    </div>
     <div class="card mb8"><div class="row-hd"><div class="row-ico" style="background:rgba(136,128,120,.09)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--stone)" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div><span class="row-lbl" style="color:var(--stone)">備考</span></div><textarea id="yp-note" class="fi" rows="3" placeholder="トラブル・特記事項など"></textarea></div>
     <button id="yp-submit" class="btn-main" onclick="submitYP()" style="background:var(--slate);color:#faf8f5;">日報を提出する</button>
     <div style="height:28px;"></div>
@@ -1476,13 +1513,41 @@ function goBack(){renderPersonalStats(driver);show('scr-select');}
 // ══ 宅配日報：郵便局選択 ══
 let selectedPostOffice = ''; // 選択中の郵便局
 
+// ── subOffices を新形式[{name,del,col}]に正規化 ──
+function _normalizeSubOffices(list){
+  return (list||[]).map(item=>{
+    if(typeof item === 'string') return {name:item, del:true, col:false};
+    return {name:item.name||'', del:!!item.del, col:!!item.col};
+  }).filter(x=>x.name);
+}
+// ドライバーが指定郵便局で集荷業務を担当できるか
+function _driverHasCol(drv, officeName){
+  if(!drv || !officeName) return false;
+  // メイン営業所は宅配+集荷両方可能とする
+  if(drv.office === officeName) return true;
+  // サブ営業所は col:true のもののみ
+  const subs = _normalizeSubOffices(drv.subOffices);
+  const found = subs.find(s=>s.name===officeName);
+  return !!(found && found.col);
+}
+// ドライバーが指定郵便局で宅配業務を担当できるか
+function _driverHasDel(drv, officeName){
+  if(!drv || !officeName) return false;
+  if(drv.office === officeName) return true;
+  const subs = _normalizeSubOffices(drv.subOffices);
+  const found = subs.find(s=>s.name===officeName);
+  return !!(found && found.del);
+}
+
 function buildPostOfficeBtns(){
   const wrap = $('yp-post-btns');
   if(!wrap || !driver) return;
 
   // ドライバーの全担当郵便局（メイン＋追加）
   const offices = [driver.office];
-  (driver.subOffices||[]).forEach(o=>{ if(!offices.includes(o)) offices.push(o); });
+  _normalizeSubOffices(driver.subOffices).forEach(o=>{
+    if(!offices.includes(o.name)) offices.push(o.name);
+  });
 
   wrap.innerHTML = '';
 
@@ -1519,6 +1584,8 @@ function buildPostOfficeBtns(){
 
   // 未確定バッジ更新
   updatePostBadge();
+  // 宅配/集荷タブの表示更新
+  updateYpBizTabs();
 }
 
 function selectPostOffice(office){
@@ -1537,7 +1604,145 @@ function selectPostOffice(office){
   if(otherArea) otherArea.style.display = office==='その他' ? 'block' : 'none';
 
   updatePostBadge();
+  // 郵便局が変わったら宅配/集荷タブと集荷先リストを更新
+  updateYpBizTabs();
 }
+
+// ══ 宅配事業内: 宅配/集荷タブ管理 ══
+let _ypBizMode = 'del'; // 'del' or 'col'
+let _ypColCounts = {};  // {companyName: count}
+
+function updateYpBizTabs(){
+  const tabs = document.getElementById('yp-biz-tabs');
+  if(!tabs) return;
+  // その他の場合はタブ非表示(集荷先リストは取得不可)
+  if(selectedPostOffice === 'その他' || !selectedPostOffice){
+    tabs.style.display = 'none';
+    setYpBizMode('del', true); // 宅配モードに固定
+    return;
+  }
+  tabs.style.display = 'block';
+  // この郵便局で集荷業務を担当できるか判定
+  const canCol = _driverHasCol(driver, selectedPostOffice);
+  const colBtn = document.getElementById('yp-btab-col');
+  const notice = document.getElementById('yp-btab-col-notice');
+  if(colBtn){
+    if(canCol){
+      colBtn.disabled = false;
+      colBtn.style.opacity = '1';
+      colBtn.style.cursor = 'pointer';
+      if(notice) notice.style.display = 'none';
+    } else {
+      colBtn.disabled = true;
+      colBtn.style.opacity = '0.4';
+      colBtn.style.cursor = 'not-allowed';
+      if(notice) notice.style.display = 'block';
+      // 集荷権限なしなら強制的に宅配モードへ
+      if(_ypBizMode === 'col') setYpBizMode('del', true);
+    }
+  }
+  // 現モードで再描画
+  if(_ypBizMode === 'col') renderYpColCompanies();
+}
+
+function switchYpBiz(mode){
+  if(mode === 'col' && !_driverHasCol(driver, selectedPostOffice)) return;
+  setYpBizMode(mode);
+}
+
+function setYpBizMode(mode, silent){
+  _ypBizMode = mode;
+  const delBtn = document.getElementById('yp-btab-del');
+  const colBtn = document.getElementById('yp-btab-col');
+  const delArea = document.getElementById('yp-del-area');
+  const colArea = document.getElementById('yp-col-area');
+  if(delBtn && colBtn){
+    if(mode === 'del'){
+      delBtn.style.background = 'var(--slate)';
+      delBtn.style.color = '#faf8f5';
+      colBtn.style.background = 'var(--inp)';
+      colBtn.style.color = 'var(--mid)';
+    } else {
+      colBtn.style.background = 'var(--clay)';
+      colBtn.style.color = '#faf8f5';
+      delBtn.style.background = 'var(--inp)';
+      delBtn.style.color = 'var(--mid)';
+    }
+  }
+  if(delArea) delArea.style.display = mode==='del' ? 'block' : 'none';
+  if(colArea) colArea.style.display = mode==='col' ? 'block' : 'none';
+  if(!silent && mode === 'col') renderYpColCompanies();
+  valYP();
+  updateYpTabBadges();
+}
+
+// 選択中の郵便局の定時集荷先リストを取得
+function _getColCompaniesForOffice(officeName){
+  if(!officeName) return [];
+  // OFFICES(経営管理システムから同期された営業所マスタ)から検索
+  const off = (typeof OFFICES !== 'undefined' ? OFFICES : []).find(o=>o.name===officeName);
+  if(!off) return [];
+  const list = off.postPrices?.colCompanies || off.colCompanies || [];
+  return Array.isArray(list) ? list.filter(c=>c && c.name) : [];
+}
+
+// 集荷先リストの描画
+function renderYpColCompanies(){
+  const wrap = document.getElementById('yp-col-companies');
+  const empty = document.getElementById('yp-col-empty');
+  if(!wrap) return;
+  const companies = _getColCompaniesForOffice(selectedPostOffice);
+  if(!companies.length){
+    wrap.innerHTML = '';
+    if(empty) empty.style.display = 'block';
+    updateYpColTotal();
+    return;
+  }
+  if(empty) empty.style.display = 'none';
+  wrap.innerHTML = companies.map((c, i)=>{
+    const val = _ypColCounts[c.name] || 0;
+    const priceLabel = c.price != null ? ` <span style="font-size:9px;color:var(--light);">¥${c.price}/個</span>` : '';
+    return `<div style="background:var(--inp);border:1px solid var(--brd);border-radius:8px;padding:8px 10px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <span style="font-size:12px;font-weight:700;color:var(--ink);">${_esc(c.name)}</span>
+        ${priceLabel}
+      </div>
+      <div class="stpr" style="margin:0;">
+        <button type="button" class="sbtn" onclick="ypColStep('${_escAttr(c.name)}',-1)">−</button>
+        <input type="number" class="sval" min="0" value="${val}" data-col-cmp="${_escAttr(c.name)}" oninput="ypColInput('${_escAttr(c.name)}',this.value)">
+        <button type="button" class="sbtn p" style="background:var(--clay)" onclick="ypColStep('${_escAttr(c.name)}',1)">＋</button>
+      </div>
+    </div>`;
+  }).join('');
+  updateYpColTotal();
+}
+
+function ypColStep(name, delta){
+  const cur = parseInt(_ypColCounts[name]||0);
+  const next = Math.max(0, cur + delta);
+  _ypColCounts[name] = next;
+  const inp = document.querySelector(`#yp-col-companies input[data-col-cmp="${CSS.escape(name)}"]`);
+  if(inp) inp.value = next;
+  updateYpColTotal();
+  valYP();
+}
+
+function ypColInput(name, val){
+  _ypColCounts[name] = Math.max(0, parseInt(val)||0);
+  updateYpColTotal();
+  valYP();
+}
+
+function updateYpColTotal(){
+  const badge = document.getElementById('yp-col-total-badge');
+  if(!badge) return;
+  const total = Object.values(_ypColCounts).reduce((a,v)=>a+(parseInt(v)||0),0);
+  badge.textContent = `合計 ${total}個`;
+}
+
+// ESC用ヘルパー
+function _esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]); }
+function _escAttr(s){ return String(s==null?'':s).replace(/'/g,"\\'").replace(/"/g,'&quot;'); }
 
 function updatePostBadge(){
   const badge = $('yp-post-unknown-badge');
@@ -1701,7 +1906,7 @@ function confirmClockOut(){
 }
 
 // ══ ゆうパック ══
-function ypReset(){['yp-m','yp-k','yp-y','yp-t','yp-mo','yp-yo','yp-s'].forEach(id=>{const e=$(id);if(e)e.value=0;});$('yp-note').value='';$('yp-date').value=today();valYP();}
+function ypReset(){['yp-m','yp-k','yp-y','yp-t','yp-mo','yp-yo','yp-s'].forEach(id=>{const e=$(id);if(e)e.value=0;});$('yp-note').value='';$('yp-date').value=today();_ypColCounts={};setYpBizMode('del', true);valYP();}
 const ypN=id=>Math.max(0,parseInt($(id)?.value)||0);
 function ypStep(k,d){const map={m:'yp-m',k:'yp-k',y:'yp-y',t:'yp-t',mo:'yp-mo',yo:'yp-yo',s:'yp-s'};const el=$(map[k]);if(!el)return;el.value=Math.max(0,(parseInt(el.value)||0)+d);valYP();}
 function valYP(){
@@ -1715,36 +1920,113 @@ function valYP(){
   $('yp-card-m').classList.toggle('warn',!mOk&&m>0); $('yp-card-k').classList.toggle('warn',!yOk&&y>0);
   const sm=$('yp-sum');
   if(m>0){sm.style.display='block';$('s-rate').textContent=m>0?Math.round(k/m*100)+'%':'-';$('s-y').textContent=y;$('s-s').textContent=ypN('yp-s');}else sm.style.display='none';
+
+  // 提出ボタン: 宅配(持出>0) or 集荷(合計>0) いずれかで有効化
+  const colTotal = Object.values(_ypColCounts).reduce((a,v)=>a+(parseInt(v)||0),0);
   const sub=$('yp-submit');
-  if(m>0){sub.classList.remove('btn-dis');sub.style.background=mOk?'var(--slate)':'var(--amber)';}else sub.classList.add('btn-dis');
+  if(m > 0 || colTotal > 0){
+    sub.classList.remove('btn-dis');
+    // 色: 宅配の検証警告があれば黄色、そうでなければ青系
+    if(m > 0 && !mOk) sub.style.background = 'var(--amber)';
+    else sub.style.background = 'var(--slate)';
+  } else {
+    sub.classList.add('btn-dis');
+  }
+
+  // タブ入力ありバッジの更新
+  updateYpTabBadges();
+}
+
+// 宅配タブ・集荷タブに入力あり(●)バッジを付ける
+function updateYpTabBadges(){
+  const delBtn = document.getElementById('yp-btab-del');
+  const colBtn = document.getElementById('yp-btab-col');
+  if(!delBtn || !colBtn) return;
+  const delFilled = ypN('yp-m') > 0 || ypN('yp-k') > 0 || ypN('yp-t') > 0 || ypN('yp-mo') > 0 || ypN('yp-yo') > 0;
+  const colTotal = Object.values(_ypColCounts).reduce((a,v)=>a+(parseInt(v)||0),0);
+  const colFilled = colTotal > 0;
+  delBtn.innerHTML = `🚛 宅配${delFilled?' <span style="font-size:9px;">●</span>':''}`;
+  const baseCol = '📦 集荷';
+  if(colBtn.disabled){
+    colBtn.innerHTML = baseCol;
+  } else {
+    colBtn.innerHTML = `${baseCol}${colFilled?' <span style="font-size:9px;">●</span>':''}`;
+  }
 }
 function submitYP(){
-  const m=ypN('yp-m'); if(!m){toast('持出個数を入力してください','err');return;}
-  const k=ypN('yp-k'),y=ypN('yp-y'),t=ypN('yp-t'),mo=ypN('yp-mo'),yo=ypN('yp-yo');
-  const sum=k+t+mo+yo;
-  if(sum!==m&&!confirm(`検証エラー：持出(${m})≠合計(${sum})\n保存しますか？`))return;
-  if(y>k&&!confirm(`夜間(${y})>完了(${k})\n保存しますか？`))return;
-  // 同日・同人の重複チェック → 警告して置き換え
   const date=$('yp-date').value;
+  const postOffice = getSelectedPostOffice();
+  if(!postOffice){ toast('郵便局を選択してください','err'); return; }
+
+  // 宅配データ収集
+  const m=ypN('yp-m'),k=ypN('yp-k'),y=ypN('yp-y'),t=ypN('yp-t'),mo=ypN('yp-mo'),yo=ypN('yp-yo');
+  const shukkaLegacy = ypN('yp-s'); // 旧「集荷(件数)」枠 (後方互換)
+  const hasDelInput = (m > 0 || k > 0 || t > 0 || mo > 0 || yo > 0);
+
+  // 集荷データ収集
+  const canCol = _driverHasCol(driver, postOffice);
+  const colEntries = canCol ? Object.entries(_ypColCounts)
+    .map(([name, cnt])=>({name, count: parseInt(cnt)||0}))
+    .filter(e=>e.count > 0) : [];
+  const hasColInput = colEntries.length > 0;
+
+  if(!hasDelInput && !hasColInput){
+    toast('宅配または集荷の数量を入力してください','err');
+    return;
+  }
+
+  // 宅配入力ありの場合のみ検証
+  if(hasDelInput){
+    const sum=k+t+mo+yo;
+    if(m > 0 && sum !== m && !confirm(`検証エラー：持出(${m})≠合計(${sum})\n保存しますか？`)) return;
+    if(y > k && !confirm(`夜間(${y})>完了(${k})\n保存しますか？`)) return;
+  }
+
+  // 同日・同人・同郵便局の重複チェック
   YP_LOGS=ls_get(LS.YP_LOGS,[]);
-  const dupIdx=YP_LOGS.findIndex(r=>r.date===date&&r.driver.id===driver.id);
+  const dupIdx=YP_LOGS.findIndex(r=>r.date===date && r.driver.id===driver.id && r.postOffice===postOffice);
   if(dupIdx>=0){
     const prev=YP_LOGS[dupIdx];
     const prevTime=new Date(prev.submittedAt).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
-    if(!confirm(`⚠ ${date} はすでに提出済みです（${prevTime}提出）。\n上書きしますか？\n※前回のデータは削除されます`))return;
+    if(!confirm(`⚠ ${date} の${postOffice}はすでに提出済みです（${prevTime}提出）。\n上書きしますか？\n※前回のデータは削除されます`))return;
     YP_LOGS.splice(dupIdx,1);
   }
-  const postOffice = getSelectedPostOffice();
   // 最後に使った郵便局を記憶
   if(postOffice && postOffice!=='その他（未確定）'){
     localStorage.setItem('lastPostOffice_'+driver.id, postOffice);
   }
-  const rec={id:Date.now(),type:'yuupack',driver:{...driver},date,
-    postOffice, // 郵便局情報を追加
-    form:{mochidashi:m,kanryo:k,yakan:y,tenso:t,mochimodoiri:mo,'翌日廻し':yo,shukka:ypN('yp-s'),notes:$('yp-note').value||''},
-    submittedAt:new Date().toISOString()};
-  YP_LOGS.push(rec); fbSet('yp_logs',YP_LOGS);
-  lastResult=rec; showDone();
+
+  // 提出内容の確認(宅配+集荷両方ある場合のみ)
+  if(hasDelInput && hasColInput){
+    const colTotal = colEntries.reduce((a,e)=>a+e.count, 0);
+    const msg = `以下の内容で提出します：\n\n🚛 宅配: 持出${m} 完了${k}\n📦 集荷: ${colEntries.length}社 合計${colTotal}個\n\nよろしいですか？`;
+    if(!confirm(msg)) return;
+  }
+
+  // レコード生成: 両方のデータを含む統合形式
+  const form = { notes:$('yp-note').value||'' };
+  if(hasDelInput || shukkaLegacy > 0){
+    form.del = {
+      mochidashi: m, kanryo: k, yakan: y,
+      tenso: t, mochimodoiri: mo, 翌日廻し: yo,
+      shukka: shukkaLegacy, // 旧「集荷件数」枠は宅配側にそのまま残す
+    };
+    // 後方互換のため旧形式フィールドもトップレベルに残す
+    Object.assign(form, form.del);
+  }
+  if(hasColInput){
+    const colTotal = colEntries.reduce((a,e)=>a+e.count, 0);
+    form.col = { companies: colEntries, total: colTotal };
+  }
+
+  const rec = {
+    id: Date.now(), type:'yuupack', driver:{...driver}, date,
+    postOffice,
+    form,
+    submittedAt: new Date().toISOString(),
+  };
+  YP_LOGS.push(rec); fbSet('yp_logs', YP_LOGS);
+  lastResult = rec; showDone();
 }
 
 // ══ 集荷 ══
@@ -2249,27 +2531,71 @@ function showDone(){
   const r=lastResult;
   $('done-title').style.color=r.type==='yuupack'?'var(--slate)':'var(--sage)';
   $('done-time').textContent=new Date(r.submittedAt).toLocaleString('ja-JP');
-  const rows=r.type==='yuupack'?[
-    ['担当者',r.driver.name],['事業','ゆうパック宅配'],['日付',fmtD(r.date)],
-    ['持出個数',`${r.form.mochidashi}個`],['配達完了',`${r.form.kanryo}個`],
-    ['夜間',`${r.form.yakan||0}個`],
-    ...(r.form.tenso?[['転送還付',`${r.form.tenso}個`]]:[]),
-    ...(r.form.mochimodoiri?[['持ち戻り',`${r.form.mochimodoiri}個`]]:[]),
-    ['集荷',`${r.form.shukka||0}個`],
-  ]:[['担当者',r.driver.name],['事業','集荷事業'],['日付',fmtD(r.date)],['明細',`${r.rows.length}件`]];
+  let rows;
+  if(r.type==='yuupack'){
+    const f = r.form || {};
+    // 統合形式(form.del / form.col)と旧形式(form.mochidashi...)の両方に対応
+    const del = f.del || (f.mochidashi!=null ? {
+      mochidashi: f.mochidashi, kanryo: f.kanryo, yakan: f.yakan,
+      tenso: f.tenso, mochimodoiri: f.mochimodoiri, shukka: f.shukka
+    } : null);
+    const col = f.col || null;
+    rows = [
+      ['担当者', r.driver.name],
+      ['事業', 'ゆうパック宅配'],
+      ['日付', fmtD(r.date)],
+      ['郵便局', r.postOffice||''],
+    ];
+    if(del && (del.mochidashi || del.kanryo)){
+      rows.push(['━━ 🚛 宅配 ━━', '']);
+      rows.push(['持出個数', `${del.mochidashi||0}個`]);
+      rows.push(['配達完了', `${del.kanryo||0}個`]);
+      if(del.yakan) rows.push(['夜間', `${del.yakan}個`]);
+      if(del.tenso) rows.push(['転送還付', `${del.tenso}個`]);
+      if(del.mochimodoiri) rows.push(['持ち戻り', `${del.mochimodoiri}個`]);
+      if(del.shukka) rows.push(['集荷(件数)', `${del.shukka}個`]);
+    }
+    if(col && col.companies && col.companies.length){
+      rows.push(['━━ 📦 定時集荷 ━━', '']);
+      col.companies.forEach(c=>rows.push([c.name, `${c.count}個`]));
+      rows.push(['集荷合計', `${col.total||0}個`]);
+    }
+  } else {
+    rows = [['担当者',r.driver.name],['事業','集荷事業'],['日付',fmtD(r.date)],['明細',`${r.rows.length}件`]];
+  }
   $('done-sum').innerHTML=rows.map(([k,v])=>`<div class="r"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('');
   show('scr-done'); toast('日報を提出しました');
 }
 function doEdit(){
   if(!lastResult)return;
   if(lastResult.type==='yuupack'){
-    const f=lastResult.form;
-    $('yp-m').value=f.mochidashi;$('yp-k').value=f.kanryo;$('yp-y').value=f.yakan;
-    $('yp-t').value=f.tenso;$('yp-mo').value=f.mochimodoiri;$('yp-yo').value=f['翌日廻し'];
-    $('yp-s').value=f.shukka;$('yp-date').value=lastResult.date; valYP();
+    const f = lastResult.form || {};
+    // 宅配データ(統合形式 or 旧形式)
+    const del = f.del || (f.mochidashi!=null ? f : null);
+    if(del){
+      $('yp-m').value = del.mochidashi || 0;
+      $('yp-k').value = del.kanryo || 0;
+      $('yp-y').value = del.yakan || 0;
+      $('yp-t').value = del.tenso || 0;
+      $('yp-mo').value = del.mochimodoiri || 0;
+      $('yp-yo').value = del['翌日廻し'] || 0;
+      $('yp-s').value = del.shukka || 0;
+    } else {
+      ['yp-m','yp-k','yp-y','yp-t','yp-mo','yp-yo','yp-s'].forEach(id=>{ const e=$(id); if(e) e.value=0; });
+    }
+    // 集荷データ
+    _ypColCounts = {};
+    if(f.col && Array.isArray(f.col.companies)){
+      f.col.companies.forEach(c=>{ _ypColCounts[c.name] = c.count; });
+    }
+    $('yp-date').value = lastResult.date;
+    $('yp-note').value = f.notes || '';
     buildPostOfficeBtns();
-    // 以前の郵便局を復元
     if(lastResult.postOffice) selectPostOffice(lastResult.postOffice);
+    // 集荷入力があれば集荷タブ、そうでなければ宅配タブ
+    const hasCol = Object.values(_ypColCounts).some(v=>v>0);
+    setYpBizMode(hasCol && !(del && del.mochidashi) ? 'col' : 'del');
+    valYP();
     show('scr-yp');
   }else{colRows=[...lastResult.rows];renderRows();$('col-date').value=lastResult.date;show('scr-col');}
 }
