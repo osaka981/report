@@ -2807,7 +2807,49 @@ function showDone(){
       rows.push(['集荷合計', `${col.total||0}個`]);
     }
   } else {
-    rows = [['担当者',r.driver.name],['事業','集荷事業'],['日付',fmtD(r.date)],['明細',`${r.rows.length}件`]];
+    // 集荷日報
+    rows = [['担当者',r.driver.name],['事業','集荷事業'],['日付',fmtD(r.date)]];
+    const rrows = r.rows || [];
+    const routeRow = rrows.find(x=>x.masterKey==='route');
+    const charterRow = rrows.find(x=>x.masterKey==='チャーター');
+    const itemRows = rrows.filter(x=>
+      x.masterKey && x.masterKey!=='route' && x.masterKey!=='route_rest' && x.masterKey!=='チャーター'
+    );
+
+    // ルート配送
+    if(routeRow){
+      rows.push(['━━ 🗺 ルート配送 ━━', '']);
+      rows.push(['ルート名', routeRow.routeName||'(未設定)']);
+      if(routeRow.fromTo) rows.push(['区間', routeRow.fromTo]);
+      rows.push(['立ち寄り', `${routeRow.stopCount||1}件/回`]);
+      rows.push(['稼働回数', `${routeRow.rounds||1}回`]);
+      const amt = (routeRow.unitPrice||0) * (routeRow.rounds||1);
+      rows.push(['金額', `¥${amt.toLocaleString()} (¥${(routeRow.unitPrice||0).toLocaleString()}/回×${routeRow.rounds||1}回)`]);
+      (routeRow.stops||[]).forEach(s=>{
+        rows.push([`立ち寄り${s.seq}`, s.memo||'(未記入)']);
+      });
+    }
+
+    // チャーター
+    if(charterRow){
+      rows.push(['━━ 🚚 チャーター ━━', '']);
+      rows.push(['顧客', charterRow.customerName||'(未設定)']);
+      const fromTo = [charterRow.charterFrom, charterRow.charterTo].filter(Boolean).join(' → ');
+      if(fromTo) rows.push(['区間', fromTo]);
+      if(charterRow.charterContent) rows.push(['内容', charterRow.charterContent]);
+      rows.push(['金額', '経営管理で後日入力']);
+    }
+
+    // 個建
+    if(itemRows.length){
+      rows.push(['━━ 📦 個建 ━━', '']);
+      rows.push(['明細', `${itemRows.length}件`]);
+    }
+
+    // 全部空の場合
+    if(!routeRow && !charterRow && !itemRows.length){
+      rows.push(['明細', '(なし)']);
+    }
   }
   $('done-sum').innerHTML=rows.map(([k,v])=>`<div class="r"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('');
   show('scr-done'); toast('日報を提出しました');
@@ -2843,7 +2885,93 @@ function doEdit(){
     setYpBizMode(hasCol && !(del && del.mochidashi) ? 'col' : 'del');
     valYP();
     show('scr-yp');
-  }else{colRows=[...lastResult.rows];renderRows();$('col-date').value=lastResult.date;show('scr-col');}
+  }else{
+    // 集荷日報: lastResult.blocksがあればそれを使用、無ければrowsから再構築
+    if(lastResult.blocks && Array.isArray(lastResult.blocks) && lastResult.blocks.length){
+      // 提出時のブロック構造をそのまま戻す(新仕様の完全復元)
+      colBlocks = JSON.parse(JSON.stringify(lastResult.blocks));
+      colBlockIdSeq = colBlocks.reduce((m,b)=>{
+        const id = parseInt(b.id);
+        return isNaN(id) ? m : Math.max(m, id);
+      }, 0) + 1;
+    } else {
+      // フォールバック: rowsから再構築(旧仕様互換)
+      colBlocks = _rebuildBlocksFromRows(lastResult.rows||[]);
+      colBlockIdSeq = colBlocks.reduce((m,b)=>{
+        const id = parseInt(b.id);
+        return isNaN(id) ? m : Math.max(m, id);
+      }, 0) + 1;
+    }
+    $('col-date').value = lastResult.date;
+    $('col-note').value = lastResult.note || '';
+    renderColBlocks();
+    updateColSubmitBtn();
+    show('scr-col');
+  }
+}
+
+// rowsからcolBlocksを再構築(フォールバック/旧仕様互換)
+function _rebuildBlocksFromRows(rows){
+  if(!Array.isArray(rows) || !rows.length) return [];
+  const blocks = [];
+  let seq = 1;
+
+  // 新仕様ルート行
+  const routeRow = rows.find(r=>r.masterKey==='route');
+  if(routeRow){
+    blocks.push({
+      type:'route', id:seq++,
+      routeId: routeRow.routeId, routeName: routeRow.routeName,
+      fromTo: routeRow.fromTo||'',
+      stopCount: routeRow.stopCount||1,
+      unitPrice: routeRow.unitPrice||0,
+      rounds: routeRow.rounds||1,
+      stops: routeRow.stops||[],
+      custId: routeRow.customerId||null,
+      custName: routeRow.customerName||'',
+      tag: '車建', open: true,
+    });
+  }
+
+  // 新仕様チャーター行
+  const charterRow = rows.find(r=>r.masterKey==='チャーター');
+  if(charterRow){
+    blocks.push({
+      type:'charter', id:seq++,
+      charterData: {
+        customerId: charterRow.customerId||null,
+        custName: charterRow.customerName||'',
+        from: charterRow.charterFrom||'',
+        to: charterRow.charterTo||'',
+        content: charterRow.charterContent||'',
+      },
+      open: true,
+    });
+  }
+
+  // 個別顧客(indiv)行 - 顧客ごとにまとめる
+  const indivMap = new Map();
+  rows.forEach(row=>{
+    const k = row.masterKey;
+    if(k==='route' || k==='route_rest' || k==='チャーター') return;
+    if(!k || !row.customerId) return;
+    const key = String(row.customerId);
+    if(!indivMap.has(key)){
+      indivMap.set(key, {
+        type:'indiv', id:seq++,
+        custId: row.customerId,
+        custName: row.customerName||'',
+        region: row.region||'',
+        items: {},
+        open: true,
+      });
+    }
+    const b = indivMap.get(key);
+    b.items[k] = (b.items[k]||0) + (row.qty||0);
+  });
+  indivMap.forEach(b=>blocks.push(b));
+
+  return blocks;
 }
 
 
