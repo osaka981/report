@@ -2265,7 +2265,7 @@ function addIndivBlock(custId,custName,region){
 // ── チャーターを追加 ──
 function addCharterBlock(){
   const id=colBlockIdSeq++;
-  colBlocks.push({type:'charter',id,charterData:{custName:'',from:'',to:'',content:''},open:true});
+  colBlocks.push({type:'charter',id,charterData:{customerId:null,custName:'',from:'',to:'',content:''},open:true});
   renderColBlocks(); saveColDraft(); updateColSubmitBtn();
 }
 
@@ -2424,33 +2424,67 @@ function renderCharterBlock(b){
   const chevStyle = b.open===false?'transform:rotate(-90deg)':'';
   const bodyDisp = b.open===false?'none':'block';
   const d = b.charterData||{};
+
+  // 顧客マスタから登録済顧客リストを取得
+  const customers = ls_get(LS.CUSTOMERS,[])||[];
+  const sortedCusts = customers.slice().sort((a,b)=>
+    String(a.name||'').localeCompare(String(b.name||''),'ja')
+  );
+
+  // 顧客選択ドロップダウン
+  const custOptions = sortedCusts.map(c=>
+    `<option value="${c.id}" ${String(d.customerId)===String(c.id)?'selected':''}>${esc_n(c.name)}</option>`
+  ).join('');
+
+  const headerName = d.custName || '(顧客未選択)';
+
   return `<div class="col-block col-block-charter" id="blk-${b.id}">
     <div class="col-block-hdr col-block-hdr-charter" onclick="colToggleBlock(${b.id})">
-      <span class="col-block-title col-block-title-c">${d.custName||'スポットチャーター'}</span>
+      <span class="col-block-title col-block-title-c">${esc_n(headerName)}</span>
       <span class="col-block-tag col-tag-c">チャーター</span>
       <span class="col-block-chev" id="blk-chev-${b.id}" style="${chevStyle}">▼</span>
     </div>
     <div id="blk-body-${b.id}" style="display:${bodyDisp};">
       <div class="col-charter-body">
-        <div style="font-size:10px;color:var(--mid);margin-bottom:4px;">顧客名</div>
-        <input type="text" class="fi fi-sm" value="${d.custName||''}" placeholder="顧客名を入力（例：ゆっく、東亜）"
-          oninput="colChUpdate(${b.id},'custName',this.value)" autocomplete="off"
-          style="margin-bottom:8px;" id="ch-cust-${b.id}">
+        <div style="font-size:10px;color:var(--mid);margin-bottom:4px;">顧客 <span style="color:var(--red,#c0392b);">*</span></div>
+        <select class="fi fi-sm" onchange="colChSelectCust(${b.id},this.value)" style="margin-bottom:8px;">
+          <option value="">-- 顧客を選択 --</option>
+          ${custOptions}
+        </select>
         <div class="col-charter-frow" style="margin-bottom:8px;">
           <div><div style="font-size:10px;color:var(--mid);margin-bottom:4px;">出発地点</div>
-            <input type="text" class="fi fi-sm" value="${d.from||''}" placeholder="例：西成区 倉庫"
+            <input type="text" class="fi fi-sm" value="${esc_n(d.from||'')}" placeholder="例：西成区 倉庫"
               oninput="colChUpdate(${b.id},'from',this.value)"></div>
           <div><div style="font-size:10px;color:var(--mid);margin-bottom:4px;">行先</div>
-            <input type="text" class="fi fi-sm" value="${d.to||''}" placeholder="例：港区 倉庫B"
+            <input type="text" class="fi fi-sm" value="${esc_n(d.to||'')}" placeholder="例：港区 倉庫B"
               oninput="colChUpdate(${b.id},'to',this.value)"></div>
         </div>
         <div style="font-size:10px;color:var(--mid);margin-bottom:4px;">内容</div>
-        <input type="text" class="fi fi-sm" value="${d.content||''}" placeholder="例：精密機器・冷蔵品・緊急配送"
+        <input type="text" class="fi fi-sm" value="${esc_n(d.content||'')}" placeholder="例：精密機器・冷蔵品・緊急配送"
           oninput="colChUpdate(${b.id},'content',this.value)">
+        <div style="font-size:9px;color:var(--mid);margin-top:6px;line-height:1.5;">※ 料金は経営管理で後日入力します。</div>
       </div>
       <div class="col-dz"><button class="col-dbtn" onclick="confirmColDel(${b.id},'スポットチャーター')">このチャーターを削除</button></div>
     </div>
   </div>`;
+}
+
+// チャーター顧客選択ハンドラ
+function colChSelectCust(blockId, custId){
+  const b = colBlocks.find(x=>x.id===blockId);
+  if(!b || !b.charterData) return;
+  if(!custId){
+    b.charterData.customerId = null;
+    b.charterData.custName = '';
+  } else {
+    const customers = ls_get(LS.CUSTOMERS,[])||[];
+    const cu = customers.find(c=>String(c.id)===String(custId));
+    if(cu){
+      b.charterData.customerId = cu.id;
+      b.charterData.custName = cu.name;
+    }
+  }
+  renderColBlocks(); saveColDraft(); updateColSubmitBtn();
 }
 
 // ── トグル操作 ──
@@ -2547,7 +2581,10 @@ function updateColSubmitBtn(){
       return b.customers?.some(cu=>!cu.rest&&Object.values(cu.items||{}).some(v=>v>0));
     }
     if(b.type==='indiv') return Object.values(b.items||{}).some(v=>v>0);
-    if(b.type==='charter') return b.charterData?.custName||b.charterData?.content;
+    if(b.type==='charter'){
+      // 新仕様: customerId必須(ドロップダウン選択必須)
+      return b.charterData?.customerId && (b.charterData?.content || b.charterData?.from || b.charterData?.to);
+    }
     return false;
   });
   btn.classList.toggle('btn-dis',!hasData);
@@ -2573,6 +2610,14 @@ function submitCol(){
     }
     if(b.type==='indiv'&&!Object.values(b.items||{}).some(v=>v>0)){
       warnings.push(`${b.custName}：数量が未入力`);
+    }
+    if(b.type==='charter'){
+      const d = b.charterData||{};
+      if(!d.customerId){
+        warnings.push(`チャーター：顧客が未選択`);
+      } else if(!d.content && !d.from && !d.to){
+        warnings.push(`チャーター(${d.custName||'顧客'})：内容・出発・行先すべて未入力`);
+      }
     }
   });
   const msg=$('col-sub-msg');
@@ -2633,8 +2678,8 @@ function doSubmitCol(){
       });
     } else if(b.type==='charter'){
       const d=b.charterData||{};
-      if(d.custName||d.content){
-        colRows.push({customerId:0,customerName:d.custName||'',region:'',
+      if(d.customerId && (d.custName||d.content||d.from||d.to)){
+        colRows.push({customerId:d.customerId,customerName:d.custName||'',region:'',
           masterKey:'チャーター',label:'チャーター',qty:1,unit:'件',
           charterFrom:d.from||'',charterTo:d.to||'',charterContent:d.content||''});
       }
