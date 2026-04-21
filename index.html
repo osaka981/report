@@ -2096,6 +2096,10 @@ function colReset(){
 }
 
 // ── ルートを追加 ──
+function esc_n(s){
+  return String(s==null?'':s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
 function addRouteBlock(){
   // 担当者に紐づくルートを取得
   const routes = getMyRoutes();
@@ -2126,26 +2130,91 @@ function getMyRoutes(){
 
 function addRouteBlockById(r){
   const id=colBlockIdSeq++;
-  const custs=(r.customers||[]).map((cu,i)=>({
-    id:cu.id||cu.custId||i,
-    name:cu.name||cu.custName||String(cu),
-    region:cu.region||'',
-    rest:false,items:{},open:i===0
-  }));
-  colBlocks.push({type:'route',id,routeId:r.id,routeName:r.name,tag:'車建',customers:custs});
+  const stopCount = parseInt(r.stopCount)||1;
+  // 新仕様: 立ち寄り箇所ごとのメモ入力
+  const stops = [];
+  for(let i=0;i<stopCount;i++){
+    stops.push({seq:i+1, memo:''});
+  }
+  colBlocks.push({
+    type:'route', id,
+    routeId:r.id, routeName:r.name,
+    fromTo: r.fromTo || '',
+    stopCount,
+    unitPrice: r.routePrice || r.dailyAmt || 0,
+    rounds: 1,           // 1日に何周したか(デフォルト1)
+    stops,               // 立ち寄り箇所ごとのメモ
+    custId: (r.customers && r.customers[0])?.id || (r.customers && r.customers[0])?.custId || null,
+    custName: '',        // 後でD.customersから引く
+    tag:'車建',
+    open: true,
+  });
+  // 顧客名を引く
+  const last = colBlocks[colBlocks.length-1];
+  if(last.custId){
+    const cuMatch = (ls_get(LS.CUSTOMERS,[])||[]).find(c=>c.id===last.custId);
+    if(cuMatch) last.custName = cuMatch.name || '';
+  }
   renderColBlocks(); saveColDraft(); updateColSubmitBtn();
+}
+
+// 稼働回数を+/-1
+function colRouteRoundAdj(blockId, delta){
+  const b = colBlocks.find(x=>x.id===blockId);
+  if(!b) return;
+  const cur = parseInt(b.rounds)||1;
+  const next = Math.max(1, cur+delta);
+  b.rounds = next;
+  renderColBlocks(); saveColDraft(); updateColSubmitBtn();
+}
+
+// 稼働回数を直接設定
+function colRouteRoundSet(blockId, val){
+  const b = colBlocks.find(x=>x.id===blockId);
+  if(!b) return;
+  b.rounds = Math.max(1, parseInt(val)||1);
+  saveColDraft();
+  // 再描画せず値だけ反映(フォーカスを保つため金額表示箇所のみ更新)
+  // 全体再描画するとinputフォーカスが外れるので、金額部分だけDOM更新
+  const unit = parseInt(b.unitPrice)||0;
+  const amount = b.rounds * unit;
+  // 表示部のテキストを更新
+  const hdr = document.getElementById(`blk-body-${blockId}`);
+  if(hdr){
+    const spans = hdr.querySelectorAll('span');
+    spans.forEach(s=>{
+      if(s.textContent && s.textContent.includes('/回 ×')){
+        s.textContent = `¥${unit.toLocaleString()}/回 × ${b.rounds}回 = ¥${amount.toLocaleString()}`;
+      }
+    });
+  }
+}
+
+// 立ち寄りメモ入力
+function colRouteStopMemo(blockId, stopIdx, val){
+  const b = colBlocks.find(x=>x.id===blockId);
+  if(!b || !b.stops || !b.stops[stopIdx]) return;
+  b.stops[stopIdx].memo = val;
+  saveColDraft();
+  updateColSubmitBtn();
 }
 
 function openRouteSelectSheet(routes){
   // ルート選択シートをボトムシート形式で表示
   let html=`<div style="position:fixed;bottom:0;left:0;right:0;background:var(--card);border-radius:14px 14px 0 0;padding:16px;z-index:8500;box-shadow:0 -4px 24px rgba(0,0,0,.15);" id="route-select-sheet">
     <div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:12px;">集荷ルートを選択</div>
-    <div style="display:flex;flex-direction:column;gap:6px;">
-    ${routes.map(r=>`<button onclick="addRouteBlockById(${JSON.stringify(r).replace(/"/g,'&quot;')});closeRouteSheet()"
-      style="padding:10px 14px;background:rgba(74,122,155,.08);border:1.5px solid rgba(74,122,155,.3);border-radius:8px;text-align:left;cursor:pointer;">
-      <div style="font-size:12px;font-weight:700;color:var(--slate);">${r.name}</div>
-      <div style="font-size:10px;color:var(--mid);margin-top:2px;">${(r.customers||[]).length}社 / 車建</div>
-    </button>`).join('')}
+    <div style="display:flex;flex-direction:column;gap:6px;max-height:60vh;overflow-y:auto;">
+    ${routes.map(r=>{
+      const price = r.routePrice || r.dailyAmt || 0;
+      const sc = parseInt(r.stopCount)||1;
+      const fromTo = r.fromTo ? `<div style="font-size:10px;color:var(--mid);margin-top:2px;">${esc_n(r.fromTo)}</div>` : '';
+      return `<button onclick="addRouteBlockById(${JSON.stringify(r).replace(/"/g,'&quot;')});closeRouteSheet()"
+        style="padding:10px 14px;background:rgba(74,122,155,.08);border:1.5px solid rgba(74,122,155,.3);border-radius:8px;text-align:left;cursor:pointer;">
+        <div style="font-size:12px;font-weight:700;color:var(--slate);">${esc_n(r.name)}</div>
+        ${fromTo}
+        <div style="font-size:10px;color:var(--mid);margin-top:2px;">${sc}件/回 · ¥${price.toLocaleString()}/回</div>
+      </button>`;
+    }).join('')}
     </div>
     <button onclick="closeRouteSheet()" style="margin-top:10px;width:100%;padding:10px;background:var(--inp);border:none;border-radius:8px;font-size:13px;color:var(--mid);cursor:pointer;">キャンセル</button>
   </div>
@@ -2266,41 +2335,65 @@ function itemsGridHtml(blockId, custIdx, items, color){
     </div>`;
 }
 
-// ── ルートブロック描画 ──
+// ── ルートブロック描画(新仕様: 区間・立ち寄りメモ・回数) ──
 function renderRouteBlock(b){
   const chevStyle = b.open===false?'transform:rotate(-90deg)':'';
   const bodyDisp = b.open===false?'none':'block';
-  const custRows = (b.customers||[]).map((cu,ci)=>{
-    const restStyle = cu.rest?'background:rgba(232,160,48,.07);border-top:1px solid rgba(232,160,48,.2);':'border-top:1px solid var(--div);';
-    const sumQty = Object.values(cu.items||{}).reduce((s,v)=>s+(parseInt(v)||0),0);
-    const sumNote = cu.rest?'':'(計'+sumQty+'個)';
-    const bodyHtml = cu.rest?'':
-      `<div id="cbody-${b.id}-${ci}" class="col-iw" style="display:${cu.open?'block':'none'};">
-        ${itemsGridHtml(b.id,ci,cu.items||{},'b')}
-       </div>`;
-    return `<div class="${cu.rest?'col-cust-row col-cust-row-rest':'col-cust-row'}">
-      <div class="col-cust-hdr" onclick="colToggleCust(${b.id},${ci})">
-        <div class="col-cdot ${cu.rest?'col-cdot-r':'col-cdot-b'}"></div>
-        <span class="${cu.rest?'col-cnm-rest':'col-cnm'}">${cu.name}</span>
-        ${cu.rest?'<span class="col-rest-badge">休業</span>':''}
-        <span class="col-snote" style="flex:1;margin-left:4px;">${cu.rest?'':sumNote}</span>
-        <div class="col-tog-wrap" onclick="event.stopPropagation()">
-          <button class="col-tog ${cu.rest?'col-tog-on-r':'col-tog-off'}" onclick="setColCustRest(${b.id},${ci},true,event)">休業</button>
-          <button class="col-tog ${!cu.rest?'col-tog-on-b':'col-tog-off'}" onclick="setColCustRest(${b.id},${ci},false,event)">入力</button>
-        </div>
+  const stopCount = parseInt(b.stopCount)||1;
+  const rounds = parseInt(b.rounds)||1;
+  const unitPrice = parseInt(b.unitPrice)||0;
+  const amount = rounds * unitPrice;
+  const fromToHtml = b.fromTo ? `<div style="font-size:10px;color:var(--mid);margin-top:2px;">${esc_n(b.fromTo)}</div>` : '';
+
+  // 立ち寄りステップのメモ入力欄
+  const stopsHtml = (b.stops||[]).map((stop, i)=>{
+    const seq = stop.seq || (i+1);
+    const memo = stop.memo || '';
+    return `<div style="background:var(--inp);border:1px solid var(--brd);border-radius:8px;padding:10px 12px;margin-bottom:6px;">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+        <span style="display:inline-block;width:22px;height:22px;background:var(--slate);color:#fff;border-radius:50%;text-align:center;line-height:22px;font-size:10px;font-weight:700;">${seq}</span>
+        <span style="font-size:11px;font-weight:700;color:var(--ink);">立ち寄り${seq}件目</span>
       </div>
-      ${bodyHtml}
+      <textarea
+        class="fi"
+        rows="2"
+        placeholder="例：大阪工場にて20個引取"
+        oninput="colRouteStopMemo(${b.id},${i},this.value)"
+        style="font-size:12px;width:100%;resize:vertical;">${esc_n(memo)}</textarea>
     </div>`;
   }).join('');
+
   return `<div class="col-block col-block-route" id="blk-${b.id}">
     <div class="col-block-hdr col-block-hdr-route" onclick="colToggleBlock(${b.id})">
-      <span class="col-block-title col-block-title-r">${b.routeName||'ルート'}</span>
-      <span class="col-block-tag col-tag-r">${b.tag||'車建'}</span>
+      <div style="flex:1;">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span class="col-block-title col-block-title-r">${esc_n(b.routeName||'ルート')}</span>
+          <span class="col-block-tag col-tag-r">${b.tag||'車建'}</span>
+        </div>
+        ${fromToHtml}
+      </div>
       <span class="col-block-chev" id="blk-chev-${b.id}" style="${chevStyle}">▼</span>
     </div>
     <div id="blk-body-${b.id}" style="display:${bodyDisp};">
-      ${custRows}
-      <div class="col-dz"><button class="col-dbtn" onclick="confirmColDel(${b.id},'${(b.routeName||'ルート').replace(/'/g,"\'")}')">このルートを削除</button></div>
+      <div style="padding:12px 14px;background:var(--card);border-top:1px solid var(--div);">
+        <!-- 稼働回数 -->
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;padding:8px 10px;background:rgba(74,122,155,.06);border-radius:8px;">
+          <span style="font-size:11px;font-weight:700;color:var(--slate);">稼働回数</span>
+          <div style="display:flex;align-items:center;gap:4px;">
+            <button class="col-ibm" onclick="colRouteRoundAdj(${b.id},-1)">−</button>
+            <input type="number" min="1" value="${rounds}" oninput="colRouteRoundSet(${b.id},this.value)"
+              style="width:48px;text-align:center;padding:4px;border:1px solid var(--brd);border-radius:4px;font-size:12px;font-weight:700;">
+            <button class="col-ibp-b" onclick="colRouteRoundAdj(${b.id},1)">＋</button>
+          </div>
+          <span style="font-size:10px;color:var(--mid);">回</span>
+          <span style="margin-left:auto;font-size:11px;font-weight:700;color:var(--slate);">¥${unitPrice.toLocaleString()}/回 × ${rounds}回 = ¥${amount.toLocaleString()}</span>
+        </div>
+
+        <!-- 立ち寄りメモ(件数分) -->
+        <div style="font-size:10px;color:var(--mid);margin-bottom:6px;">立ち寄り${stopCount}件の配送内容を記入</div>
+        ${stopsHtml}
+      </div>
+      <div class="col-dz"><button class="col-dbtn" onclick="confirmColDel(${b.id},'${(b.routeName||'ルート').replace(/'/g,"\\'")}')">このルートを削除</button></div>
     </div>
   </div>`;
 }
@@ -2445,7 +2538,14 @@ function closeColSubModal(){const m=$('col-sub-modal');if(m) m.style.display='no
 function updateColSubmitBtn(){
   const btn=$('col-submit');if(!btn)return;
   const hasData=colBlocks.some(b=>{
-    if(b.type==='route') return b.customers?.some(cu=>!cu.rest&&Object.values(cu.items||{}).some(v=>v>0));
+    if(b.type==='route'){
+      // 新仕様: 立ち寄りメモが1つでも入っていればOK
+      if(Array.isArray(b.stops) && b.stops.length){
+        return b.stops.some(s=>(s.memo||'').trim().length>0);
+      }
+      // 旧仕様フォールバック
+      return b.customers?.some(cu=>!cu.rest&&Object.values(cu.items||{}).some(v=>v>0));
+    }
     if(b.type==='indiv') return Object.values(b.items||{}).some(v=>v>0);
     if(b.type==='charter') return b.charterData?.custName||b.charterData?.content;
     return false;
@@ -2459,8 +2559,17 @@ function submitCol(){
   const warnings=[];
   colBlocks.forEach(b=>{
     if(b.type==='route'){
-      const emptyActive=(b.customers||[]).filter(cu=>!cu.rest&&!Object.values(cu.items||{}).some(v=>v>0));
-      if(emptyActive.length) warnings.push(`${b.routeName}：${emptyActive.map(c=>c.name).join('・')}が未入力`);
+      // 新仕様: 立ち寄りメモ空欄チェック
+      if(Array.isArray(b.stops) && b.stops.length){
+        const emptyStops = b.stops.filter(s=>!(s.memo||'').trim());
+        if(emptyStops.length){
+          warnings.push(`${b.routeName}：立ち寄り${emptyStops.map(s=>s.seq).join('・')}件目のメモが未入力`);
+        }
+      } else {
+        // 旧仕様フォールバック
+        const emptyActive=(b.customers||[]).filter(cu=>!cu.rest&&!Object.values(cu.items||{}).some(v=>v>0));
+        if(emptyActive.length) warnings.push(`${b.routeName}：${emptyActive.map(c=>c.name).join('・')}が未入力`);
+      }
     }
     if(b.type==='indiv'&&!Object.values(b.items||{}).some(v=>v>0)){
       warnings.push(`${b.custName}：数量が未入力`);
@@ -2481,20 +2590,41 @@ function doSubmitCol(){
   const colRows=[];
   colBlocks.forEach(b=>{
     if(b.type==='route'){
-      (b.customers||[]).forEach(cu=>{
-        if(cu.rest){
-          colRows.push({customerId:cu.id,customerName:cu.name,region:cu.region||'',
-            masterKey:'route_rest',label:'休業',qty:0,unit:'',
-            routeId:b.routeId,routeName:b.routeName,isRest:true});
-        } else {
-          Object.entries(cu.items||{}).forEach(([k,v])=>{
-            if(!v) return;
+      // 新仕様: 立ち寄りメモ+稼働回数
+      if(Array.isArray(b.stops) && b.stops.length){
+        colRows.push({
+          customerId: b.custId||0,
+          customerName: b.custName||'',
+          region: b.region||'',
+          masterKey: 'route',
+          label: b.routeName||'ルート',
+          qty: parseInt(b.rounds)||1,
+          unit: '回',
+          routeId: b.routeId,
+          routeName: b.routeName,
+          fromTo: b.fromTo||'',
+          stopCount: b.stopCount||1,
+          unitPrice: b.unitPrice||0,
+          rounds: b.rounds||1,
+          stops: (b.stops||[]).map(s=>({seq:s.seq, memo:s.memo||''})),
+        });
+      } else {
+        // 旧仕様フォールバック(顧客ごと品目)
+        (b.customers||[]).forEach(cu=>{
+          if(cu.rest){
             colRows.push({customerId:cu.id,customerName:cu.name,region:cu.region||'',
-              masterKey:k,label:k.replace(/_/g,' '),qty:v,unit:'個',
-              routeId:b.routeId,routeName:b.routeName});
-          });
-        }
-      });
+              masterKey:'route_rest',label:'休業',qty:0,unit:'',
+              routeId:b.routeId,routeName:b.routeName,isRest:true});
+          } else {
+            Object.entries(cu.items||{}).forEach(([k,v])=>{
+              if(!v) return;
+              colRows.push({customerId:cu.id,customerName:cu.name,region:cu.region||'',
+                masterKey:k,label:k.replace(/_/g,' '),qty:v,unit:'個',
+                routeId:b.routeId,routeName:b.routeName});
+            });
+          }
+        });
+      }
     } else if(b.type==='indiv'){
       Object.entries(b.items||{}).forEach(([k,v])=>{
         if(!v) return;
