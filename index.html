@@ -2041,8 +2041,12 @@ let colBlockIdSeq = 0;
 
 // ── 一時保存 ──
 const COL_DRAFT_KEY = 'col_input_draft';
+// 下書きバージョン: v2 = 新仕様(ルート:stops/rounds, チャーター:customerId)
+const COL_DRAFT_VERSION = 2;
+
 function saveColDraft(){
   const draft = {
+    version: COL_DRAFT_VERSION,
     date: $('col-date')?.value || '',
     note: $('col-note')?.value || '',
     blocks: colBlocks,
@@ -2050,30 +2054,97 @@ function saveColDraft(){
   };
   try{ localStorage.setItem(COL_DRAFT_KEY, JSON.stringify(draft)); }catch(e){}
 }
+
+// 旧仕様の下書きデータを新仕様にマイグレーション
+// 旧ルート(customers[].items)は新仕様に対応できないため削除
+// 旧チャーター(customerIdなし)も削除
+function _migrateDraftBlocks(blocks){
+  if(!Array.isArray(blocks)) return [];
+  const out = [];
+  let droppedRoute = 0;
+  let droppedCharter = 0;
+  blocks.forEach(b=>{
+    if(!b || !b.type) return;
+    if(b.type==='route'){
+      // 新仕様: stops配列必須
+      if(Array.isArray(b.stops) && b.stops.length){
+        out.push(b);
+      } else {
+        // 旧仕様ルート → 破棄(ユーザーに後で通知)
+        droppedRoute++;
+      }
+    } else if(b.type==='charter'){
+      // 新仕様: customerId必須
+      if(b.charterData && b.charterData.customerId){
+        out.push(b);
+      } else {
+        // customerId無しは破棄
+        droppedCharter++;
+      }
+    } else if(b.type==='indiv'){
+      // 個別顧客ブロックはそのまま
+      out.push(b);
+    } else {
+      // 未知のtypeも一応保持
+      out.push(b);
+    }
+  });
+  return {blocks:out, droppedRoute, droppedCharter};
+}
+
 function loadColDraft(){
   try{
     const d = JSON.parse(localStorage.getItem(COL_DRAFT_KEY)||'null');
     if(!d) return;
     if($('col-date')) $('col-date').value = d.date||today();
     if($('col-note')) $('col-note').value = d.note||'';
-    colBlocks = d.blocks||[];
-    colBlockIdSeq = colBlocks.reduce((m,b)=>Math.max(m,b.id||0),0)+1;
+
+    // バージョン判定+マイグレーション
+    const ver = d.version || 1;
+    if(ver < COL_DRAFT_VERSION){
+      const mig = _migrateDraftBlocks(d.blocks||[]);
+      colBlocks = mig.blocks;
+      const dropTotal = mig.droppedRoute + mig.droppedCharter;
+      if(dropTotal > 0){
+        const parts = [];
+        if(mig.droppedRoute) parts.push(`ルート${mig.droppedRoute}件(旧仕様)`);
+        if(mig.droppedCharter) parts.push(`チャーター${mig.droppedCharter}件(顧客未選択)`);
+        toast(`旧仕様のため${parts.join('・')}を除外しました`, 'info');
+      }
+    } else {
+      colBlocks = d.blocks||[];
+    }
+
+    // colBlockIdSeqを数値として再計算
+    colBlockIdSeq = colBlocks.reduce((m,b)=>{
+      const id = parseInt(b.id);
+      return isNaN(id) ? m : Math.max(m, id);
+    }, 0) + 1;
     renderColBlocks();
     updateColSubmitBtn();
     hideDraftBanner();
     toast('前回の入力を復元しました');
-  }catch(e){}
+  }catch(e){
+    console.error('loadColDraft error:', e);
+    toast('下書き復元でエラーが発生しました', 'err');
+  }
 }
+
 function clearColDraft(){
   localStorage.removeItem(COL_DRAFT_KEY);
   hideDraftBanner();
 }
+
 function checkColDraft(){
   try{
     const d = JSON.parse(localStorage.getItem(COL_DRAFT_KEY)||'null');
     if(!d||!d.blocks?.length) return;
     const info = $('col-draft-info');
-    if(info) info.textContent = `${fmtD(d.date)} 保存 (${d.blocks.length}件のブロック)`;
+    if(info){
+      const verTxt = (d.version||1) < COL_DRAFT_VERSION ? ' ⚠️旧仕様' : '';
+      const savedAt = d.savedAt ? new Date(d.savedAt).toLocaleString('ja-JP',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
+      info.textContent = `${fmtD(d.date)} (${d.blocks.length}件)${savedAt?' · '+savedAt+'保存':''}${verTxt}`;
+    }
     const banner = $('col-draft-banner');
     if(banner) banner.style.display='block';
   }catch(e){}
