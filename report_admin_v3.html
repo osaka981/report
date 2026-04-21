@@ -592,7 +592,11 @@ function itemOneCell(row){
 // rows → 品目集計 {key:qty}
 function sumItems(rows){
   const m={};
-  rows.forEach(r=>{m[r.masterKey]=(m[r.masterKey]||0)+r.qty;});
+  rows.forEach(r=>{
+    // ルート系とチャーターは個建集計から除外
+    if(r.masterKey==='route' || r.masterKey==='route_rest' || r.masterKey==='チャーター') return;
+    m[r.masterKey]=(m[r.masterKey]||0)+r.qty;
+  });
   return m;
 }
 // 品目集計 → コンパクトテキスト HTML（テーブルセル用）
@@ -603,6 +607,17 @@ function itemCompact(rows){
     const brd=ITEM_COLOR[k]+'66';
     return `<span style="display:inline-flex;flex-direction:column;align-items:center;padding:2px 8px 3px;margin:2px 3px;border-radius:6px;background:${bg};border:1px solid ${brd};white-space:nowrap;min-width:38px;"><span style="color:${ITEM_COLOR[k]};font-size:9px;font-weight:700;letter-spacing:.03em;line-height:1.4;">${ITEM_SHORT[k]}</span><span style="color:#2c2825;font-size:13px;font-weight:800;font-family:var(--mono);line-height:1.3;">${m[k].toLocaleString()}</span></span>`;
   });
+  // ルート・チャーターバッジを追加
+  const hasRoute = rows.some(r=>r.masterKey==='route');
+  const hasCharter = rows.some(r=>r.masterKey==='チャーター');
+  if(hasRoute){
+    const rtRow = rows.find(r=>r.masterKey==='route');
+    const rounds = rtRow?.rounds || 1;
+    parts.unshift(`<span style="display:inline-flex;flex-direction:column;align-items:center;padding:2px 8px 3px;margin:2px 3px;border-radius:6px;background:#4a7a9b22;border:1px solid #4a7a9b66;white-space:nowrap;min-width:38px;"><span style="color:#4a7a9b;font-size:9px;font-weight:700;line-height:1.4;">ルート</span><span style="color:#2c2825;font-size:13px;font-weight:800;font-family:var(--mono);line-height:1.3;">${rounds}回</span></span>`);
+  }
+  if(hasCharter){
+    parts.unshift(`<span style="display:inline-flex;flex-direction:column;align-items:center;padding:2px 8px 3px;margin:2px 3px;border-radius:6px;background:#9a6a3a22;border:1px solid #9a6a3a66;white-space:nowrap;min-width:38px;"><span style="color:#9a6a3a;font-size:9px;font-weight:700;line-height:1.4;">チャ</span><span style="color:#2c2825;font-size:13px;font-weight:800;font-family:var(--mono);line-height:1.3;">1件</span></span>`);
+  }
   return parts.length?`<div style="display:flex;flex-wrap:wrap;gap:0;align-items:flex-start;">${parts.join('')}</div>`:'<span style="color:var(--light);font-size:11px;">—</span>';
 }
 // popupで詳細表示
@@ -894,6 +909,12 @@ function colLogsBadges(logs){return itemCompact(logs.flatMap(r=>r.rows));}
 
 // 宅配日報 内容バッジ（持出・完了・夜間・転送・集荷）
 function ypBadge(form){
+  if(!form) return '';
+  // 新形式(form.del) / 旧形式(form.mochidashi...) 両対応
+  const del = form.del || {
+    mochidashi: form.mochidashi, kanryo: form.kanryo, yakan: form.yakan,
+    tenso: form.tenso, mochimodoiri: form.mochimodoiri, shukka: form.shukka
+  };
   const defs=[
     {key:'mochidashi', label:'持出', col:'#607080', always:true},
     {key:'kanryo',     label:'完了', col:'#607080', always:true},
@@ -902,15 +923,22 @@ function ypBadge(form){
     {key:'mochimodoiri',label:'持戻',col:'#8b5a5a', always:false},
     {key:'shukka',     label:'集荷', col:'#6b7c6a', always:true},
   ];
+  // 宅配内集荷(form.col)がある場合はバッジで表示
+  const col = form.col;
+  const colBadge = col && col.total ? `<span style="display:inline-flex;flex-direction:column;align-items:center;padding:2px 7px 3px;border-radius:6px;background:#6b7c6a1e;border:1px solid #6b7c6a55;min-width:34px;">
+    <span style="color:#6b7c6a;font-size:9px;font-weight:700;line-height:1.3;">宅内集</span>
+    <span style="color:#2c2825;font-size:12px;font-weight:800;font-family:var(--mono);line-height:1.2;">${col.total}</span>
+  </span>` : '';
   return '<div style="display:flex;flex-wrap:wrap;gap:3px;align-items:center;">'
-    + defs.filter(d=>d.always||(form[d.key]>0)).map(d=>{
-        const v=form[d.key]||0;
+    + defs.filter(d=>d.always||((del[d.key]||0)>0)).map(d=>{
+        const v=del[d.key]||0;
         const dim=!v;
         return `<span style="display:inline-flex;flex-direction:column;align-items:center;padding:2px 7px 3px;border-radius:6px;background:${d.col}${dim?'10':'1e'};border:1px solid ${d.col}${dim?'28':'55'};min-width:34px;opacity:${dim?0.45:1};">
           <span style="color:${d.col};font-size:9px;font-weight:700;line-height:1.3;">${d.label}</span>
           <span style="color:#2c2825;font-size:12px;font-weight:800;font-family:var(--mono);line-height:1.2;">${v}</span>
         </span>`;
       }).join('')
+    + colBadge
     + '</div>';
 }
 
@@ -1630,32 +1658,120 @@ function openLogDetail(id,type){
   $('detail-back-label').textContent='← 一覧に戻る';
   let html='';
   if(type==='yp'){
-    const f=r.form;
+    const f=r.form||{};
+    // 新形式(form.del)と旧形式(form.mochidashi...)両対応
+    const del = f.del || {
+      mochidashi: f.mochidashi, kanryo: f.kanryo, yakan: f.yakan,
+      tenso: f.tenso, mochimodoiri: f.mochimodoiri, '翌日廻し': f['翌日廻し'], shukka: f.shukka
+    };
+    const col = f.col || null;
+    const notes = f.notes || '';
+
+    // 宅配内集荷(form.col)の表示HTML
+    let colPart = '';
+    if(col){
+      const companies = col.companies || [];
+      if(companies.length){
+        const companyRows = companies.map(c=>
+          `<tr><td style="color:var(--mid);">${c.name||'(未設定)'}</td><td class="mono">${c.count||0}</td></tr>`
+        ).join('');
+        colPart = `
+        <div style="margin-top:14px;">
+          <div class="lbl" style="font-size:11px;margin-bottom:6px;">宅配内集荷(郵便局の定時集荷)</div>
+          <table class="tbl" style="max-width:400px;"><thead><tr><th>会社名</th><th>件数</th></tr></thead><tbody>
+            ${companyRows}
+            <tr style="background:rgba(107,124,106,.08);font-weight:700;"><td>合計</td><td class="mono">${col.total||0}</td></tr>
+          </tbody></table>
+        </div>`;
+      }
+    }
+
     html=`<div class="card-title">📋 宅配日報 ${fmtD(r.date)}</div>
     <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px;">
-      <div><div class="lbl">担当者</div><div style="font-weight:600;cursor:pointer;color:var(--slate);text-decoration:underline;" onclick="openDetailPage('driver','${r.driver.name.replace(/'/g,"\'")}')">→ ${r.driver.name}</div></div>
-      <div><div class="lbl">営業所</div><div style="font-weight:600;cursor:pointer;color:var(--slate);text-decoration:underline;" onclick="openDetailPage('office','${r.driver.office.replace(/'/g,"\'")}')">→ ${r.driver.office}</div></div>
+      <div><div class="lbl">担当者</div><div style="font-weight:600;cursor:pointer;color:var(--slate);text-decoration:underline;" onclick="openDetailPage('driver','${r.driver.name.replace(/'/g,"\\'")}')">→ ${r.driver.name}</div></div>
+      <div><div class="lbl">営業所</div><div style="font-weight:600;cursor:pointer;color:var(--slate);text-decoration:underline;" onclick="openDetailPage('office','${r.driver.office.replace(/'/g,"\\'")}')">→ ${r.driver.office}</div></div>
+      ${r.postOffice?`<div><div class="lbl">郵便局</div><div style="font-weight:600;">${r.postOffice}</div></div>`:''}
       <div><div class="lbl">提出時刻</div><div style="font-size:11px;color:var(--mid);">${new Date(r.submittedAt).toLocaleString('ja-JP')}</div></div>
     </div>
     <table class="tbl" style="max-width:400px;"><tbody>
-      <tr><td style="color:var(--mid);">持出個数</td><td><strong>${f.mochidashi}</strong></td></tr>
-      <tr><td style="color:var(--mid);">配達完了</td><td>${f.kanryo}</td></tr>
-      <tr><td style="color:var(--mid);">夜間配達</td><td>${f.yakan||0}</td></tr>
-      <tr><td style="color:var(--mid);">転送還付</td><td>${f.tenso}</td></tr>
-      <tr><td style="color:var(--mid);">持ち戻り</td><td>${f.mochimodoiri}</td></tr>
-      <tr><td style="color:var(--mid);">翌日廻し</td><td>${f['翌日廻し']}</td></tr>
-      <tr><td style="color:var(--mid);">集荷</td><td>${f.shukka||0}</td></tr>
-      ${f.notes?`<tr><td style="color:var(--mid);">備考</td><td>${f.notes}</td></tr>`:''}
-    </tbody></table>`;
+      <tr><td style="color:var(--mid);">持出個数</td><td><strong>${del.mochidashi||0}</strong></td></tr>
+      <tr><td style="color:var(--mid);">配達完了</td><td>${del.kanryo||0}</td></tr>
+      <tr><td style="color:var(--mid);">夜間配達</td><td>${del.yakan||0}</td></tr>
+      <tr><td style="color:var(--mid);">転送還付</td><td>${del.tenso||0}</td></tr>
+      <tr><td style="color:var(--mid);">持ち戻り</td><td>${del.mochimodoiri||0}</td></tr>
+      <tr><td style="color:var(--mid);">翌日廻し</td><td>${del['翌日廻し']||0}</td></tr>
+      <tr><td style="color:var(--mid);">集荷(旧)</td><td>${del.shukka||0}</td></tr>
+      ${notes?`<tr><td style="color:var(--mid);">備考</td><td>${notes}</td></tr>`:''}
+    </tbody></table>
+    ${colPart}`;
   }else{
+    // 集荷日報詳細(ルート・チャーター新仕様対応)
+    const rows = r.rows || [];
+    const routeRow = rows.find(row=>row.masterKey==='route');
+    const charterRow = rows.find(row=>row.masterKey==='チャーター');
+    const itemRows = rows.filter(row=>
+      row.masterKey && row.masterKey!=='route' && row.masterKey!=='route_rest' && row.masterKey!=='チャーター'
+    );
+
+    // ルート配送セクション
+    let routeHtml = '';
+    if(routeRow){
+      const stopsList = (routeRow.stops||[]).map(s=>
+        `<tr><td style="color:var(--mid);width:50px;">${s.seq||1}件目</td><td>${s.memo||'(未記入)'}</td></tr>`
+      ).join('');
+      routeHtml = `
+      <div style="margin-top:14px;padding:12px;background:rgba(74,122,155,.06);border-left:3px solid var(--slate);border-radius:4px;">
+        <div style="font-size:12px;font-weight:700;color:var(--slate);margin-bottom:8px;">🗺 ルート配送</div>
+        <div style="font-size:12px;margin-bottom:4px;"><strong>${routeRow.routeName||'(名称未設定)'}</strong>
+          ${routeRow.fromTo?`<span style="color:var(--mid);font-size:11px;margin-left:8px;">${routeRow.fromTo}</span>`:''}
+        </div>
+        <div style="font-size:11px;color:var(--mid);margin-bottom:8px;">
+          立ち寄り${routeRow.stopCount||1}件 / 稼働${routeRow.rounds||1}回 / 単価¥${(routeRow.unitPrice||0).toLocaleString()}/回
+          / 金額¥${((routeRow.unitPrice||0)*(routeRow.rounds||1)).toLocaleString()}
+        </div>
+        ${stopsList?`<table class="tbl" style="margin-top:6px;"><thead><tr><th>立ち寄り</th><th>配送メモ</th></tr></thead><tbody>${stopsList}</tbody></table>`:''}
+      </div>`;
+    }
+
+    // チャーターセクション
+    let charterHtml = '';
+    if(charterRow){
+      const amt = charterRow.amount || 0;
+      const amtSet = amt > 0;
+      const fromTo = [charterRow.charterFrom, charterRow.charterTo].filter(Boolean).join(' → ') || '-';
+      charterHtml = `
+      <div style="margin-top:14px;padding:12px;background:rgba(154,106,42,.06);border-left:3px solid var(--amber,#9a7a3a);border-radius:4px;">
+        <div style="font-size:12px;font-weight:700;color:var(--amber,#9a7a3a);margin-bottom:8px;">🚚 チャーター</div>
+        <table class="tbl" style="max-width:500px;"><tbody>
+          <tr><td style="color:var(--mid);width:80px;">顧客</td><td style="font-weight:600;">${charterRow.customerName||'(顧客不明)'}</td></tr>
+          <tr><td style="color:var(--mid);">出発→行先</td><td>${fromTo}</td></tr>
+          <tr><td style="color:var(--mid);">内容</td><td>${charterRow.charterContent||'-'}</td></tr>
+          <tr><td style="color:var(--mid);">金額(税別)</td><td>${amtSet?`<strong>¥${amt.toLocaleString()}</strong>`:'<span style="color:#c0392b;">⚠ 未設定(経営管理で入力)</span>'}</td></tr>
+        </tbody></table>
+      </div>`;
+    }
+
+    // 個建セクション(従来通り)
+    let itemsHtml = '';
+    if(itemRows.length){
+      itemsHtml = `
+      <div style="margin-top:14px;">
+        <div class="lbl" style="font-size:11px;margin-bottom:6px;">個建(品目別)</div>
+        <div class="item-badges" style="margin-bottom:12px;">${colItemBadges(itemRows)}</div>
+        <table class="tbl"><thead><tr><th>顧客名</th><th>地域</th><th>品目</th><th>数量</th><th>単位</th></tr></thead><tbody>${itemRows.map(row=>`<tr><td style="font-weight:600;cursor:pointer;color:var(--slate);" onclick="openDetailPage('customer','${String(row.customerName||'').replace(/'/g,"\\'")}')">→ ${row.customerName||'-'}</td><td style="color:var(--mid);font-size:11px;cursor:pointer;" onclick="openDetailPage('region','${String(row.region||'').replace(/'/g,"\\'")}')">→ ${row.region||'-'}</td><td style="color:${ITEM_COLOR[row.masterKey]||'#888'};font-weight:700;">${ITEM_SHORT[row.masterKey]||row.masterKey}</td><td class="mono">${row.qty}</td><td style="color:var(--mid);">${row.unit}</td></tr>`).join('')}</tbody></table>
+      </div>`;
+    }
+
     html=`<div class="card-title">📦 集荷日報 ${fmtD(r.date)}</div>
     <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px;">
-      <div><div class="lbl">担当者</div><div style="font-weight:600;cursor:pointer;color:var(--slate);text-decoration:underline;" onclick="openDetailPage('driver','${r.driver.name.replace(/'/g,"\'")}')">→ ${r.driver.name}</div></div>
-      <div><div class="lbl">営業所</div><div style="font-weight:600;cursor:pointer;color:var(--slate);text-decoration:underline;" onclick="openDetailPage('office','${r.driver.office.replace(/'/g,"\'")}')">→ ${r.driver.office}</div></div>
+      <div><div class="lbl">担当者</div><div style="font-weight:600;cursor:pointer;color:var(--slate);text-decoration:underline;" onclick="openDetailPage('driver','${r.driver.name.replace(/'/g,"\\'")}')">→ ${r.driver.name}</div></div>
+      <div><div class="lbl">営業所</div><div style="font-weight:600;cursor:pointer;color:var(--slate);text-decoration:underline;" onclick="openDetailPage('office','${r.driver.office.replace(/'/g,"\\'")}')">→ ${r.driver.office}</div></div>
       <div><div class="lbl">提出時刻</div><div style="font-size:11px;color:var(--mid);">${new Date(r.submittedAt).toLocaleString('ja-JP')}</div></div>
     </div>
-    <div class="item-badges" style="margin-bottom:12px;">${colItemBadges(r.rows)}</div>
-    <table class="tbl"><thead><tr><th>顧客名</th><th>地域</th><th>品目</th><th>数量</th><th>単位</th></tr></thead><tbody>${r.rows.map(row=>`<tr><td style="font-weight:600;cursor:pointer;color:var(--slate);" onclick="openDetailPage('customer','${row.customerName.replace(/'/g,"\'")}')">→ ${row.customerName}</td><td style="color:var(--mid);font-size:11px;cursor:pointer;" onclick="openDetailPage('region','${row.region.replace(/'/g,"\'")}')">→ ${row.region}</td><td style="color:${ITEM_COLOR[row.masterKey]||'#888'};font-weight:700;">${ITEM_SHORT[row.masterKey]||row.masterKey}</td><td class="mono">${row.qty}</td><td style="color:var(--mid);">${row.unit}</td></tr>`).join('')}</tbody></table>
+    ${routeHtml}
+    ${charterHtml}
+    ${itemsHtml}
+    ${(!routeHtml && !charterHtml && !itemsHtml)?'<div style="padding:20px;color:var(--mid);text-align:center;">このログには明細データがありません</div>':''}
     ${r.note?`<div style="margin-top:10px;padding:8px 11px;background:var(--inp);border-radius:7px;font-size:12px;color:var(--mid);">備考：${r.note}</div>`:''}`;
   }
   $('detail-content-page').innerHTML=`<div class="card">${html}</div>`;
