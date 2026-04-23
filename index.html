@@ -1014,6 +1014,64 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
   </div>
 </div>
 
+<!-- ══ 委託会社オーナー画面 ══ -->
+<div id="scr-company" class="screen">
+  <div class="topbar">
+    <div class="tb-eye">委託会社オーナーページ</div>
+    <div id="co-tb-name" class="tb-title" style="color:var(--clay);"></div>
+    <div id="co-tb-sub" class="tb-sub"></div>
+    <div style="display:flex;gap:6px;margin-top:6px;">
+      <button class="settings-btn" onclick="coSwitchTab('monthly')" id="co-tab-monthly-btn" style="flex:1;">月次集計</button>
+      <button class="settings-btn" onclick="coSwitchTab('drivers')" id="co-tab-drivers-btn" style="flex:1;">ドライバー</button>
+      <button class="settings-btn" onclick="coSwitchTab('csv')" id="co-tab-csv-btn" style="flex:1;">CSV</button>
+      <button class="settings-btn" onclick="ownerLogout()">ログアウト</button>
+    </div>
+  </div>
+  <div class="p16">
+    <!-- 月次集計タブ -->
+    <div id="co-view-monthly" class="co-view">
+      <!-- 月選択 -->
+      <div class="mv-month-nav">
+        <button class="mv-mn-btn" onclick="coShiftMonth(-1)">&lsaquo;</button>
+        <div class="mv-mn-label" id="co-mon-label">2026年4月</div>
+        <button class="mv-mn-btn" onclick="coShiftMonth(1)">&rsaquo;</button>
+      </div>
+      <!-- 月合計 -->
+      <div class="mv-sum-grid">
+        <div class="mv-sum-box"><div class="mv-sum-lbl">配達</div><div class="mv-sum-val del" id="co-total-del">0</div></div>
+        <div class="mv-sum-box"><div class="mv-sum-lbl">定時集荷</div><div class="mv-sum-val shu" id="co-total-shu">0</div></div>
+        <div class="mv-sum-box"><div class="mv-sum-lbl">集荷事業</div><div class="mv-sum-val col" id="co-total-col">0</div></div>
+      </div>
+      <div class="mv-workdays" id="co-workdays">稼働 0 日</div>
+      <!-- ドライバー別集計 -->
+      <div class="card mb10">
+        <div style="font-size:11px;font-weight:700;color:var(--mid);margin-bottom:8px;">ドライバー別 (タップで詳細)</div>
+        <div id="co-driver-rows"></div>
+      </div>
+    </div>
+
+    <!-- ドライバータブ -->
+    <div id="co-view-drivers" class="co-view" style="display:none;">
+      <div class="card mb10">
+        <div style="font-size:11px;font-weight:700;color:var(--mid);margin-bottom:8px;">所属ドライバー一覧</div>
+        <div id="co-driver-list"></div>
+      </div>
+      <div class="card mb10" style="background:rgba(230,160,60,.06);border:1px solid rgba(230,160,60,.3);">
+        <div style="font-size:11px;color:var(--amber);font-weight:700;margin-bottom:4px;">新規ドライバー登録</div>
+        <div style="font-size:10px;color:var(--mid);margin-bottom:8px;">所属ドライバーの新規登録は次回実装予定(Step E)</div>
+      </div>
+    </div>
+
+    <!-- CSVタブ -->
+    <div id="co-view-csv" class="co-view" style="display:none;">
+      <div class="card mb10">
+        <div style="font-size:11px;font-weight:700;color:var(--mid);margin-bottom:8px;">月次CSVダウンロード</div>
+        <div id="co-csv-list"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ══ 設定画面 ══ -->
 <div id="scr-settings" class="screen">
   <div class="topbar">
@@ -1344,6 +1402,13 @@ function setupRealtimeSync() {
     DRIVERS = snap.val() || DRIVERS;
     fbSet('drivers', DRIVERS);
   });
+  // 委託会社データ(Step C): オーナーログイン認証で使用
+  onValue(ref(fbDB, 'companies'), snap => {
+    if (!snap.exists()) return;
+    const v = snap.val();
+    COMPANIES = Array.isArray(v) ? v : (v ? Object.values(v) : []);
+    try{ ls_set('nikki_companies', COMPANIES); }catch(e){}
+  });
   onValue(ref(fbDB, 'nikki/col_routes'), snap => {
     if(snap.exists()){
       COL_ROUTES = snap.val()||[];
@@ -1422,7 +1487,8 @@ let CUST_HIST = ls_get(LS.CUST_HIST,[]); // [{id, name, region, count, lastUsed}
 let YP_LOGS = ls_get(LS.YP_LOGS,[]);
 let COL_LOGS = ls_get(LS.COL_LOGS,[]);
 let ATT_LOGS = ls_get(LS.ATT_LOGS,[]); // 勤怠ログ
-let COL_ROUTES = ls_get(LS.COL_ROUTES,[]); // 集荷ルートマスタ（経営管理から同期） {id,driverId,clockIn,clockInGps,clockOut,clockOutGps,adjustedOut,workMin}
+let COL_ROUTES = ls_get(LS.COL_ROUTES,[]); // 集荷ルートマスタ（経営管理から同期）
+let COMPANIES = (()=>{ try{ return JSON.parse(localStorage.getItem('nikki_companies')||'[]'); }catch(e){ return []; } })(); // 委託会社マスタ(オーナーログイン用)
 // 営業所マスタ：DRIVERSから自動生成して初期値として使用
 let OFFICES = ls_get(LS.OFFICES,(()=>{
   const names=[...new Set([
@@ -2111,21 +2177,6 @@ async function doLogin(){
     return;
   }
 
-  // Step Aでは個人直属のみ対応
-  if(parsed.type !== 'personal'){
-    $('login-err').textContent = 'このIDタイプは現在準備中です(個人直属のみ対応)';
-    $('login-err').style.display = 'block';
-    return;
-  }
-
-  // ドライバー検索
-  const d = DRIVERS.find(x => x.id===parsed.id || x.id===padId || x.id===rawId);
-  if(!d){
-    $('login-err').textContent = '社員番号が見つかりません';
-    $('login-err').style.display = 'block';
-    return;
-  }
-
   // ロック中?
   if(_isPinLocked()){
     $('login-err').textContent = `ロック中: あと${_getLockRemainSec()}秒お待ちください`;
@@ -2133,8 +2184,63 @@ async function doLogin(){
     return;
   }
 
-  // PIN認証画面へ
-  _pendingLoginDriver = d;
+  // ───── タイプ別ログイン処理 ─────
+  if(parsed.type === 'owner'){
+    // 委託会社オーナーログイン
+    const co = (COMPANIES||[]).find(c=>_buildOwnerLoginId(c.companyCode)===parsed.id);
+    if(!co){
+      $('login-err').textContent = '該当する委託会社が見つかりません';
+      $('login-err').style.display = 'block';
+      return;
+    }
+    if(!co.ownerInitialPinHash && !co.ownerPinHash){
+      $('login-err').textContent = 'オーナーPINが未発行です。代表にお問い合わせください';
+      $('login-err').style.display = 'block';
+      return;
+    }
+    // オーナー用PIN画面へ
+    _pendingLoginDriver = {
+      _isOwner: true,
+      id: parsed.id,
+      name: `${co.name} (オーナー)`,
+      companyId: co.id,
+      companyCode: co.companyCode,
+      _company: co,
+    };
+    _loginPin = '';
+    [0,1,2,3,4,5].forEach(i=>{ const el=$('lpd'+i); if(el) el.classList.remove('on'); });
+    if($('pin-login-name')) $('pin-login-name').textContent = co.name + ' オーナー';
+    if($('pin-login-err')) $('pin-login-err').textContent = '';
+    if($('pin-login-hint')){
+      if(!co.ownerPinHash){
+        $('pin-login-hint').textContent = '初期PINを入力してください(代表から配布)';
+      } else {
+        $('pin-login-hint').textContent = '';
+      }
+    }
+    show('scr-pin');
+    return;
+  }
+
+  // 個人直属・委託所属個人・管理者コードは既存ロジック
+  if(parsed.type === 'personal'){
+    const d = DRIVERS.find(x => x.id===parsed.id || x.id===padId || x.id===rawId);
+    if(!d){
+      $('login-err').textContent = '社員番号が見つかりません';
+      $('login-err').style.display = 'block';
+      return;
+    }
+    _pendingLoginDriver = d;
+    _showPinScreen(d);
+    return;
+  }
+
+  // それ以外は現在準備中
+  $('login-err').textContent = 'このIDタイプは現在準備中です';
+  $('login-err').style.display = 'block';
+}
+
+function _showPinScreen(d){
   _loginPin = '';
   [0,1,2,3,4,5].forEach(i=>{
     const el = $('lpd'+i);
@@ -2142,13 +2248,264 @@ async function doLogin(){
   });
   if($('pin-login-name')) $('pin-login-name').textContent = d.name || '';
   if($('pin-login-err')) $('pin-login-err').textContent = '';
-  // PIN未設定(初回)か?
   if(!d.pinHash){
     if($('pin-login-hint')) $('pin-login-hint').textContent = '初期PINを入力してください(管理者から配布)';
   } else {
     if($('pin-login-hint')) $('pin-login-hint').textContent = '';
   }
   show('scr-pin');
+}
+
+// オーナーID生成(mgmt側と同じロジック)
+function _buildOwnerLoginId(companyCode){
+  const code = String(companyCode||'').padStart(5,'0');
+  return '9' + code;
+}
+
+// ══════════════════════════════════════════════════
+// 委託会社オーナー画面 (Step C)
+// ══════════════════════════════════════════════════
+
+let _ownerCompany = null;
+let _ownerMvState = {
+  year: 0, month: 0,
+  tab: 'monthly',
+};
+
+function _completeOwnerLogin(co){
+  _ownerCompany = co;
+  const now = new Date();
+  _ownerMvState.year = now.getFullYear();
+  _ownerMvState.month = now.getMonth();
+  _ownerMvState.tab = 'monthly';
+  if($('co-tb-name')) $('co-tb-name').textContent = co.name + ' (オーナー)';
+  if($('co-tb-sub')) $('co-tb-sub').textContent = `会社コード: ${co.companyCode}`;
+  coSwitchTab('monthly');
+  show('scr-company');
+}
+
+function ownerLogout(){
+  _ownerCompany = null;
+  _pendingLoginDriver = null;
+  _loginPin = '';
+  if($('emp-id')) $('emp-id').value='';
+  show('scr-login');
+}
+
+function coSwitchTab(tab){
+  _ownerMvState.tab = tab;
+  ['monthly','drivers','csv'].forEach(t=>{
+    const view = $('co-view-'+t);
+    const btn  = $('co-tab-'+t+'-btn');
+    if(view) view.style.display = (t===tab)?'':'none';
+    if(btn){
+      btn.style.background = (t===tab) ? 'var(--clay)' : '';
+      btn.style.color = (t===tab) ? '#faf8f5' : '';
+    }
+  });
+  if(tab === 'monthly') _renderOwnerMonthly();
+  else if(tab === 'drivers') _renderOwnerDrivers();
+  else if(tab === 'csv') _renderOwnerCSV();
+}
+
+function coShiftMonth(delta){
+  const d = new Date(_ownerMvState.year, _ownerMvState.month + delta, 1);
+  const now = new Date();
+  if(d > new Date(now.getFullYear(), now.getMonth(), 1)) return;
+  _ownerMvState.year = d.getFullYear();
+  _ownerMvState.month = d.getMonth();
+  _renderOwnerMonthly();
+}
+
+// 会社所属ドライバー一覧
+function _getCompanyDrivers(){
+  if(!_ownerCompany) return [];
+  const coCode = String(_ownerCompany.companyCode||'');
+  return (DRIVERS||[]).filter(d=>{
+    if(d.companyId && String(d.companyId)===String(_ownerCompany.id)) return true;
+    if(d.id && String(d.id).startsWith(coCode+'-')) return true;
+    if(d.driverNo && String(d.driverNo).startsWith(coCode+'-')) return true;
+    return false;
+  });
+}
+
+function _renderOwnerMonthly(){
+  const {year, month} = _ownerMvState;
+  const monLabel = $('co-mon-label');
+  if(monLabel) monLabel.textContent = `${year}年${month+1}月`;
+
+  const drivers = _getCompanyDrivers();
+  const y = year, m = String(month+1).padStart(2,'0');
+  const prefix = `${y}-${m}`;
+
+  const driverStats = drivers.map(drv=>{
+    const yps = (YP_LOGS||[]).filter(r=>r.driver&&r.driver.id===drv.id && r.date && r.date.startsWith(prefix));
+    const cols = (COL_LOGS||[]).filter(r=>r.driver&&r.driver.id===drv.id && r.date && r.date.startsWith(prefix));
+    let delCnt=0, shuCnt=0, colCnt=0, daysSet=new Set();
+    yps.forEach(r=>{
+      const f=r.form||{}, del=f.del||{};
+      delCnt += (del.kanryo||0) + (del.tenso||0);
+      ((f.col&&f.col.companies)||[]).forEach(c=>shuCnt += (c.count||0));
+      if(r.date) daysSet.add(r.date);
+    });
+    cols.forEach(r=>{
+      const b = r.blocks||{};
+      (b.indiv||[]).forEach(x=>Object.values(x.items||{}).forEach(v=>colCnt+=Number(v)||0));
+      (b.route||[]).forEach(rt=>(rt.customers||[]).forEach(c=>Object.values(c.items||{}).forEach(v=>colCnt+=Number(v)||0)));
+      (b.charter||[]).forEach(ch=>colCnt += Number(ch.qty||0));
+      if(r.date) daysSet.add(r.date);
+    });
+    return {drv, delCnt, shuCnt, colCnt, days:daysSet.size};
+  });
+
+  const totals = driverStats.reduce((t,s)=>({
+    del:t.del+s.delCnt, shu:t.shu+s.shuCnt, col:t.col+s.colCnt
+  }), {del:0,shu:0,col:0});
+
+  const allDays = new Set();
+  drivers.forEach(drv=>{
+    (YP_LOGS||[]).filter(r=>r.driver&&r.driver.id===drv.id && r.date && r.date.startsWith(prefix)).forEach(r=>allDays.add(r.date));
+    (COL_LOGS||[]).filter(r=>r.driver&&r.driver.id===drv.id && r.date && r.date.startsWith(prefix)).forEach(r=>allDays.add(r.date));
+  });
+
+  if($('co-total-del')) $('co-total-del').textContent = totals.del.toLocaleString();
+  if($('co-total-shu')) $('co-total-shu').textContent = totals.shu.toLocaleString();
+  if($('co-total-col')) $('co-total-col').textContent = totals.col.toLocaleString();
+  if($('co-workdays')) $('co-workdays').textContent = `稼働 ${allDays.size} 日 / ドライバー ${drivers.length} 名`;
+
+  const rows = $('co-driver-rows');
+  if(!rows) return;
+  if(!driverStats.length){
+    rows.innerHTML = `<div style="padding:16px 8px;text-align:center;color:var(--light);font-size:11px;">所属ドライバーが登録されていません</div>`;
+    return;
+  }
+  driverStats.sort((a,b)=>(b.delCnt+b.shuCnt+b.colCnt) - (a.delCnt+a.shuCnt+a.colCnt));
+  rows.innerHTML = driverStats.map(s=>{
+    const isAdmin = String(s.drv.driverNo||s.drv.id||'').endsWith('-999');
+    return `<div style="padding:8px 4px;border-bottom:1px solid var(--div);display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <div style="font-size:12px;font-weight:700;color:var(--ink);">${isAdmin?'(管理者) ':''}${s.drv.name||'(名前なし)'}</div>
+        <div style="font-size:10px;color:var(--mid);font-family:var(--mono);">${s.drv.id||s.drv.driverNo||'−'}</div>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <div style="text-align:right;min-width:40px;">
+          <div style="font-size:9px;color:var(--mid);">配</div>
+          <div style="font-size:13px;font-weight:700;color:var(--tag-del-fg);">${s.delCnt}</div>
+        </div>
+        <div style="text-align:right;min-width:40px;">
+          <div style="font-size:9px;color:var(--mid);">定</div>
+          <div style="font-size:13px;font-weight:700;color:var(--tag-shu-fg);">${s.shuCnt}</div>
+        </div>
+        <div style="text-align:right;min-width:40px;">
+          <div style="font-size:9px;color:var(--mid);">集</div>
+          <div style="font-size:13px;font-weight:700;color:var(--tag-col-fg);">${s.colCnt}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function _renderOwnerDrivers(){
+  const drivers = _getCompanyDrivers();
+  const list = $('co-driver-list');
+  if(!list) return;
+  if(!drivers.length){
+    list.innerHTML = `<div style="padding:16px 8px;text-align:center;color:var(--light);font-size:11px;">所属ドライバーが登録されていません</div>`;
+    return;
+  }
+  list.innerHTML = drivers.map(d=>{
+    const isAdmin = String(d.driverNo||d.id||'').endsWith('-999');
+    const pinStatus = d.pinHash ? '本人設定済み' : (d.initialPinHash ? '初期PIN発行済み' : 'PIN未発行');
+    const pinColor = d.pinHash ? 'var(--ok)' : (d.initialPinHash ? 'var(--amber)' : 'var(--light)');
+    return `<div style="padding:10px 4px;border-bottom:1px solid var(--div);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+        <div>
+          <div style="font-size:12px;font-weight:700;">${isAdmin?'(管理者) ':''}${d.name||'(名前なし)'}</div>
+          <div style="font-size:10px;color:var(--mid);font-family:var(--mono);">${d.id||d.driverNo||'−'}</div>
+        </div>
+        <div style="font-size:10px;color:${pinColor};font-weight:600;">${pinStatus}</div>
+      </div>
+      <div style="display:flex;gap:5px;margin-top:5px;">
+        <button class="settings-btn" style="font-size:10px;padding:4px 10px;" onclick="ownerResetDriverPin('${d.id||''}')">PINリセット</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function ownerResetDriverPin(driverId){
+  if(!driverId) return;
+  const d = DRIVERS.find(x=>x.id===driverId);
+  if(!d){ alert('ドライバーが見つかりません'); return; }
+  if(!confirm(`${d.name} のPINをリセットして新しい初期PINを発行します。よろしいですか?`)) return;
+  const newPin = _genRandomPin6Local();
+  const hash = await _sha256(newPin);
+  d.initialPinHash = hash;
+  d.initialPinIssuedAt = new Date().toISOString();
+  d.pinHash = null;
+  d.pinInitialized = false;
+  const idx = DRIVERS.findIndex(x=>x.id===driverId);
+  if(idx>=0) DRIVERS[idx] = d;
+  try{ fbSet('drivers', DRIVERS); }catch(e){}
+  try{ ls_set(LS.DRIVERS, DRIVERS); }catch(e){}
+  alert(`${d.name} の初期PIN: ${newPin}\n\nこのPINは一度しか表示されません。ドライバーに直接伝達してください。`);
+  _renderOwnerDrivers();
+}
+
+function _genRandomPin6Local(){
+  let pin;
+  do {
+    pin = String(Math.floor(Math.random()*1000000)).padStart(6,'0');
+  } while(/^(\d)\1+$/.test(pin) || pin==='123456' || pin==='000000');
+  return pin;
+}
+
+function _renderOwnerCSV(){
+  const list = $('co-csv-list');
+  if(!list) return;
+  const now = new Date();
+  const months = [];
+  for(let i=0; i<12; i++){
+    const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+    months.push({year:d.getFullYear(), month:d.getMonth()});
+  }
+  list.innerHTML = months.map(m=>{
+    const label = `${m.year}年${m.month+1}月`;
+    return `<div style="padding:8px 4px;border-bottom:1px solid var(--div);display:flex;justify-content:space-between;align-items:center;">
+      <div style="font-size:12px;font-weight:700;">${label}</div>
+      <button class="settings-btn" style="font-size:10px;padding:4px 12px;" onclick="downloadOwnerCSV(${m.year},${m.month})">ダウンロード</button>
+    </div>`;
+  }).join('');
+}
+
+function downloadOwnerCSV(year, month){
+  const drivers = _getCompanyDrivers();
+  const y = year, mm = String(month+1).padStart(2,'0');
+  const prefix = `${y}-${mm}`;
+  const rows = [];
+  rows.push(['日付','ドライバー名','ID','配達完了','配達転送','定時集荷','集荷事業'].join(','));
+  drivers.forEach(drv=>{
+    (YP_LOGS||[]).filter(r=>r.driver&&r.driver.id===drv.id && r.date && r.date.startsWith(prefix)).forEach(r=>{
+      const f=r.form||{}, del=f.del||{};
+      const shuCnt = ((f.col&&f.col.companies)||[]).reduce((s,c)=>s+(c.count||0),0);
+      rows.push([r.date, drv.name||'', drv.id||'', del.kanryo||0, del.tenso||0, shuCnt, 0].join(','));
+    });
+    (COL_LOGS||[]).filter(r=>r.driver&&r.driver.id===drv.id && r.date && r.date.startsWith(prefix)).forEach(r=>{
+      const b = r.blocks||{};
+      let colCnt = 0;
+      (b.indiv||[]).forEach(x=>Object.values(x.items||{}).forEach(v=>colCnt+=Number(v)||0));
+      (b.route||[]).forEach(rt=>(rt.customers||[]).forEach(c=>Object.values(c.items||{}).forEach(v=>colCnt+=Number(v)||0)));
+      (b.charter||[]).forEach(ch=>colCnt += Number(ch.qty||0));
+      rows.push([r.date, drv.name||'', drv.id||'', 0, 0, 0, colCnt].join(','));
+    });
+  });
+  const csv = '\uFEFF' + rows.join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${_ownerCompany?.name||'委託会社'}_${y}-${mm}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 // PINキーパッド入力
@@ -2179,6 +2536,41 @@ async function _verifyLoginPin(){
 
   const inputHash = await _sha256(_loginPin);
 
+  // ───── オーナーログイン ─────
+  if(d._isOwner){
+    const co = d._company;
+    if(!co){ _onPinFail(); return; }
+
+    // 本人設定済みPIN
+    if(co.ownerPinHash){
+      if(inputHash === co.ownerPinHash){
+        _pinLock.attempts = 0;
+        _completeOwnerLogin(co);
+        return;
+      }
+      _onPinFail();
+      return;
+    }
+    // 初期PIN
+    if(co.ownerInitialPinHash){
+      if(inputHash === co.ownerInitialPinHash){
+        // 強制変更画面へ
+        _initPinNew = '';
+        _initPinConfirm = '';
+        _initPinStep = 'new';
+        [0,1,2,3,4,5].forEach(i=>{ const el=$('ipd'+i); if(el) el.classList.remove('on'); });
+        $('init-pin-err').textContent = '';
+        $('pin-init-step').textContent = '新しいPINを入力';
+        show('scr-pin-init');
+        return;
+      }
+      _onPinFail();
+      return;
+    }
+    _onPinFail();
+    return;
+  }
+
   // PIN変更モード(現PIN確認中)
   if(_isChangingPin && _changePinStep === 'current'){
     if(inputHash === d.pinHash){
@@ -2200,7 +2592,6 @@ async function _verifyLoginPin(){
 
   // 初回ログイン: PIN未設定なら初期PINとして照合
   if(!d.pinHash){
-    // initialPin(平文またはハッシュで配布)と照合
     const initPinHash = d.initialPinHash || (d.initialPin ? await _sha256(d.initialPin) : null);
     if(!initPinHash){
       $('login-pin-err').textContent = '初期PINが未発行です。管理者にお問い合わせください';
@@ -2212,7 +2603,6 @@ async function _verifyLoginPin(){
       return;
     }
     if(inputHash === initPinHash){
-      // 初期PIN一致 → 強制変更画面へ
       _initPinNew = '';
       _initPinConfirm = '';
       _initPinStep = 'new';
@@ -2232,7 +2622,6 @@ async function _verifyLoginPin(){
 
   // 通常のPIN照合
   if(inputHash === d.pinHash){
-    // 成功
     _pinLock.attempts = 0;
     _completeLogin(d);
     return;
@@ -2316,6 +2705,30 @@ async function _processPinInit(){
     $('init-pin-err').textContent = 'エラーが発生しました';
     return;
   }
+
+  // ───── オーナーPIN変更 ─────
+  if(d._isOwner){
+    const co = d._company;
+    co.ownerPinHash = hash;
+    co.ownerPinInitialized = true;
+    co.ownerPinInitializedAt = new Date().toISOString();
+    // COMPANIES配列の対応レコード更新
+    const coIdx = COMPANIES.findIndex(x=>x.id===co.id);
+    if(coIdx>=0){
+      COMPANIES[coIdx].ownerPinHash = hash;
+      COMPANIES[coIdx].ownerPinInitialized = true;
+      COMPANIES[coIdx].ownerPinInitializedAt = co.ownerPinInitializedAt;
+    }
+    if(typeof fbSet === 'function'){
+      try{ fbSet('companies', COMPANIES); }catch(e){}
+    }
+    try{ localStorage.setItem('nikki_companies', JSON.stringify(COMPANIES)); }catch(e){}
+
+    toast && toast('オーナーPINを設定しました');
+    _completeOwnerLogin(co);
+    return;
+  }
+
   d.pinHash = hash;
   d.pinInitialized = true;
   d.pinInitializedAt = new Date().toISOString();
