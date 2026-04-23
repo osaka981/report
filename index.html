@@ -14,18 +14,43 @@
   --clay:#8b6f5e;--sage:#6b7c6a;--slate:#607080;
   --amber:#9a7a3a;--rust:#8b4a3a;--stone:#888078;
   --ok:#5a8a5a;
+  /* 月次確認画面のタグ色(ライト) */
+  --tag-del-bg:#dbeafe; --tag-del-fg:#1e40af;
+  --tag-shu-bg:#ede9fe; --tag-shu-fg:#5b21b6;
+  --tag-col-bg:#d1fae5; --tag-col-fg:#065f46;
+  --cell-active:#fafafa;
+  --day-sat:#2563eb; --day-sun:#e11d48;
   --mono:'Courier Prime',monospace;
   --sans:'Noto Sans JP',sans-serif;
   --sh:0 1px 4px rgba(44,40,37,.08),0 4px 16px rgba(44,40,37,.04);
+  /* 文字サイズ倍率 */
+  --fs-scale:1;
 }
-html,body{min-height:100vh;background:var(--page);font-family:var(--sans);color:var(--ink);}
+/* ダークモード */
+html[data-theme="dark"]{
+  --page:#22211f;--card:#2d2d2b;--inp:#35352f;
+  --ink:#f0eee6;--mid:#a8a097;--light:#736e66;
+  --brd:#3d3d3a;--div:#333330;
+  --clay:#a88972;--sage:#8aa189;--slate:#7d8fa0;
+  --amber:#c79f5a;--rust:#b56a58;--stone:#aaa299;
+  --ok:#8abb8a;
+  /* タグ色(ダーク) */
+  --tag-del-bg:#2d3f5c; --tag-del-fg:#a8c5e8;
+  --tag-shu-bg:#3d3050; --tag-shu-fg:#c5afda;
+  --tag-col-bg:#2d4a3c; --tag-col-fg:#9ec9b0;
+  --cell-active:#37373a;
+  --day-sat:#7bb4f0; --day-sun:#e67a7a;
+  --sh:0 1px 4px rgba(0,0,0,.35),0 4px 16px rgba(0,0,0,.2);
+}
+html,body{min-height:100vh;background:var(--page);font-family:var(--sans);color:var(--ink);font-size:calc(14px * var(--fs-scale));}
 .mb10{margin-bottom:10px;}
 
 /* ══ SECURITY LAYER ══ */
 #sec-layer{
   position:fixed;inset:0;z-index:9000;
   background:#48443f;
-  display:flex;align-items:center;justify-content:center;
+  display:none; /* 個人PIN認証に置き換えたため非表示(管理者用に後日転用) */
+  align-items:center;justify-content:center;
   overflow:hidden;
   transition:transform .55s cubic-bezier(.77,0,.18,1),opacity .4s ease;
 }
@@ -292,6 +317,77 @@ textarea.fi{resize:none;}
 .col-charter-frow{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
 /* モーダル表示切替 */
 #col-del-modal.show,#col-sub-modal.show{display:flex!important;}
+/* ══ ログインPIN画面 ══ */
+.login-pd{width:14px;height:14px;border-radius:50%;border:1.5px solid var(--brd);background:transparent;transition:all .15s;}
+.login-pd.on{background:var(--clay);border-color:var(--clay);}
+.pin-key{padding:15px 0;background:var(--card);border:1px solid var(--brd);border-radius:10px;font-size:20px;font-weight:600;color:var(--ink);cursor:pointer;font-family:var(--mono);transition:transform .1s,background .15s;}
+.pin-key:active{transform:scale(.96);background:var(--inp);}
+.pin-key-ghost{font-size:13px;color:var(--mid);font-weight:500;font-family:var(--sans);}
+.pin-lock-overlay{position:fixed;inset:0;z-index:5000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;}
+.pin-lock-box{background:var(--card);color:var(--ink);border-radius:12px;padding:24px 28px;text-align:center;max-width:280px;}
+
+/* ══ 月次確認画面 ══ */
+.mv-toggle{display:flex;gap:3px;background:var(--inp);padding:3px;border-radius:7px;margin-bottom:10px;}
+.mv-toggle-btn{flex:1;padding:7px 0;border:none;background:transparent;font-size:11.5px;font-weight:700;border-radius:5px;cursor:pointer;color:var(--mid);font-family:var(--sans);}
+.mv-toggle-btn.on{background:var(--card);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.06);}
+
+.mv-month-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.mv-mn-btn{background:transparent;border:none;font-size:20px;color:var(--mid);cursor:pointer;padding:4px 10px;}
+.mv-mn-label{font-size:14px;font-weight:700;color:var(--ink);}
+
+.mv-sum-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:6px;}
+.mv-sum-box{background:var(--card);border:1px solid var(--brd);border-radius:7px;padding:7px 8px;text-align:center;}
+.mv-sum-lbl{font-size:9.5px;color:var(--mid);font-weight:600;margin-bottom:3px;}
+.mv-sum-val{font-size:16px;font-weight:700;color:var(--ink);font-family:var(--mono);}
+.mv-sum-val.del{color:var(--tag-del-fg);}
+.mv-sum-val.shu{color:var(--tag-shu-fg);}
+.mv-sum-val.col{color:var(--tag-col-fg);}
+.mv-workdays{text-align:center;font-size:10px;color:var(--mid);margin-bottom:10px;font-family:var(--mono);}
+
+/* カレンダー */
+.mv-cal-head{display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:2px;}
+.mv-cal-head div{text-align:center;font-size:10px;font-weight:500;color:var(--light);padding:4px 0;}
+.mv-cal-head .sat{color:var(--day-sat);}
+.mv-cal-head .sun{color:var(--day-sun);}
+.mv-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--brd);}
+.mv-cal-cell{background:var(--card);padding:3px 4px;min-height:64px;font-size:9.5px;cursor:pointer;display:flex;flex-direction:column;gap:1px;border:1.5px solid transparent;}
+.mv-cal-cell.empty{background:var(--page);opacity:.5;}
+.mv-cal-cell.active{background:var(--cell-active);}
+.mv-cal-cell.today .mv-day-num{background:var(--ink);color:var(--page);border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;}
+.mv-cal-cell.selected{border-color:var(--clay);}
+.mv-day-num{font-weight:600;font-size:11px;color:var(--ink);padding:1px 2px;}
+.mv-cal-cell.sat .mv-day-num{color:var(--day-sat);}
+.mv-cal-cell.sun .mv-day-num,.mv-cal-cell.holi .mv-day-num{color:var(--day-sun);}
+.mv-cal-tag{display:block;padding:1px 4px;border-radius:3px;font-size:9px;font-weight:600;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.mv-tag-del{background:var(--tag-del-bg);color:var(--tag-del-fg);}
+.mv-tag-shu{background:var(--tag-shu-bg);color:var(--tag-shu-fg);}
+.mv-tag-col{background:var(--tag-col-bg);color:var(--tag-col-fg);}
+.mv-holi-txt{font-size:8.5px;color:var(--day-sun);line-height:1.2;}
+
+/* 日詳細 */
+.mv-day-detail{background:var(--card);border:1px solid var(--brd);border-radius:8px;padding:10px 12px;margin-top:10px;}
+.mv-dd-head{font-size:12px;font-weight:700;padding-bottom:5px;border-bottom:1px solid var(--brd);margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;}
+.mv-dd-close{background:var(--inp);border:none;width:22px;height:22px;border-radius:50%;cursor:pointer;font-size:12px;color:var(--mid);}
+.mv-dd-sec{margin-top:6px;}
+.mv-dd-sec-title{font-size:10px;font-weight:700;padding:3px 7px;border-radius:3px;display:inline-block;margin-bottom:4px;}
+.mv-dd-sec-title.del{background:var(--tag-del-bg);color:var(--tag-del-fg);}
+.mv-dd-sec-title.shu{background:var(--tag-shu-bg);color:var(--tag-shu-fg);}
+.mv-dd-sec-title.col{background:var(--tag-col-bg);color:var(--tag-col-fg);}
+.mv-dd-row{display:flex;justify-content:space-between;padding:1.5px 0;font-size:10.5px;color:var(--ink);}
+.mv-dd-row-sub{padding-left:10px;font-size:10px;color:var(--mid);}
+.mv-dd-total{font-weight:700;color:var(--ink);}
+
+/* リストビュー: カレンダーの日詳細と同じカードを縦に羅列 */
+.mv-list-card{background:var(--card);border:1px solid var(--brd);border-radius:8px;padding:10px 12px;margin-bottom:8px;}
+
+/* 設定画面: セグメント */
+.st-seg{display:flex;gap:3px;background:var(--inp);padding:3px;border-radius:7px;}
+.st-seg-btn{flex:1;padding:8px 0;border:none;background:transparent;font-size:12px;font-weight:700;border-radius:5px;cursor:pointer;color:var(--mid);font-family:var(--sans);}
+.st-seg-btn.on{background:var(--card);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.06);}
+
+/* トップ画面からの設定ボタン */
+.settings-btn{background:transparent;border:1px solid var(--brd);border-radius:6px;padding:5px 10px;font-size:10px;color:var(--mid);cursor:pointer;}
+
 </style>
 <link rel="manifest" href="./manifest-app.json">
 <link rel="apple-touch-icon" href="./icon-app-192.png">
@@ -462,12 +558,102 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
   </div>
 </div>
 
+<!-- ══ PIN入力画面(個人認証) ══ -->
+<div id="scr-pin" class="screen">
+  <div class="topbar">
+    <button class="back-btn" onclick="cancelPinLogin()"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>戻る</button>
+    <div class="tb-title" style="color:var(--clay);">PIN認証</div>
+    <div class="tb-sub" id="pin-login-name"></div>
+  </div>
+  <div class="p16">
+    <div class="card mb12">
+      <div style="text-align:center;margin-bottom:14px;">
+        <div style="display:inline-flex;align-items:center;justify-content:center;width:54px;height:54px;border-radius:14px;background:rgba(139,111,94,.13);margin-bottom:9px;">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--clay)" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </div>
+        <div style="font-size:15px;font-weight:700;" id="pin-login-subtitle">PINコード6桁を入力</div>
+        <div style="color:var(--light);font-size:10.5px;margin-top:2px;" id="pin-login-hint"></div>
+      </div>
+
+      <!-- PINドット -->
+      <div id="login-pin-dots" style="display:flex;justify-content:center;gap:10px;margin:12px 0 6px;">
+        <div class="login-pd" id="lpd0"></div><div class="login-pd" id="lpd1"></div><div class="login-pd" id="lpd2"></div>
+        <div class="login-pd" id="lpd3"></div><div class="login-pd" id="lpd4"></div><div class="login-pd" id="lpd5"></div>
+      </div>
+
+      <div id="login-pin-err" style="text-align:center;color:var(--rust);font-size:11px;min-height:16px;margin-bottom:6px;"></div>
+
+      <!-- 数字キーパッド -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px;">
+        <button class="pin-key" onclick="loginPinKey('1')">1</button>
+        <button class="pin-key" onclick="loginPinKey('2')">2</button>
+        <button class="pin-key" onclick="loginPinKey('3')">3</button>
+        <button class="pin-key" onclick="loginPinKey('4')">4</button>
+        <button class="pin-key" onclick="loginPinKey('5')">5</button>
+        <button class="pin-key" onclick="loginPinKey('6')">6</button>
+        <button class="pin-key" onclick="loginPinKey('7')">7</button>
+        <button class="pin-key" onclick="loginPinKey('8')">8</button>
+        <button class="pin-key" onclick="loginPinKey('9')">9</button>
+        <button class="pin-key pin-key-ghost" onclick="loginPinForget()">忘れた</button>
+        <button class="pin-key" onclick="loginPinKey('0')">0</button>
+        <button class="pin-key pin-key-ghost" onclick="loginPinKey('DEL')">⌫</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ PIN初期設定画面(初回ログイン時の強制変更) ══ -->
+<div id="scr-pin-init" class="screen">
+  <div class="topbar">
+    <div class="tb-title" style="color:var(--clay);">初期PIN変更</div>
+    <div class="tb-sub">新しいPINコードを設定してください</div>
+  </div>
+  <div class="p16">
+    <div class="card mb12">
+      <div style="background:rgba(230,160,60,.08);border:1px solid rgba(230,160,60,.3);border-radius:6px;padding:10px;margin-bottom:12px;font-size:11px;color:var(--amber);">
+        セキュリティのため、初期PINから自分専用のPINに変更してください。<br>
+        他人に推測されにくい6桁の数字を選んでください。
+      </div>
+
+      <div style="text-align:center;margin-bottom:10px;">
+        <div id="pin-init-step" style="font-size:12px;font-weight:700;color:var(--ink);">新しいPINを入力</div>
+      </div>
+
+      <div id="init-pin-dots" style="display:flex;justify-content:center;gap:10px;margin:12px 0 6px;">
+        <div class="login-pd" id="ipd0"></div><div class="login-pd" id="ipd1"></div><div class="login-pd" id="ipd2"></div>
+        <div class="login-pd" id="ipd3"></div><div class="login-pd" id="ipd4"></div><div class="login-pd" id="ipd5"></div>
+      </div>
+
+      <div id="init-pin-err" style="text-align:center;color:var(--rust);font-size:11px;min-height:16px;margin-bottom:6px;"></div>
+
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px;">
+        <button class="pin-key" onclick="initPinKey('1')">1</button>
+        <button class="pin-key" onclick="initPinKey('2')">2</button>
+        <button class="pin-key" onclick="initPinKey('3')">3</button>
+        <button class="pin-key" onclick="initPinKey('4')">4</button>
+        <button class="pin-key" onclick="initPinKey('5')">5</button>
+        <button class="pin-key" onclick="initPinKey('6')">6</button>
+        <button class="pin-key" onclick="initPinKey('7')">7</button>
+        <button class="pin-key" onclick="initPinKey('8')">8</button>
+        <button class="pin-key" onclick="initPinKey('9')">9</button>
+        <button class="pin-key pin-key-ghost" style="visibility:hidden;"></button>
+        <button class="pin-key" onclick="initPinKey('0')">0</button>
+        <button class="pin-key pin-key-ghost" onclick="initPinKey('DEL')">⌫</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- 事業選択（個人ページ兼用） -->
 <div id="scr-select" class="screen">
   <div class="topbar">
     <div class="tb-eye">軽貨物運送　日報システム</div>
     <div id="sel-name" class="tb-title" style="color:var(--clay)"></div>
     <div id="sel-sub" class="tb-sub"></div>
+    <div style="display:flex;gap:6px;margin-top:6px;">
+      <button class="settings-btn" onclick="openMonthlyView()" style="flex:1;">月次確認</button>
+      <button class="settings-btn" onclick="openSettings()">設定</button>
+    </div>
   </div>
   <div class="p16">
     <div style="color:var(--light);font-size:9.5px;font-family:var(--mono);margin-bottom:10px;text-align:center;" id="sel-date"></div>
@@ -781,6 +967,87 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
     <div style="display:flex;gap:7px;"><button class="btn-main btn-ghost" onclick="doEdit()" style="flex:1;font-size:12px;display:flex;align-items:center;justify-content:center;gap:4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>修正</button><button class="btn-main" onclick="goTop()" style="flex:2;background:var(--ok);color:#faf8f5;font-size:12px;">トップへ戻る</button></div>
   </div>
 </div>
+
+<!-- ══ 月次確認画面 ══ -->
+<div id="scr-monthly" class="screen">
+  <div class="topbar">
+    <button class="back-btn" onclick="goBack()"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>戻る</button>
+    <div class="tb-title">月次確認</div>
+    <div class="tb-sub" id="mv-name"></div>
+  </div>
+  <div class="p16">
+    <!-- ビュー切替 -->
+    <div class="mv-toggle">
+      <button id="mv-tab-cal" class="mv-toggle-btn on" onclick="switchMvView('cal')">カレンダー</button>
+      <button id="mv-tab-list" class="mv-toggle-btn" onclick="switchMvView('list')">リスト</button>
+    </div>
+
+    <!-- 月選択 -->
+    <div class="mv-month-nav">
+      <button class="mv-mn-btn" onclick="mvShiftMonth(-1)">&lsaquo;</button>
+      <div class="mv-mn-label" id="mv-mon-label">2026年4月</div>
+      <button class="mv-mn-btn" onclick="mvShiftMonth(1)">&rsaquo;</button>
+    </div>
+
+    <!-- 月合計 -->
+    <div class="mv-sum-grid">
+      <div class="mv-sum-box"><div class="mv-sum-lbl">配達</div><div class="mv-sum-val del" id="mv-total-del">0</div></div>
+      <div class="mv-sum-box"><div class="mv-sum-lbl">定時集荷</div><div class="mv-sum-val shu" id="mv-total-shu">0</div></div>
+      <div class="mv-sum-box"><div class="mv-sum-lbl">集荷事業</div><div class="mv-sum-val col" id="mv-total-col">0</div></div>
+    </div>
+    <div class="mv-workdays" id="mv-workdays">稼働 0 日</div>
+
+    <!-- カレンダー表示 -->
+    <div id="mv-view-cal" class="mv-view">
+      <div class="mv-cal-head">
+        <div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="sat">土</div><div class="sun">日</div>
+      </div>
+      <div class="mv-cal-grid" id="mv-cal-grid"></div>
+      <!-- 日付タップで展開する詳細 -->
+      <div id="mv-day-detail" class="mv-day-detail" style="display:none;"></div>
+    </div>
+
+    <!-- リスト表示 -->
+    <div id="mv-view-list" class="mv-view" style="display:none;">
+      <div id="mv-list-wrap"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ 設定画面 ══ -->
+<div id="scr-settings" class="screen">
+  <div class="topbar">
+    <button class="back-btn" onclick="goBack()"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>戻る</button>
+    <div class="tb-title">設定</div>
+  </div>
+  <div class="p16">
+    <!-- テーマ -->
+    <div class="card mb10">
+      <div class="lbl">テーマ</div>
+      <div class="st-seg">
+        <button class="st-seg-btn" data-theme="auto" onclick="setTheme('auto')">自動</button>
+        <button class="st-seg-btn" data-theme="light" onclick="setTheme('light')">ライト</button>
+        <button class="st-seg-btn" data-theme="dark" onclick="setTheme('dark')">ダーク</button>
+      </div>
+    </div>
+    <!-- 文字サイズ -->
+    <div class="card mb10">
+      <div class="lbl">文字サイズ</div>
+      <div class="st-seg">
+        <button class="st-seg-btn" data-fs="0.9" onclick="setFontScale(0.9)">小</button>
+        <button class="st-seg-btn on" data-fs="1" onclick="setFontScale(1)">標準</button>
+        <button class="st-seg-btn" data-fs="1.15" onclick="setFontScale(1.15)">大</button>
+        <button class="st-seg-btn" data-fs="1.3" onclick="setFontScale(1.3)">特大</button>
+      </div>
+    </div>
+    <!-- PIN変更 -->
+    <div class="card mb10">
+      <div class="lbl">PINコード変更</div>
+      <button class="btn-main btn-ghost" style="font-size:12px;" onclick="startChangePin()">PINを変更する</button>
+    </div>
+  </div>
+</div>
+
 </div><!-- .app -->
 
 <!-- ══ 管理画面モーダル（画面中央） ══ -->
@@ -1458,55 +1725,8 @@ function getDriverOfficeCoord(d){
 
 // ══ ログイン ══
 let todayAttId = null; // 本日の勤怠ID
-function doLogin(){
-  const rawId=$('emp-id').value.trim();
-  // 先頭0省略入力に対応（例：6036→06036）
-  const padId = rawId.length===4 ? '0'+rawId : rawId;
-  const d=DRIVERS.find(x=>x.id===rawId||x.id===padId);
-  if(!d){$('login-err').textContent='社員番号が見つかりません';$('login-err').style.display='block';return;}
-  const id=d.id;
-  driver=d;
-  const now=new Date();
-  const dt=now.toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric',weekday:'short'});
-  $('sel-name').textContent=`${d.name} さん`; $('sel-sub').textContent=`${d.office}　ID: ${d.id}`; $('sel-date').textContent=dt;
-  // 当日の既存勤怠チェック（再ログイン時）
-  const todayStr=now.toISOString().slice(0,10);
-  ATT_LOGS=ls_get(LS.ATT_LOGS,[]);
-  const existing=ATT_LOGS.find(a=>a.driverId===d.id&&a.date===todayStr&&!a.clockOut);
-  if(existing){
-    todayAttId=existing.id;
-    const ci=new Date(existing.clockIn);
-    $('sel-clock-in').textContent=`出勤: ${ci.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}`;
-    $('sel-clock-in').style.display='block';
-  } else {
-    // 新規出勤記録
-    const att={id:Date.now(),driverId:d.id,driverName:d.name,date:todayStr,
-      clockIn:now.toISOString(),clockInGps:null,clockOut:null,clockOutGps:null,
-      adjustedOut:null,workMin:null,kyuyo:d.kyuyo||'個数制（歩合）'};
-    todayAttId=att.id;
-    // GPS取得（バックグラウンド）
-    if(navigator.geolocation){
-      navigator.geolocation.getCurrentPosition(pos=>{
-        att.clockInGps={lat:pos.coords.latitude,lng:pos.coords.longitude,acc:pos.coords.accuracy};
-        const idx=ATT_LOGS.findIndex(a=>a.id===att.id);
-        if(idx>=0){ATT_LOGS[idx]=att;}
-        fbSet('att_logs',ATT_LOGS);
-      },()=>{},{timeout:8000,maximumAge:0});
-    }
-    ATT_LOGS.push(att);
-    fbSet('att_logs',ATT_LOGS);
-    $('sel-clock-in').textContent=`出勤: ${now.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}`;
-    $('sel-clock-in').style.display='block';
-  }
-  // パートはbiz-areaを非表示
-  const isP=attType(d)==='part';
-  $('sel-biz-area').style.display=isP?'none':'block';
-  // 当月実績を集計
-  renderPersonalStats(d);
-  show('scr-select');
-}
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&$('scr-login').classList.contains('on'))doLogin();});
-function doLogout(){driver=null;todayAttId=null;clockOutGps=null;$('emp-id').value='';show('scr-login');secReset();}
+function doLogout(){driver=null;todayAttId=null;clockOutGps=null;$('emp-id').value='';_pendingLoginDriver=null;_loginPin='';show('scr-login');}
 function goTop(){renderPersonalStats(driver);show('scr-select');}
 function goBack(){renderPersonalStats(driver);show('scr-select');}
 
@@ -1790,6 +2010,849 @@ function renderPersonalStats(d){
   $('stat-work-days').textContent=days||'0';
   renderHistoryList(d);
 }
+
+// ══════════════════════════════════════════════════
+// PIN認証システム (Step A: 個人直属IDのみ対応の試作版)
+// ══════════════════════════════════════════════════
+
+// SHA-256ハッシュ関数
+async function _sha256(str){
+  const buf = new TextEncoder().encode(str);
+  const hash = await crypto.subtle.digest('SHA-256', buf);
+  return Array.from(new Uint8Array(hash)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+// 6桁ランダムPIN生成
+function _genRandomPin(){
+  return String(Math.floor(Math.random()*1000000)).padStart(6,'0');
+}
+
+// ID形式判定(ハイフン正規化含む)
+function _parseLoginId(raw){
+  if(!raw) return null;
+  const trimmed = raw.trim().toUpperCase();
+  // ハイフンを除去して数字のみ
+  const clean = trimmed.replace(/[-\s]/g,'');
+  if(!/^\d+$/.test(clean)) return null;
+
+  // 6桁先頭9: オーナー(将来対応、今は弾く)
+  if(clean.length===6 && clean.startsWith('9')){
+    return {type:'owner', companyCode:clean.slice(1), id:clean};
+  }
+
+  // 7桁: 委託会社所属個人 or 管理者コード(将来対応)
+  if(clean.length===7){
+    const code = clean.slice(0,5);
+    const sub  = clean.slice(5);
+    const normalized = `${code}-${sub}`;
+    if(sub==='99') return {type:'company_admin', companyCode:code, id:normalized};
+    return {type:'company_driver_individual', id:normalized};
+  }
+
+  // 5桁(先頭1): 委託会社共通コード(将来対応)
+  if(clean.length===5 && clean.startsWith('1')){
+    return {type:'company_shared', id:clean};
+  }
+
+  // 4〜5桁: 個人直属
+  if(clean.length>=4 && clean.length<=5){
+    return {type:'personal', id:clean};
+  }
+
+  return null;
+}
+
+// ログインロック状態管理
+let _pinLock = {
+  attempts: 0,
+  lockedUntil: 0,
+};
+
+function _isPinLocked(){
+  return Date.now() < _pinLock.lockedUntil;
+}
+
+function _getLockRemainSec(){
+  return Math.ceil((_pinLock.lockedUntil - Date.now())/1000);
+}
+
+function _lockPin(){
+  _pinLock.lockedUntil = Date.now() + 30000; // 30秒
+  _pinLock.attempts = 0;
+}
+
+// Step 1: 社員番号入力 → ID判定 → PIN画面へ
+let _pendingLoginDriver = null;
+let _loginPin = '';
+
+async function doLogin(){
+  const rawId = $('emp-id').value.trim();
+  // 先頭0省略入力に対応(例:6036→06036)
+  const padId = rawId.length===4 ? '0'+rawId : rawId;
+
+  // ID形式判定
+  const parsed = _parseLoginId(rawId) || _parseLoginId(padId);
+  if(!parsed){
+    $('login-err').textContent = '社員番号の形式が正しくありません';
+    $('login-err').style.display = 'block';
+    return;
+  }
+
+  // Step Aでは個人直属のみ対応
+  if(parsed.type !== 'personal'){
+    $('login-err').textContent = 'このIDタイプは現在準備中です(個人直属のみ対応)';
+    $('login-err').style.display = 'block';
+    return;
+  }
+
+  // ドライバー検索
+  const d = DRIVERS.find(x => x.id===parsed.id || x.id===padId || x.id===rawId);
+  if(!d){
+    $('login-err').textContent = '社員番号が見つかりません';
+    $('login-err').style.display = 'block';
+    return;
+  }
+
+  // ロック中?
+  if(_isPinLocked()){
+    $('login-err').textContent = `ロック中: あと${_getLockRemainSec()}秒お待ちください`;
+    $('login-err').style.display = 'block';
+    return;
+  }
+
+  // PIN認証画面へ
+  _pendingLoginDriver = d;
+  _loginPin = '';
+  [0,1,2,3,4,5].forEach(i=>{
+    const el = $('lpd'+i);
+    if(el) el.classList.remove('on');
+  });
+  if($('pin-login-name')) $('pin-login-name').textContent = d.name || '';
+  if($('pin-login-err')) $('pin-login-err').textContent = '';
+  // PIN未設定(初回)か?
+  if(!d.pinHash){
+    if($('pin-login-hint')) $('pin-login-hint').textContent = '初期PINを入力してください(管理者から配布)';
+  } else {
+    if($('pin-login-hint')) $('pin-login-hint').textContent = '';
+  }
+  show('scr-pin');
+}
+
+// PINキーパッド入力
+async function loginPinKey(k){
+  if(_isPinLocked()){
+    $('login-pin-err').textContent = `ロック中: あと${_getLockRemainSec()}秒`;
+    return;
+  }
+  if(k==='DEL'){
+    _loginPin = _loginPin.slice(0,-1);
+  } else if(_loginPin.length < 6){
+    _loginPin += k;
+  }
+  [0,1,2,3,4,5].forEach(i=>{
+    const el = $('lpd'+i);
+    if(el) el.classList.toggle('on', i < _loginPin.length);
+  });
+  $('login-pin-err').textContent = '';
+
+  if(_loginPin.length === 6){
+    setTimeout(()=>_verifyLoginPin(), 100);
+  }
+}
+
+async function _verifyLoginPin(){
+  const d = _pendingLoginDriver;
+  if(!d) return;
+
+  const inputHash = await _sha256(_loginPin);
+
+  // PIN変更モード(現PIN確認中)
+  if(_isChangingPin && _changePinStep === 'current'){
+    if(inputHash === d.pinHash){
+      // 正しい現PIN → 新PIN設定画面へ
+      _changePinCurrent = _loginPin;
+      _initPinNew = '';
+      _initPinConfirm = '';
+      _initPinStep = 'new';
+      [0,1,2,3,4,5].forEach(i=>{ const el=$('ipd'+i); if(el) el.classList.remove('on'); });
+      $('pin-init-step').textContent = '新しいPINを入力';
+      $('init-pin-err').textContent = '';
+      show('scr-pin-init');
+      return;
+    } else {
+      _onPinFail();
+      return;
+    }
+  }
+
+  // 初回ログイン: PIN未設定なら初期PINとして照合
+  if(!d.pinHash){
+    // initialPin(平文またはハッシュで配布)と照合
+    const initPinHash = d.initialPinHash || (d.initialPin ? await _sha256(d.initialPin) : null);
+    if(!initPinHash){
+      $('login-pin-err').textContent = '初期PINが未発行です。管理者にお問い合わせください';
+      _loginPin = '';
+      [0,1,2,3,4,5].forEach(i=>{
+        const el = $('lpd'+i);
+        if(el) el.classList.remove('on');
+      });
+      return;
+    }
+    if(inputHash === initPinHash){
+      // 初期PIN一致 → 強制変更画面へ
+      _initPinNew = '';
+      _initPinConfirm = '';
+      _initPinStep = 'new';
+      [0,1,2,3,4,5].forEach(i=>{
+        const el = $('ipd'+i);
+        if(el) el.classList.remove('on');
+      });
+      $('init-pin-err').textContent = '';
+      $('pin-init-step').textContent = '新しいPINを入力';
+      show('scr-pin-init');
+      return;
+    } else {
+      _onPinFail();
+      return;
+    }
+  }
+
+  // 通常のPIN照合
+  if(inputHash === d.pinHash){
+    // 成功
+    _pinLock.attempts = 0;
+    _completeLogin(d);
+    return;
+  }
+
+  _onPinFail();
+}
+
+function _onPinFail(){
+  _pinLock.attempts++;
+  _loginPin = '';
+  [0,1,2,3,4,5].forEach(i=>{
+    const el = $('lpd'+i);
+    if(el) el.classList.remove('on');
+  });
+  if(_pinLock.attempts >= 3){
+    _lockPin();
+    $('login-pin-err').textContent = `3回失敗しました。30秒ロック`;
+    setTimeout(()=>{ if(!_isPinLocked()) $('login-pin-err').textContent = ''; }, 30000);
+  } else {
+    $('login-pin-err').textContent = `PINが違います(残り${3-_pinLock.attempts}回)`;
+  }
+}
+
+// 初期PIN変更画面の状態
+let _initPinNew = '';
+let _initPinConfirm = '';
+let _initPinStep = 'new'; // 'new' or 'confirm'
+
+function initPinKey(k){
+  const current = _initPinStep==='new' ? _initPinNew : _initPinConfirm;
+  let val = current;
+  if(k==='DEL') val = val.slice(0,-1);
+  else if(val.length < 6) val += k;
+
+  if(_initPinStep==='new') _initPinNew = val;
+  else _initPinConfirm = val;
+
+  [0,1,2,3,4,5].forEach(i=>{
+    const el = $('ipd'+i);
+    if(el) el.classList.toggle('on', i < val.length);
+  });
+  $('init-pin-err').textContent = '';
+
+  if(val.length === 6){
+    setTimeout(()=>_processPinInit(), 120);
+  }
+}
+
+async function _processPinInit(){
+  if(_initPinStep==='new'){
+    // 弱いPINチェック
+    if(/^(\d)\1+$/.test(_initPinNew) || _initPinNew==='123456' || _initPinNew==='000000'){
+      $('init-pin-err').textContent = 'このPINは推測されやすいです。別のPINにしてください';
+      _initPinNew = '';
+      [0,1,2,3,4,5].forEach(i=>{ const el=$('ipd'+i); if(el) el.classList.remove('on'); });
+      return;
+    }
+    _initPinStep = 'confirm';
+    _initPinConfirm = '';
+    [0,1,2,3,4,5].forEach(i=>{ const el=$('ipd'+i); if(el) el.classList.remove('on'); });
+    $('pin-init-step').textContent = '確認のためもう一度入力';
+    return;
+  }
+
+  // confirm
+  if(_initPinNew !== _initPinConfirm){
+    $('init-pin-err').textContent = 'PINが一致しません。最初からやり直します';
+    _initPinNew = '';
+    _initPinConfirm = '';
+    _initPinStep = 'new';
+    [0,1,2,3,4,5].forEach(i=>{ const el=$('ipd'+i); if(el) el.classList.remove('on'); });
+    $('pin-init-step').textContent = '新しいPINを入力';
+    return;
+  }
+
+  // 保存
+  const hash = await _sha256(_initPinNew);
+  const d = _pendingLoginDriver;
+  if(!d){
+    $('init-pin-err').textContent = 'エラーが発生しました';
+    return;
+  }
+  d.pinHash = hash;
+  d.pinInitialized = true;
+  d.pinInitializedAt = new Date().toISOString();
+
+  // DRIVERS配列の対応レコードを更新
+  const idx = DRIVERS.findIndex(x=>x.id===d.id);
+  if(idx>=0){
+    DRIVERS[idx].pinHash = hash;
+    DRIVERS[idx].pinInitialized = true;
+    DRIVERS[idx].pinInitializedAt = d.pinInitializedAt;
+  }
+  // Firebase同期
+  if(typeof fbSet === 'function'){
+    try{ fbSet('drivers', DRIVERS); }catch(e){}
+  }
+  // localStorage
+  try{ ls_set(LS.DRIVERS, DRIVERS); }catch(e){}
+
+  toast && toast('PINを設定しました');
+  if(_isChangingPin){
+    // PIN変更モード → 設定画面へ戻る
+    _isChangingPin = false;
+    _changePinStep = 'current';
+    _changePinCurrent = '';
+    _pendingLoginDriver = null;
+    show('scr-settings');
+    return;
+  }
+  _completeLogin(d);
+}
+
+// ログイン完了処理(旧doLoginの後半を分離)
+function _completeLogin(d){
+  driver = d;
+  const now = new Date();
+  const dt = now.toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric',weekday:'short'});
+  $('sel-name').textContent = `${d.name} さん`;
+  $('sel-sub').textContent = `${d.office}　ID: ${d.id}`;
+  $('sel-date').textContent = dt;
+  // 当日の既存勤怠チェック(再ログイン時)
+  const todayStr = now.toISOString().slice(0,10);
+  ATT_LOGS = ls_get(LS.ATT_LOGS,[]);
+  const existing = ATT_LOGS.find(a=>a.driverId===d.id && a.date===todayStr && !a.clockOut);
+  if(existing){
+    todayAttId = existing.id;
+    const ci = new Date(existing.clockIn);
+    $('sel-clock-in').textContent = `出勤: ${ci.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}`;
+    $('sel-clock-in').style.display = 'block';
+  } else {
+    // 新規出勤記録
+    const att = {id:Date.now(), driverId:d.id, driverName:d.name, date:todayStr,
+      clockIn:now.toISOString(), clockInGps:null, clockOut:null, clockOutGps:null,
+      adjustedOut:null, workMin:null, kyuyo:d.kyuyo||'個数制（歩合）'};
+    todayAttId = att.id;
+    if(navigator.geolocation){
+      navigator.geolocation.getCurrentPosition(pos=>{
+        att.clockInGps = {lat:pos.coords.latitude, lng:pos.coords.longitude, acc:pos.coords.accuracy};
+        const i = ATT_LOGS.findIndex(a=>a.id===att.id);
+        if(i>=0){ATT_LOGS[i] = att;}
+        fbSet('att_logs', ATT_LOGS);
+      },()=>{}, {timeout:8000, maximumAge:0});
+    }
+    ATT_LOGS.push(att);
+    fbSet('att_logs', ATT_LOGS);
+    $('sel-clock-in').textContent = `出勤: ${now.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}`;
+    $('sel-clock-in').style.display = 'block';
+  }
+  // パートはbiz-areaを非表示
+  const isP = attType(d)==='part';
+  $('sel-biz-area').style.display = isP?'none':'block';
+  // 当月実績を集計
+  renderPersonalStats(d);
+  show('scr-select');
+}
+
+// PIN画面から戻る
+function cancelPinLogin(){
+  _pendingLoginDriver = null;
+  _loginPin = '';
+  [0,1,2,3,4,5].forEach(i=>{ const el=$('lpd'+i); if(el) el.classList.remove('on'); });
+  show('scr-login');
+}
+
+// PIN忘れた
+function loginPinForget(){
+  alert('管理者(代表)にPIN再発行を依頼してください。\n電話: 080-XXXX-XXXX');
+}
+
+// 設定画面からのPIN変更
+// 現在のPIN → 新PIN → 確認 という3段階
+function startChangePin(){
+  if(!driver){ show('scr-login'); return; }
+  // 初期PIN変更画面を再利用: まず現PIN確認 → 新PIN設定
+  // シンプルに、ログアウトせず直接scr-pinに一度飛ばし、確認フロー開始
+  alert('現在のPINを入力してください');
+  _changePinStep = 'current';
+  _changePinCurrent = '';
+  _pendingLoginDriver = driver;
+  _loginPin = '';
+  [0,1,2,3,4,5].forEach(i=>{ const el=$('lpd'+i); if(el) el.classList.remove('on'); });
+  if($('pin-login-name')) $('pin-login-name').textContent = driver.name || '';
+  if($('pin-login-subtitle')) $('pin-login-subtitle').textContent = '現在のPINを入力';
+  if($('pin-login-hint')) $('pin-login-hint').textContent = 'PIN変更のため現在のPINが必要です';
+  _isChangingPin = true;
+  show('scr-pin');
+}
+
+let _isChangingPin = false;
+let _changePinStep = 'current';
+let _changePinCurrent = '';
+
+// ══════════════════════════════════════════════════
+
+// 日本の祝日(2025-2027分、必要に応じて追加)
+const HOLIDAYS_JP = {
+  '2025-01-01':'元日','2025-01-13':'成人の日','2025-02-11':'建国記念の日',
+  '2025-02-23':'天皇誕生日','2025-02-24':'振替休日','2025-03-20':'春分の日',
+  '2025-04-29':'昭和の日','2025-05-03':'憲法記念日','2025-05-04':'みどりの日',
+  '2025-05-05':'こどもの日','2025-05-06':'振替休日','2025-07-21':'海の日',
+  '2025-08-11':'山の日','2025-09-15':'敬老の日','2025-09-23':'秋分の日',
+  '2025-10-13':'スポーツの日','2025-11-03':'文化の日','2025-11-23':'勤労感謝の日',
+  '2025-11-24':'振替休日','2026-01-01':'元日','2026-01-12':'成人の日',
+  '2026-02-11':'建国記念の日','2026-02-23':'天皇誕生日','2026-03-20':'春分の日',
+  '2026-04-29':'昭和の日','2026-05-03':'憲法記念日','2026-05-04':'みどりの日',
+  '2026-05-05':'こどもの日','2026-05-06':'振替休日','2026-07-20':'海の日',
+  '2026-08-11':'山の日','2026-09-21':'敬老の日','2026-09-22':'国民の休日',
+  '2026-09-23':'秋分の日','2026-10-12':'スポーツの日','2026-11-03':'文化の日',
+  '2026-11-23':'勤労感謝の日',
+  '2027-01-01':'元日','2027-01-11':'成人の日','2027-02-11':'建国記念の日',
+  '2027-02-23':'天皇誕生日','2027-03-21':'春分の日','2027-03-22':'振替休日',
+  '2027-04-29':'昭和の日','2027-05-03':'憲法記念日','2027-05-04':'みどりの日',
+  '2027-05-05':'こどもの日','2027-07-19':'海の日','2027-08-11':'山の日',
+  '2027-09-20':'敬老の日','2027-09-23':'秋分の日','2027-10-11':'スポーツの日',
+  '2027-11-03':'文化の日','2027-11-23':'勤労感謝の日',
+};
+
+let _mvState = {
+  mode: 'cal',         // 'cal' or 'list'
+  year: 0, month: 0,   // 表示中の年月(0始まり月)
+  selectedDate: null,  // カレンダーで選択された日付(YYYY-MM-DD)
+};
+
+// 月次確認画面を開く
+function openMonthlyView(){
+  if(!driver){show('scr-login');return;}
+  const now = new Date();
+  _mvState.year = now.getFullYear();
+  _mvState.month = now.getMonth();
+  _mvState.selectedDate = null;
+  _mvState.mode = 'cal';
+  if($('mv-tab-cal'))  $('mv-tab-cal').classList.add('on');
+  if($('mv-tab-list')) $('mv-tab-list').classList.remove('on');
+  if($('mv-view-cal'))  $('mv-view-cal').style.display = '';
+  if($('mv-view-list')) $('mv-view-list').style.display = 'none';
+  if($('mv-name')) $('mv-name').textContent = driver.name || '';
+  renderMonthlyView();
+  show('scr-monthly');
+}
+
+// ビュー切替
+function switchMvView(mode){
+  _mvState.mode = mode;
+  if($('mv-tab-cal'))  $('mv-tab-cal').classList.toggle('on', mode==='cal');
+  if($('mv-tab-list')) $('mv-tab-list').classList.toggle('on', mode==='list');
+  if($('mv-view-cal'))  $('mv-view-cal').style.display  = mode==='cal'?'':'none';
+  if($('mv-view-list')) $('mv-view-list').style.display = mode==='list'?'':'none';
+  renderMonthlyView();
+}
+
+// 月を前後に移動
+function mvShiftMonth(delta){
+  const d = new Date(_mvState.year, _mvState.month + delta, 1);
+  // 未来月には行けない
+  const now = new Date();
+  if(d > new Date(now.getFullYear(), now.getMonth(), 1)) return;
+  _mvState.year = d.getFullYear();
+  _mvState.month = d.getMonth();
+  _mvState.selectedDate = null;
+  if($('mv-day-detail')) $('mv-day-detail').style.display = 'none';
+  renderMonthlyView();
+}
+
+// 月次データを集計
+function _mvCollectMonth(year, month){
+  if(!driver) return {byDate:{}, totals:{del:0, shu:0, col:0, workDays:0}};
+  const y = year, m = String(month+1).padStart(2,'0');
+  const prefix = `${y}-${m}`;
+
+  // YP_LOGS/COL_LOGSからフィルタ
+  const yps = (YP_LOGS||[]).filter(r=>r.driver&&r.driver.id===driver.id&&r.date&&r.date.startsWith(prefix));
+  const cols = (COL_LOGS||[]).filter(r=>r.driver&&r.driver.id===driver.id&&r.date&&r.date.startsWith(prefix));
+
+  const byDate = {};
+  const ensureDay = (date)=>{
+    if(!byDate[date]) byDate[date] = {
+      date,
+      posts: new Set(),    // 郵便局セット
+      del: null,           // 宅配データ(同日複数あれば合算)
+      shuCompanies: {},    // 定時集荷: {会社名:件数}
+      colBlocks: null,     // 集荷日報(blocks)
+    };
+    return byDate[date];
+  };
+
+  yps.forEach(r=>{
+    const d = ensureDay(r.date);
+    if(r.postOffice) d.posts.add(r.postOffice);
+    const f = r.form || {};
+    const del = f.del || {};
+    if(!d.del) d.del = {mochidashi:0,kanryo:0,tenso:0,yakan:0,ogata:0,mochimodoiri:0};
+    d.del.mochidashi += del.mochidashi||0;
+    d.del.kanryo += del.kanryo||0;
+    d.del.tenso += del.tenso||0;
+    d.del.yakan += del.yakan||0;
+    d.del.ogata += del.ogata||0;
+    d.del.mochimodoiri += del.mochimodoiri||0;
+    // 定時集荷
+    const col = f.col || {};
+    (col.companies||[]).forEach(c=>{
+      if(!c.name) return;
+      d.shuCompanies[c.name] = (d.shuCompanies[c.name]||0) + (c.count||0);
+    });
+  });
+
+  cols.forEach(r=>{
+    const d = ensureDay(r.date);
+    if(r.postOffice) d.posts.add(r.postOffice);
+    // blocks保持(詳細表示で使う)
+    if(!d.colBlocks) d.colBlocks = {indiv:[], route:[], charter:[]};
+    const blocks = r.blocks || {};
+    (blocks.indiv||[]).forEach(b=>d.colBlocks.indiv.push(b));
+    (blocks.route||[]).forEach(b=>d.colBlocks.route.push(b));
+    (blocks.charter||[]).forEach(b=>d.colBlocks.charter.push(b));
+  });
+
+  // 合計計算
+  let total = {del:0, shu:0, col:0, workDays:0};
+  Object.values(byDate).forEach(d=>{
+    if(d.del){
+      total.del += (d.del.kanryo||0) + (d.del.tenso||0);
+    }
+    Object.values(d.shuCompanies).forEach(n=>total.shu += n);
+    if(d.colBlocks){
+      (d.colBlocks.indiv||[]).forEach(b=>{
+        Object.values(b.items||{}).forEach(v=>total.col += (Number(v)||0));
+      });
+      (d.colBlocks.route||[]).forEach(rt=>{
+        (rt.customers||[]).forEach(c=>{
+          Object.values(c.items||{}).forEach(v=>total.col += (Number(v)||0));
+        });
+      });
+      (d.colBlocks.charter||[]).forEach(ch=>{
+        total.col += Number(ch.qty||0);
+      });
+    }
+    total.workDays++;
+  });
+
+  return {byDate, totals:total};
+}
+
+// 月次確認を描画
+function renderMonthlyView(){
+  const {year, month} = _mvState;
+  const monLabel = $('mv-mon-label');
+  if(monLabel) monLabel.textContent = `${year}年${month+1}月`;
+
+  const data = _mvCollectMonth(year, month);
+
+  // 合計
+  if($('mv-total-del')) $('mv-total-del').textContent = data.totals.del.toLocaleString();
+  if($('mv-total-shu')) $('mv-total-shu').textContent = data.totals.shu.toLocaleString();
+  if($('mv-total-col')) $('mv-total-col').textContent = data.totals.col.toLocaleString();
+  if($('mv-workdays')) $('mv-workdays').textContent = `稼働 ${data.totals.workDays} 日`;
+
+  if(_mvState.mode === 'cal'){
+    _renderMvCalendar(data);
+  } else {
+    _renderMvList(data);
+  }
+}
+
+// カレンダーグリッド描画
+function _renderMvCalendar(data){
+  const wrap = $('mv-cal-grid');
+  if(!wrap) return;
+  const {year, month} = _mvState;
+  // 月曜始まり
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month+1, 0);
+  const firstDow = (firstDay.getDay()+6)%7; // 月=0 .. 日=6
+  const totalDays = lastDay.getDate();
+
+  const cells = [];
+  // 前月空白
+  for(let i=0; i<firstDow; i++){
+    const d = new Date(year, month, -firstDow+i+1);
+    cells.push({date:null, day:d.getDate(), empty:true, isoDate:null});
+  }
+  // 当月
+  const todayIso = new Date().toISOString().slice(0,10);
+  for(let i=1; i<=totalDays; i++){
+    const d = new Date(year, month, i);
+    const iso = d.toISOString().slice(0,10);
+    const dow = (d.getDay()+6)%7;
+    cells.push({
+      date:d, day:i, empty:false, isoDate:iso,
+      isSat:dow===5, isSun:dow===6,
+      isHoli:!!HOLIDAYS_JP[iso],
+      holiName:HOLIDAYS_JP[iso]||'',
+      isToday:iso===todayIso,
+    });
+  }
+  // 翌月空白(7の倍数まで)
+  while(cells.length % 7 !== 0){
+    cells.push({empty:true});
+  }
+
+  const html = cells.map(c=>{
+    if(c.empty && !c.date){
+      return `<div class="mv-cal-cell empty"><span class="mv-day-num">${c.day||''}</span></div>`;
+    }
+    const dayData = data.byDate[c.isoDate];
+    const hasData = !!dayData;
+    const classes = ['mv-cal-cell'];
+    if(c.isSat) classes.push('sat');
+    if(c.isSun) classes.push('sun');
+    if(c.isHoli) classes.push('holi');
+    if(c.isToday) classes.push('today');
+    if(hasData) classes.push('active');
+    if(_mvState.selectedDate===c.isoDate) classes.push('selected');
+
+    // 件数タグ
+    const tags = [];
+    if(dayData && dayData.del){
+      const delCnt = (dayData.del.kanryo||0) + (dayData.del.tenso||0);
+      if(delCnt>0) tags.push(`<span class="mv-cal-tag mv-tag-del">配${delCnt}</span>`);
+    }
+    if(dayData){
+      const shuCnt = Object.values(dayData.shuCompanies||{}).reduce((s,v)=>s+v,0);
+      if(shuCnt>0) tags.push(`<span class="mv-cal-tag mv-tag-shu">定${shuCnt}</span>`);
+    }
+    if(dayData && dayData.colBlocks){
+      let colCnt = 0;
+      (dayData.colBlocks.indiv||[]).forEach(b=>Object.values(b.items||{}).forEach(v=>colCnt += (Number(v)||0)));
+      (dayData.colBlocks.route||[]).forEach(rt=>(rt.customers||[]).forEach(c=>Object.values(c.items||{}).forEach(v=>colCnt+=(Number(v)||0))));
+      (dayData.colBlocks.charter||[]).forEach(ch=>colCnt += Number(ch.qty||0));
+      if(colCnt>0) tags.push(`<span class="mv-cal-tag mv-tag-col">集${colCnt}</span>`);
+    }
+    const holi = c.isHoli ? `<div class="mv-holi-txt">${c.holiName}</div>` : '';
+
+    return `<div class="${classes.join(' ')}" onclick="mvSelectDate('${c.isoDate}')">
+      <span class="mv-day-num">${c.day}</span>
+      ${holi}${tags.join('')}
+    </div>`;
+  }).join('');
+
+  wrap.innerHTML = html;
+
+  // 選択日の詳細表示
+  if(_mvState.selectedDate){
+    _renderMvDayDetail(_mvState.selectedDate, data.byDate[_mvState.selectedDate]);
+  } else {
+    if($('mv-day-detail')) $('mv-day-detail').style.display = 'none';
+  }
+}
+
+// 日付タップ
+function mvSelectDate(iso){
+  if(!iso) return;
+  if(_mvState.selectedDate === iso){
+    _mvState.selectedDate = null;
+  } else {
+    _mvState.selectedDate = iso;
+  }
+  renderMonthlyView();
+  // スクロールして詳細を表示
+  setTimeout(()=>{
+    const el = $('mv-day-detail');
+    if(el && el.style.display !== 'none') el.scrollIntoView({behavior:'smooth',block:'nearest'});
+  }, 50);
+}
+
+// 日詳細カードを描画(カレンダー選択時)
+function _renderMvDayDetail(iso, dayData){
+  const el = $('mv-day-detail');
+  if(!el) return;
+  if(!dayData){
+    el.innerHTML = `<div class="mv-dd-head"><span>${_fmtDateJp(iso)}</span><button class="mv-dd-close" onclick="mvSelectDate('${iso}')">×</button></div><div style="padding:10px 0;text-align:center;color:var(--light);font-size:10.5px;">この日の日報はありません</div>`;
+    el.style.display = '';
+    return;
+  }
+  el.innerHTML = _buildDayDetailHTML(iso, dayData, true);
+  el.style.display = '';
+}
+
+// 日詳細のHTMLを構築(カレンダーとリストで共通)
+function _buildDayDetailHTML(iso, dayData, withCloseBtn){
+  const posts = [...(dayData.posts||[])].filter(Boolean);
+  const postLine = posts.length ? `<div style="font-size:10px;color:var(--mid);margin-bottom:4px;">対応郵便局: ${posts.join('・')}</div>` : '';
+  const closeBtn = withCloseBtn ? `<button class="mv-dd-close" onclick="mvSelectDate('${iso}')">×</button>` : '';
+  let html = `<div class="mv-dd-head"><span>${_fmtDateJp(iso)}</span>${closeBtn}</div>${postLine}`;
+
+  // 配達業務
+  if(dayData.del){
+    const d = dayData.del;
+    const total = (d.kanryo||0) + (d.tenso||0);
+    if(total > 0 || d.mochidashi > 0){
+      html += `<div class="mv-dd-sec"><div class="mv-dd-sec-title del">配達業務</div>`;
+      html += `<div class="mv-dd-row mv-dd-total"><span>配達件数</span><span>${total}件</span></div>`;
+      if(d.mochidashi>0) html += `<div class="mv-dd-row mv-dd-row-sub"><span>持出</span><span>${d.mochidashi}</span></div>`;
+      if(d.kanryo>0) html += `<div class="mv-dd-row mv-dd-row-sub"><span>完了</span><span>${d.kanryo}</span></div>`;
+      if(d.tenso>0) html += `<div class="mv-dd-row mv-dd-row-sub"><span>転送還付</span><span>${d.tenso}</span></div>`;
+      if(d.yakan>0) html += `<div class="mv-dd-row mv-dd-row-sub"><span>夜間(内計)</span><span>${d.yakan}</span></div>`;
+      if(d.ogata>0) html += `<div class="mv-dd-row mv-dd-row-sub"><span>大型(内計)</span><span>${d.ogata}</span></div>`;
+      if(d.mochimodoiri>0) html += `<div class="mv-dd-row mv-dd-row-sub"><span>持戻</span><span>${d.mochimodoiri}</span></div>`;
+      html += `</div>`;
+    }
+  }
+
+  // 定時集荷
+  const shuTotal = Object.values(dayData.shuCompanies||{}).reduce((s,v)=>s+v,0);
+  if(shuTotal > 0){
+    html += `<div class="mv-dd-sec"><div class="mv-dd-sec-title shu">定時集荷</div>`;
+    html += `<div class="mv-dd-row mv-dd-total"><span>定時集荷件数</span><span>${shuTotal}件</span></div>`;
+    Object.entries(dayData.shuCompanies).forEach(([name,cnt])=>{
+      if(cnt>0) html += `<div class="mv-dd-row mv-dd-row-sub"><span>${name}</span><span>${cnt}</span></div>`;
+    });
+    html += `</div>`;
+  }
+
+  // 集荷事業
+  if(dayData.colBlocks){
+    const hasCol = (dayData.colBlocks.indiv?.length||0) + (dayData.colBlocks.route?.length||0) + (dayData.colBlocks.charter?.length||0) > 0;
+    if(hasCol){
+      html += `<div class="mv-dd-sec"><div class="mv-dd-sec-title col">集荷事業</div>`;
+      // 単独顧客
+      (dayData.colBlocks.indiv||[]).forEach(b=>{
+        const items = b.items || {};
+        const tot = Object.values(items).reduce((s,v)=>s+(Number(v)||0),0);
+        if(tot === 0) return;
+        html += `<div class="mv-dd-row mv-dd-total"><span>単独: ${b.customerName||'(名称未設定)'}</span><span>${tot}個</span></div>`;
+        Object.entries(items).forEach(([k,v])=>{
+          if(v>0) html += `<div class="mv-dd-row mv-dd-row-sub"><span>${k}</span><span>${v}</span></div>`;
+        });
+      });
+      // ルート
+      (dayData.colBlocks.route||[]).forEach(rt=>{
+        html += `<div class="mv-dd-row mv-dd-total"><span>ルート: ${rt.routeName||'(名称未設定)'}</span><span></span></div>`;
+        (rt.customers||[]).forEach(c=>{
+          const items = c.items || {};
+          const tot = Object.values(items).reduce((s,v)=>s+(Number(v)||0),0);
+          if(tot === 0) return;
+          html += `<div class="mv-dd-row mv-dd-row-sub"><span>${c.customerName||'(顧客)'}</span><span>${tot}個</span></div>`;
+        });
+      });
+      // チャーター
+      (dayData.colBlocks.charter||[]).forEach(ch=>{
+        const qty = Number(ch.qty||0);
+        const label = ch.customerName || ch.routeName || 'チャーター';
+        html += `<div class="mv-dd-row mv-dd-total"><span>チャーター: ${label}</span><span>${qty>0?qty+'個':'1本'}</span></div>`;
+      });
+      html += `</div>`;
+    }
+  }
+
+  return html;
+}
+
+// リストビュー: 日別カードを縦に羅列
+function _renderMvList(data){
+  const wrap = $('mv-list-wrap');
+  if(!wrap) return;
+  const dates = Object.keys(data.byDate).sort();
+  if(!dates.length){
+    wrap.innerHTML = `<div style="text-align:center;padding:30px 10px;color:var(--light);font-size:11px;">この月の日報はまだありません</div>`;
+    return;
+  }
+  wrap.innerHTML = dates.map(iso=>{
+    return `<div class="mv-list-card">${_buildDayDetailHTML(iso, data.byDate[iso], false)}</div>`;
+  }).join('');
+}
+
+// 日付を「2026年4月1日(水)」形式に
+function _fmtDateJp(iso){
+  const d = new Date(iso);
+  const dows = ['日','月','火','水','木','金','土'];
+  return `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日 (${dows[d.getDay()]})`;
+}
+
+// ══════════════════════════════════════════════════
+// 設定画面 (Settings)
+// ══════════════════════════════════════════════════
+function openSettings(){
+  // ボタンの状態を反映
+  const theme = localStorage.getItem('nikki_theme')||'auto';
+  const fs = localStorage.getItem('nikki_fs')||'1';
+  document.querySelectorAll('[data-theme]').forEach(b=>{
+    b.classList.toggle('on', b.dataset.theme===theme);
+  });
+  document.querySelectorAll('[data-fs]').forEach(b=>{
+    b.classList.toggle('on', b.dataset.fs===String(fs));
+  });
+  show('scr-settings');
+}
+
+function setTheme(mode){
+  localStorage.setItem('nikki_theme', mode);
+  applyTheme(mode);
+  document.querySelectorAll('[data-theme]').forEach(b=>{
+    b.classList.toggle('on', b.dataset.theme===mode);
+  });
+}
+
+function applyTheme(mode){
+  mode = mode || localStorage.getItem('nikki_theme') || 'auto';
+  let actual = mode;
+  if(mode === 'auto'){
+    actual = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+  }
+  document.documentElement.setAttribute('data-theme', actual);
+}
+
+function setFontScale(scale){
+  const s = String(scale);
+  localStorage.setItem('nikki_fs', s);
+  document.documentElement.style.setProperty('--fs-scale', s);
+  document.querySelectorAll('[data-fs]').forEach(b=>{
+    b.classList.toggle('on', b.dataset.fs===s);
+  });
+}
+
+// 初期化: テーマと文字サイズを適用
+function _initThemeAndFont(){
+  applyTheme();
+  const fs = localStorage.getItem('nikki_fs') || '1';
+  document.documentElement.style.setProperty('--fs-scale', fs);
+  // 自動モードでシステム設定変更時に連動
+  if(window.matchMedia){
+    try{
+      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', ()=>{
+        const mode = localStorage.getItem('nikki_theme')||'auto';
+        if(mode === 'auto') applyTheme('auto');
+      });
+    }catch(e){}
+  }
+}
+// 即座に適用(DOMContentLoaded待たずに)
+_initThemeAndFont();
+
 
 // ══ 退勤処理 ══
 let clockOutGps=null;
