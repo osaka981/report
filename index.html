@@ -2031,25 +2031,38 @@ function _genRandomPin(){
 function _parseLoginId(raw){
   if(!raw) return null;
   const trimmed = raw.trim().toUpperCase();
-  // ハイフンを除去して数字のみ
-  const clean = trimmed.replace(/[-\s]/g,'');
+  // ハイフンや空白を除去
+  let clean = trimmed.replace(/[-\s]/g,'');
   if(!/^\d+$/.test(clean)) return null;
 
-  // 6桁先頭9: オーナー(将来対応、今は弾く)
+  // ハイフン区切りで入力された場合の補完(例: 10001-1 → 10001-001)
+  // 元の入力にハイフンが含まれていたらその形式を尊重する
+  const hyphenMatch = trimmed.match(/^(\d+)-(\d+)$/);
+  if(hyphenMatch){
+    const left = hyphenMatch[1];
+    const right = hyphenMatch[2];
+    // 委託会社ドライバー想定: 会社コード5桁 + 連番(1〜3桁)→3桁に正規化
+    if(left.length === 5){
+      const sub3 = right.padStart(3,'0');
+      clean = left + sub3; // 8桁
+    }
+  }
+
+  // 6桁先頭9: オーナー
   if(clean.length===6 && clean.startsWith('9')){
     return {type:'owner', companyCode:clean.slice(1), id:clean};
   }
 
-  // 7桁: 委託会社所属個人 or 管理者コード(将来対応)
-  if(clean.length===7){
+  // 8桁: 委託会社所属個人 or 管理者コード(-999)
+  if(clean.length===8){
     const code = clean.slice(0,5);
     const sub  = clean.slice(5);
     const normalized = `${code}-${sub}`;
-    if(sub==='99') return {type:'company_admin', companyCode:code, id:normalized};
+    if(sub==='999') return {type:'company_admin', companyCode:code, id:normalized};
     return {type:'company_driver_individual', id:normalized};
   }
 
-  // 5桁(先頭1): 委託会社共通コード(将来対応)
+  // 5桁(先頭1): 委託会社共通コード(予約・現在未使用)
   if(clean.length===5 && clean.startsWith('1')){
     return {type:'company_shared', id:clean};
   }
