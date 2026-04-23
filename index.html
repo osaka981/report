@@ -2802,6 +2802,49 @@ function _completeLogin(d){
   // 当月実績を集計
   renderPersonalStats(d);
   show('scr-select');
+
+  // 3ヶ月経過チェック(個人直属のみ)
+  setTimeout(()=>_checkPinExpiry(d), 600);
+}
+
+// 個人直属ドライバー判定(日報アプリ側)
+function _isPersonalDriverNikki(d){
+  if(!d) return false;
+  // 委託所属個人/委託共通/オーナーは除外
+  if(d.companyId) return false;
+  if(d._isOwner) return false;
+  const id = String(d.id||'');
+  if(id.includes('-')) return false; // 10001-001形式
+  if(id.length===6 && id.startsWith('9')) return false; // オーナー
+  return true; // 個人直属
+}
+
+// 3ヶ月経過チェック → 強制PIN変更
+function _checkPinExpiry(d){
+  if(!d || !d.pinHash) return;
+  if(!_isPersonalDriverNikki(d)) return; // 個人直属のみ対象
+  if(!d.pinInitializedAt) return;
+
+  const setDate = new Date(d.pinInitializedAt);
+  const now = new Date();
+  const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth()-3, now.getDate());
+  if(setDate < threeMonthsAgo){
+    // 強制変更画面へ
+    const daysPassed = Math.floor((now - setDate) / (1000*60*60*24));
+    if(confirm(`PINを設定してから${daysPassed}日経過しました。\nセキュリティのため、新しいPINに変更してください。`)){
+      // PIN変更フローへ
+      _isChangingPin = true;
+      _changePinStep = 'current';
+      _changePinCurrent = '';
+      _pendingLoginDriver = d;
+      _loginPin = '';
+      [0,1,2,3,4,5].forEach(i=>{ const el=$('lpd'+i); if(el) el.classList.remove('on'); });
+      if($('pin-login-name')) $('pin-login-name').textContent = d.name;
+      if($('pin-login-subtitle')) $('pin-login-subtitle').textContent = '現在のPINを入力';
+      if($('pin-login-hint')) $('pin-login-hint').textContent = '3ヶ月経過のためPIN変更をお願いします';
+      show('scr-pin');
+    }
+  }
 }
 
 // PIN画面から戻る
