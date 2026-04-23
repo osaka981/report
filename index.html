@@ -1014,6 +1014,36 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
   </div>
 </div>
 
+<!-- ══ 管理者コード使用者の氏名入力画面 ══ -->
+<div id="scr-name-input" class="screen">
+  <div class="topbar">
+    <div class="tb-eye">入力者氏名</div>
+    <div class="tb-title" style="color:var(--clay);">氏名を入力してください</div>
+    <div class="tb-sub" id="name-input-co"></div>
+  </div>
+  <div class="p16">
+    <div class="card mb12">
+      <div style="font-size:11px;color:var(--mid);line-height:1.6;margin-bottom:10px;">
+        管理者コードでログインしました。<br>
+        誰が日報を入力するか識別するため、<strong>本人の氏名</strong>を入力してください。
+      </div>
+      <div class="lbl">氏名</div>
+      <input type="text" id="name-input-val" class="fi" style="font-size:15px;padding:10px;" placeholder="例: 田中 次郎">
+      <div id="name-input-err" style="display:none;background:rgba(139,74,58,.07);border:1px solid rgba(139,74,58,.22);border-radius:6px;padding:6px 10px;color:var(--rust);font-size:11px;margin-top:6px;"></div>
+      <button class="btn-main mt8" style="background:var(--clay);color:#faf8f5;" onclick="submitNameInput()">続ける</button>
+      <button onclick="cancelNameInput()" style="background:none;border:none;color:var(--light);font-size:10px;cursor:pointer;width:100%;padding:7px;margin-top:4px;">キャンセル</button>
+    </div>
+
+    <!-- 過去の入力履歴 -->
+    <div id="name-input-history-wrap" style="display:none;">
+      <div class="card">
+        <div style="font-size:10px;font-weight:700;color:var(--mid);margin-bottom:6px;">過去に入力した氏名</div>
+        <div id="name-input-history"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ══ 委託会社オーナー画面 ══ -->
 <div id="scr-company" class="screen">
   <div class="topbar">
@@ -2235,6 +2265,64 @@ async function doLogin(){
     return;
   }
 
+  // ───── 委託会社所属個人(10001-001等) ─────
+  if(parsed.type === 'company_driver_individual'){
+    // DRIVERS または STAFF から検索
+    // 日報アプリのDRIVERSは経営管理のstaff.driverNoで保存されている前提
+    let d = (DRIVERS||[]).find(x=>
+      x.id===parsed.id ||
+      x.driverNo===parsed.id ||
+      x.empNo===parsed.id
+    );
+    if(!d){
+      $('login-err').textContent = `社員番号「${parsed.id}」が見つかりません`;
+      $('login-err').style.display = 'block';
+      return;
+    }
+    if(!d.initialPinHash && !d.pinHash){
+      $('login-err').textContent = 'PINが未発行です。委託会社オーナーまたは代表にお問い合わせください';
+      $('login-err').style.display = 'block';
+      return;
+    }
+    // ドライバーデータにidを揃える(日報保存時のキー統一)
+    if(!d.id) d.id = d.driverNo || parsed.id;
+    _pendingLoginDriver = d;
+    _showPinScreen(d);
+    return;
+  }
+
+  // ───── 委託会社管理者コード(10001-999) ─────
+  if(parsed.type === 'company_admin'){
+    // 会社コードから会社を特定
+    const co = (COMPANIES||[]).find(c=>String(c.companyCode)===parsed.companyCode);
+    if(!co){
+      $('login-err').textContent = '該当する委託会社が見つかりません';
+      $('login-err').style.display = 'block';
+      return;
+    }
+    // 管理者コードのドライバーレコードを検索(10001-999)
+    const adminDrv = (DRIVERS||[]).find(x=>
+      String(x.driverNo||x.id||'')===parsed.id
+    );
+    if(!adminDrv){
+      $('login-err').textContent = `管理者コード「${parsed.id}」が未発行です。代表にお問い合わせください`;
+      $('login-err').style.display = 'block';
+      return;
+    }
+    if(!adminDrv.initialPinHash && !adminDrv.pinHash){
+      $('login-err').textContent = '管理者コードのPINが未発行です';
+      $('login-err').style.display = 'block';
+      return;
+    }
+    // 氏名入力が必要なフラグをセット
+    if(!adminDrv.id) adminDrv.id = adminDrv.driverNo || parsed.id;
+    adminDrv._isSharedCode = true; // 氏名入力必須フラグ
+    adminDrv._companyRef = co;
+    _pendingLoginDriver = adminDrv;
+    _showPinScreen(adminDrv);
+    return;
+  }
+
   // それ以外は現在準備中
   $('login-err').textContent = 'このIDタイプは現在準備中です';
   $('login-err').style.display = 'block';
@@ -2761,7 +2849,87 @@ async function _processPinInit(){
 }
 
 // ログイン完了処理(旧doLoginの後半を分離)
+// 管理者コード使用者の氏名入力画面表示
+function _showNameInputScreen(d){
+  const co = d._companyRef;
+  if($('name-input-co')) $('name-input-co').textContent = co ? `${co.name}(管理者コード ${d.id})` : d.id;
+  const inp = $('name-input-val');
+  if(inp){ inp.value = ''; }
+  if($('name-input-err')) $('name-input-err').style.display = 'none';
+
+  // 過去の入力履歴(localStorage)
+  const key = `sharedCodeNames:${co?.id||d.id}`;
+  let history = [];
+  try{ history = JSON.parse(localStorage.getItem(key)||'[]'); }catch(e){}
+  const histWrap = $('name-input-history-wrap');
+  const histEl = $('name-input-history');
+  if(histWrap && histEl){
+    if(history.length){
+      histWrap.style.display = '';
+      histEl.innerHTML = history.slice(0,10).map(h=>{
+        const esc = h.replace(/'/g, "\\'");
+        return `<div style="padding:6px 4px;border-bottom:1px solid var(--div);cursor:pointer;font-size:12px;" onclick="_pickNameHistory('${esc}')">${h}</div>`;
+      }).join('');
+    } else {
+      histWrap.style.display = 'none';
+    }
+  }
+
+  show('scr-name-input');
+  setTimeout(()=>{ if(inp) inp.focus(); }, 100);
+}
+
+function _pickNameHistory(name){
+  const inp = $('name-input-val');
+  if(inp) inp.value = name;
+}
+
+function cancelNameInput(){
+  _pendingLoginDriver = null;
+  if($('emp-id')) $('emp-id').value='';
+  show('scr-login');
+}
+
+function submitNameInput(){
+  const inp = $('name-input-val');
+  const name = (inp?.value||'').trim();
+  if(name.length < 2){
+    if($('name-input-err')){
+      $('name-input-err').style.display = 'block';
+      $('name-input-err').textContent = '氏名を入力してください(2文字以上)';
+    }
+    return;
+  }
+  // 氏名の正規化(連続空白を1つに、前後スペース除去)
+  const normalized = name.replace(/[\s　]+/g,' ').trim();
+
+  const d = _pendingLoginDriver;
+  if(!d){ show('scr-login'); return; }
+  const co = d._companyRef;
+
+  // 履歴に追加(最大20件保持)
+  const key = `sharedCodeNames:${co?.id||d.id}`;
+  let history = [];
+  try{ history = JSON.parse(localStorage.getItem(key)||'[]'); }catch(e){}
+  history = history.filter(h=>h!==normalized);
+  history.unshift(normalized);
+  try{ localStorage.setItem(key, JSON.stringify(history.slice(0,20))); }catch(e){}
+
+  // 入力者情報をセット
+  d._inputName = normalized;
+  d.name = normalized + ` (${co?.name||'共通コード'})`;
+  d._uidSuffix = `#${normalized}`;
+
+  _completeLogin(d);
+}
+
 function _completeLogin(d){
+  // 管理者コード使用者は氏名入力画面を先に表示
+  if(d._isSharedCode && !d._inputName){
+    _showNameInputScreen(d);
+    return;
+  }
+
   driver = d;
   const now = new Date();
   const dt = now.toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric',weekday:'short'});
@@ -3516,7 +3684,13 @@ function submitYP(){
 
   // 同日・同人・同郵便局の重複チェック
   YP_LOGS=ls_get(LS.YP_LOGS,[]);
-  const dupIdx=YP_LOGS.findIndex(r=>r.date===date && r.driver.id===driver.id && r.postOffice===postOffice);
+  // 管理者コード使用時は氏名も比較対象(同じ10001-999でも別人扱い)
+  const driverUid = driver._inputName ? `${driver.id}#${driver._inputName}` : driver.id;
+  const dupIdx=YP_LOGS.findIndex(r=>{
+    if(r.date!==date || r.postOffice!==postOffice) return false;
+    const recUid = r.driver?._inputName ? `${r.driver.id}#${r.driver._inputName}` : r.driver?.id;
+    return recUid === driverUid;
+  });
   if(dupIdx>=0){
     const prev=YP_LOGS[dupIdx];
     const prevTime=new Date(prev.submittedAt).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
