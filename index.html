@@ -689,7 +689,7 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
     </button>
 
     <!-- 月次確認・設定 -->
-    <button onclick="enterMode('view')" style="display:block;width:100%;padding:16px;margin-bottom:10px;background:var(--card);color:var(--ink);border:1.5px solid var(--brd);border-radius:10px;cursor:pointer;text-align:left;">
+    <button id="mode-view-btn" onclick="enterMode('view')" style="display:block;width:100%;padding:16px;margin-bottom:10px;background:var(--card);color:var(--ink);border:1.5px solid var(--brd);border-radius:10px;cursor:pointer;text-align:left;">
       <div style="display:flex;align-items:center;gap:12px;">
         <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--slate)" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
         <div style="flex:1;">
@@ -1376,6 +1376,7 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
     <div id="co-tb-sub" class="tb-sub"></div>
     <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">
       <button class="settings-btn" onclick="coSwitchTab('monthly')" id="co-tab-monthly-btn" style="flex:1;">月次集計</button>
+      <button class="settings-btn" onclick="coSwitchTab('mc')" id="co-tab-mc-btn" style="flex:1;">月次確認</button>
       <button class="settings-btn" onclick="coSwitchTab('drivers')" id="co-tab-drivers-btn" style="flex:1;">ドライバー</button>
       <button class="settings-btn" onclick="coSwitchTab('schedule')" id="co-tab-schedule-btn" style="flex:1;">休業表</button>
       <button class="settings-btn" onclick="coSwitchTab('csv')" id="co-tab-csv-btn" style="flex:1;">CSV</button>
@@ -1440,6 +1441,74 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
           </button>
         </div>
         <div id="co-driver-list"></div>
+      </div>
+    </div>
+
+    <!-- ══ 月次確認タブ(Phase B: 2026/05/02) ══ -->
+    <div id="co-view-mc" class="co-view" style="display:none;">
+      <!-- 月選択 -->
+      <div class="mv-month-nav">
+        <button class="mv-mn-btn" onclick="coMcShiftMonth(-1)">&lsaquo;</button>
+        <div class="mv-mn-label" id="co-mc-mon-label">2026年4月</div>
+        <button class="mv-mn-btn" onclick="coMcShiftMonth(1)">&rsaquo;</button>
+      </div>
+      
+      <div class="card mb10">
+        <div style="font-size:11px;font-weight:700;color:var(--mid);margin-bottom:8px;">📋 管理者コード(突発ドライバー)使用分の月次確認</div>
+        <div style="font-size:10.5px;color:var(--mid);line-height:1.6;">
+          管理者コード(10001-999)で日報提出された分の集計です。<br>
+          内容を確認後「この内容で確認しました」ボタンを押してください。
+        </div>
+      </div>
+      
+      <!-- 合計サマリー -->
+      <div class="mv-sum-grid">
+        <div class="mv-sum-box"><div class="mv-sum-lbl">配達</div><div class="mv-sum-val del" id="co-mc-total-del">0</div></div>
+        <div class="mv-sum-box"><div class="mv-sum-lbl">定時集荷</div><div class="mv-sum-val shu" id="co-mc-total-shu">0</div></div>
+        <div class="mv-sum-box"><div class="mv-sum-lbl">集荷事業</div><div class="mv-sum-val col" id="co-mc-total-col">0</div></div>
+      </div>
+      <div class="mv-workdays" id="co-mc-workdays">稼働 0 日</div>
+      
+      <!-- フィルタ -->
+      <div class="card mb10">
+        <div style="font-size:11px;font-weight:700;color:var(--mid);margin-bottom:8px;">絞り込み</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <select id="co-mc-name-filter" onchange="renderCoMcView()" style="flex:1;min-width:130px;padding:6px 10px;font-size:12px;border:1px solid var(--brd);border-radius:6px;background:var(--card);color:var(--ink);">
+            <option value="">氏名: 全員</option>
+          </select>
+          <select id="co-mc-cust-filter" onchange="renderCoMcView()" style="flex:1;min-width:130px;padding:6px 10px;font-size:12px;border:1px solid var(--brd);border-radius:6px;background:var(--card);color:var(--ink);">
+            <option value="">顧客: 全顧客</option>
+          </select>
+          <select id="co-mc-office-filter" onchange="renderCoMcView()" style="flex:1;min-width:130px;padding:6px 10px;font-size:12px;border:1px solid var(--brd);border-radius:6px;background:var(--card);color:var(--ink);">
+            <option value="">営業所: 全営業所</option>
+          </select>
+        </div>
+      </div>
+      
+      <!-- 詳細リスト -->
+      <div class="card mb10">
+        <div style="font-size:11px;font-weight:700;color:var(--mid);margin-bottom:8px;">詳細(日別×氏名別)</div>
+        <div id="co-mc-list-content" style="overflow-x:auto;"></div>
+      </div>
+      
+      <!-- 確認・送信セクション -->
+      <div class="card mb10" style="background:var(--card);border:1.5px solid var(--brd);">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <div style="font-size:13px;font-weight:700;color:var(--ink);">📋 確認・送信</div>
+          <div id="co-mc-status" style="font-size:11px;font-weight:700;"></div>
+        </div>
+        <div id="co-mc-deadline" style="font-size:11px;color:var(--mid);margin-bottom:10px;line-height:1.6;"></div>
+        
+        <div style="margin-bottom:12px;">
+          <label style="font-size:11px;font-weight:600;color:var(--ink);display:block;margin-bottom:4px;">修正・備考(任意)</label>
+          <textarea id="co-mc-correction-text" rows="3" placeholder="例: 5月15日の○○様の配達数が3個少なく登録されています。" 
+            style="width:100%;padding:8px 10px;font-size:12px;border:1px solid var(--brd);border-radius:6px;background:var(--card);color:var(--ink);resize:vertical;box-sizing:border-box;"></textarea>
+        </div>
+        
+        <button id="co-mc-confirm-btn" onclick="submitCoMonthlyConfirmation()" 
+          style="width:100%;padding:12px;background:var(--clay);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">
+          この内容で確認しました
+        </button>
       </div>
     </div>
 
@@ -8307,7 +8376,7 @@ function _osqApplyPicker(){
 
 function coSwitchTab(tab){
   _ownerMvState.tab = tab;
-  ['monthly','drivers','schedule','csv','noti'].forEach(t=>{
+  ['monthly','mc','drivers','schedule','csv','noti'].forEach(t=>{
     const view = $('co-view-'+t);
     const btn  = $('co-tab-'+t+'-btn');
     if(view) view.style.display = (t===tab)?'':'none';
@@ -8317,6 +8386,7 @@ function coSwitchTab(tab){
     }
   });
   if(tab === 'monthly') _renderOwnerMonthly();
+  else if(tab === 'mc') renderCoMcView();
   else if(tab === 'drivers') _renderOwnerDrivers();
   else if(tab === 'schedule') _renderOwnerSchedule();
   else if(tab === 'csv') _renderOwnerCSV();
@@ -8334,6 +8404,448 @@ function coShiftMonth(delta){
   _ownerMvState.year = d.getFullYear();
   _ownerMvState.month = d.getMonth();
   _renderOwnerMonthly();
+}
+
+// ══════════════════════════════════════════════════
+// オーナー月次確認(管理者コード使用分)Phase B: 2026/05/02
+// ══════════════════════════════════════════════════
+
+let _coMcState = {
+  year: new Date().getFullYear(),
+  month: new Date().getMonth() - 1, // デフォルト前月
+};
+if(_coMcState.month < 0){ _coMcState.month = 11; _coMcState.year--; }
+
+/** 月切替 */
+function coMcShiftMonth(delta){
+  const d = new Date(_coMcState.year, _coMcState.month + delta, 1);
+  const now = new Date();
+  if(d > new Date(now.getFullYear(), now.getMonth(), 1)) return;
+  _coMcState.year = d.getFullYear();
+  _coMcState.month = d.getMonth();
+  renderCoMcView();
+}
+
+/** 10001-999(管理者コード)で日報提出された分の生データを抽出 */
+function _coMcGatherRawData(year, month){
+  if(!_ownerCompany) return [];
+  const coCode = String(_ownerCompany.companyCode || '');
+  const adminId = `${coCode}-999`;
+  const ymPrefix = `${year}-${String(month+1).padStart(2,'0')}`;
+  
+  const result = [];
+  
+  // YP_LOGS(配達)
+  (YP_LOGS||[]).forEach(r => {
+    if(!r.date || !r.date.startsWith(ymPrefix)) return;
+    if(!r.driver) return;
+    const dId = String(r.driver.id || '');
+    // 管理者コード判定: id が「{coCode}-999」または driver._isSharedCode
+    const isAdminCode = (dId === adminId) || r.driver._isSharedCode;
+    if(!isAdminCode) return;
+    
+    const f = r.form || {};
+    const del = f.del || {};
+    const delTotal = (del.kanryo||0) + (del.tenso||0) + (del.kangenpu||0);
+    const yakan = del.yakan || 0;
+    const ogata = del.ogata || 0;
+    
+    if(delTotal > 0 || yakan > 0 || ogata > 0){
+      result.push({
+        date: r.date,
+        driverName: r.driver.name || r.driver._inputName || '(不明)',
+        customerName: r.postOffice || '(郵便局)',
+        office: r.driver.office || '',
+        delivery: delTotal + yakan + ogata,
+        shu: 0,
+        collection: 0,
+      });
+    }
+    
+    // 定時集荷
+    ((f.col && f.col.companies) || []).forEach(c => {
+      const cnt = c.count || 0;
+      if(cnt > 0){
+        result.push({
+          date: r.date,
+          driverName: r.driver.name || r.driver._inputName || '(不明)',
+          customerName: c.name || c.companyName || '(集荷会社)',
+          office: r.driver.office || '',
+          delivery: 0,
+          shu: cnt,
+          collection: 0,
+        });
+      }
+    });
+  });
+  
+  // COL_LOGS(集荷事業)
+  (COL_LOGS||[]).forEach(r => {
+    if(!r.date || !r.date.startsWith(ymPrefix)) return;
+    if(!r.driver) return;
+    const dId = String(r.driver.id || '');
+    const isAdminCode = (dId === adminId) || r.driver._isSharedCode;
+    if(!isAdminCode) return;
+    
+    const blocks = _normalizeBlocks(r.blocks);
+    blocks.forEach(b => {
+      if(b.type === 'indiv' && !b.rest){
+        const items = b.items || {};
+        const totalCnt = Object.values(items).reduce((a,v) => a + (parseInt(v)||0), 0);
+        if(totalCnt > 0){
+          result.push({
+            date: r.date,
+            driverName: r.driver.name || r.driver._inputName || '(不明)',
+            customerName: b.custName || '(顧客不明)',
+            office: r.driver.office || '',
+            delivery: 0,
+            shu: 0,
+            collection: totalCnt,
+          });
+        }
+      } else if(b.type === 'route'){
+        (b.customers || []).forEach(c => {
+          if(c.rest) return;
+          const items = c.items || {};
+          const totalCnt = Object.values(items).reduce((a,v) => a + (parseInt(v)||0), 0);
+          if(totalCnt > 0){
+            result.push({
+              date: r.date,
+              driverName: r.driver.name || r.driver._inputName || '(不明)',
+              customerName: c.custName || c.name || '(顧客不明)',
+              office: r.driver.office || '',
+              delivery: 0,
+              shu: 0,
+              collection: totalCnt,
+            });
+          }
+        });
+      }
+    });
+  });
+  
+  return result;
+}
+
+/** フィルタ選択肢の更新 */
+function _coMcUpdateFilters(rawData){
+  const nameFilter = document.getElementById('co-mc-name-filter');
+  const custFilter = document.getElementById('co-mc-cust-filter');
+  const offFilter = document.getElementById('co-mc-office-filter');
+  
+  // 現在の選択値を保持
+  const curName = nameFilter?.value || '';
+  const curCust = custFilter?.value || '';
+  const curOff = offFilter?.value || '';
+  
+  // 全件から一意の値を抽出
+  const allNames = [...new Set(rawData.map(r => r.driverName).filter(Boolean))].sort();
+  
+  // 氏名フィルタの選択肢(全氏名)
+  if(nameFilter){
+    nameFilter.innerHTML = '<option value="">氏名: 全員</option>' + 
+      allNames.map(n => `<option value="${esc_n(n)}">${esc_n(n)}</option>`).join('');
+    if(allNames.includes(curName)) nameFilter.value = curName;
+  }
+  
+  // 顧客フィルタ: 選択中の氏名で絞った顧客一覧
+  let custCandidates = rawData;
+  if(curName) custCandidates = custCandidates.filter(r => r.driverName === curName);
+  const allCusts = [...new Set(custCandidates.map(r => r.customerName).filter(Boolean))].sort();
+  if(custFilter){
+    custFilter.innerHTML = '<option value="">顧客: 全顧客</option>' + 
+      allCusts.map(c => `<option value="${esc_n(c)}">${esc_n(c)}</option>`).join('');
+    if(allCusts.includes(curCust)) custFilter.value = curCust;
+  }
+  
+  // 営業所フィルタ: 選択中の氏名で絞った営業所一覧
+  let offCandidates = rawData;
+  if(curName) offCandidates = offCandidates.filter(r => r.driverName === curName);
+  const allOffs = [...new Set(offCandidates.map(r => r.office).filter(Boolean))].sort();
+  if(offFilter){
+    offFilter.innerHTML = '<option value="">営業所: 全営業所</option>' + 
+      allOffs.map(o => `<option value="${esc_n(o)}">${esc_n(o)}</option>`).join('');
+    if(allOffs.includes(curOff)) offFilter.value = curOff;
+  }
+}
+
+/** 月次確認画面の描画 */
+function renderCoMcView(){
+  if(!_ownerCompany) return;
+  const {year, month} = _coMcState;
+  const monLabel = document.getElementById('co-mc-mon-label');
+  if(monLabel) monLabel.textContent = `${year}年${month+1}月`;
+  
+  // 生データ取得
+  const rawData = _coMcGatherRawData(year, month);
+  
+  // フィルタ選択肢更新
+  _coMcUpdateFilters(rawData);
+  
+  // 現在のフィルタ値
+  const fName = document.getElementById('co-mc-name-filter')?.value || '';
+  const fCust = document.getElementById('co-mc-cust-filter')?.value || '';
+  const fOff = document.getElementById('co-mc-office-filter')?.value || '';
+  
+  // フィルタ適用
+  let filtered = rawData;
+  if(fName) filtered = filtered.filter(r => r.driverName === fName);
+  if(fCust) filtered = filtered.filter(r => r.customerName === fCust);
+  if(fOff) filtered = filtered.filter(r => r.office === fOff);
+  
+  // 合計集計
+  const totalDel = filtered.reduce((a, r) => a + r.delivery, 0);
+  const totalShu = filtered.reduce((a, r) => a + r.shu, 0);
+  const totalCol = filtered.reduce((a, r) => a + r.collection, 0);
+  const workDays = new Set(filtered.map(r => r.date)).size;
+  
+  if(document.getElementById('co-mc-total-del')) document.getElementById('co-mc-total-del').textContent = totalDel.toLocaleString();
+  if(document.getElementById('co-mc-total-shu')) document.getElementById('co-mc-total-shu').textContent = totalShu.toLocaleString();
+  if(document.getElementById('co-mc-total-col')) document.getElementById('co-mc-total-col').textContent = totalCol.toLocaleString();
+  if(document.getElementById('co-mc-workdays')) document.getElementById('co-mc-workdays').textContent = `稼働 ${workDays} 日`;
+  
+  // 詳細リスト(日付×氏名×顧客で集約)
+  const grouped = {};
+  filtered.forEach(r => {
+    const key = `${r.date}__${r.driverName}__${r.customerName}`;
+    if(!grouped[key]){
+      grouped[key] = {
+        date: r.date,
+        driverName: r.driverName,
+        customerName: r.customerName,
+        office: r.office,
+        delivery: 0,
+        shu: 0,
+        collection: 0,
+      };
+    }
+    grouped[key].delivery += r.delivery;
+    grouped[key].shu += r.shu;
+    grouped[key].collection += r.collection;
+  });
+  
+  const rows = Object.values(grouped).sort((a,b) => {
+    if(a.date !== b.date) return a.date.localeCompare(b.date);
+    return a.driverName.localeCompare(b.driverName);
+  });
+  
+  const listEl = document.getElementById('co-mc-list-content');
+  if(listEl){
+    if(rows.length === 0){
+      listEl.innerHTML = '<div style="text-align:center;padding:24px;color:var(--mid);font-size:12px;">該当データがありません</div>';
+    } else {
+      listEl.innerHTML = `
+        <table style="width:100%;border-collapse:collapse;font-size:11px;min-width:480px;">
+          <thead style="position:sticky;top:0;background:var(--bg3);">
+            <tr>
+              <th style="padding:6px 8px;border:1px solid var(--brd);text-align:left;">日付</th>
+              <th style="padding:6px 8px;border:1px solid var(--brd);text-align:left;">氏名</th>
+              <th style="padding:6px 8px;border:1px solid var(--brd);text-align:left;">顧客</th>
+              <th style="padding:6px 8px;border:1px solid var(--brd);text-align:left;">営業所</th>
+              <th style="padding:6px 8px;border:1px solid var(--brd);text-align:right;">配達</th>
+              <th style="padding:6px 8px;border:1px solid var(--brd);text-align:right;">集荷</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map(r => `
+              <tr>
+                <td style="padding:5px 8px;border:1px solid var(--brd);">${esc_n(r.date)}</td>
+                <td style="padding:5px 8px;border:1px solid var(--brd);">${esc_n(r.driverName)}</td>
+                <td style="padding:5px 8px;border:1px solid var(--brd);">${esc_n(r.customerName)}</td>
+                <td style="padding:5px 8px;border:1px solid var(--brd);font-size:10px;color:var(--mid);">${esc_n(r.office||'-')}</td>
+                <td style="padding:5px 8px;border:1px solid var(--brd);text-align:right;">${(r.delivery + r.shu).toLocaleString() || '-'}</td>
+                <td style="padding:5px 8px;border:1px solid var(--brd);text-align:right;">${r.collection.toLocaleString() || '-'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+  }
+  
+  // 確認・送信セクション更新
+  _updateCoMcConfirmSection(year, month, totalDel, totalShu, totalCol, workDays);
+}
+
+/** 月次確認データを取得(オーナー用) */
+function _getCoMcConfirmation(year, month){
+  if(!_ownerCompany) return null;
+  const ym = `${year}-${String(month+1).padStart(2,'0')}`;
+  const coId = String(_ownerCompany.id);
+  const adminId = `${_ownerCompany.companyCode || ''}-999`;
+  // 委託会社の管理者コード分の確認データ
+  return (MONTHLY_CONFIRMATIONS||[]).find(c => 
+    c.yearMonth === ym && (
+      String(c.driverId) === adminId ||
+      (c.driverType === 'corporate_admin' && String(c.companyId) === coId)
+    )
+  ) || null;
+}
+
+/** 確認・送信セクションのUI更新(オーナー用) */
+function _updateCoMcConfirmSection(year, month, totalDel, totalShu, totalCol, workDays){
+  if(!_ownerCompany) return;
+  const ym = `${year}-${String(month+1).padStart(2,'0')}`;
+  const conf = _getCoMcConfirmation(year, month);
+  const status = conf?.status || 'draft';
+  
+  // 確認期限: 委託会社は翌月7日まで
+  const deadline = new Date(year, month + 1, 7, 23, 59, 59);
+  const now = new Date();
+  const isFuture = (year > now.getFullYear()) || (year === now.getFullYear() && month >= now.getMonth());
+  const isPastDeadline = now > deadline;
+  
+  // ステータス表示
+  const statusEl = document.getElementById('co-mc-status');
+  if(statusEl){
+    if(status === 'approved'){
+      statusEl.innerHTML = '<span style="background:#10b981;color:#fff;padding:3px 10px;border-radius:10px;">✓ 承認済み(締め確定)</span>';
+    } else if(status === 'confirmed'){
+      statusEl.innerHTML = '<span style="background:#3b82f6;color:#fff;padding:3px 10px;border-radius:10px;">✓ 確認済み</span>';
+    } else if(isFuture){
+      statusEl.innerHTML = '<span style="background:#9ca3af;color:#fff;padding:3px 10px;border-radius:10px;">対象月外</span>';
+    } else if(isPastDeadline){
+      statusEl.innerHTML = '<span style="background:#dc2626;color:#fff;padding:3px 10px;border-radius:10px;">⚠ 期限超過</span>';
+    } else {
+      statusEl.innerHTML = '<span style="background:#f59e0b;color:#fff;padding:3px 10px;border-radius:10px;">未確認</span>';
+    }
+  }
+  
+  // 期限表示
+  const deadlineEl = document.getElementById('co-mc-deadline');
+  if(deadlineEl){
+    const dlStr = `${deadline.getFullYear()}年${deadline.getMonth()+1}月${deadline.getDate()}日`;
+    if(status === 'approved'){
+      deadlineEl.innerHTML = `承認日: ${conf.approvedAt ? new Date(conf.approvedAt).toLocaleDateString('ja-JP') : '不明'}<br>このデータは編集できません(締め確定済み)。`;
+    } else if(status === 'confirmed'){
+      deadlineEl.innerHTML = `確認日: ${conf.confirmedAt ? new Date(conf.confirmedAt).toLocaleDateString('ja-JP') : '不明'}<br>承認待ちです。`;
+    } else {
+      deadlineEl.innerHTML = `確認期限: <strong>${dlStr}まで</strong><br>${ym} の管理者コード使用分を確認してください。`;
+    }
+  }
+  
+  // 修正テキスト復元
+  const textEl = document.getElementById('co-mc-correction-text');
+  if(textEl){
+    textEl.value = conf?.correctionText || '';
+    textEl.disabled = (status === 'approved');
+  }
+  
+  // 確認ボタン
+  const btn = document.getElementById('co-mc-confirm-btn');
+  if(btn){
+    if(status === 'approved'){
+      btn.style.display = 'none';
+    } else if(isFuture){
+      btn.style.display = 'block';
+      btn.disabled = true;
+      btn.style.opacity = '0.5';
+      btn.style.cursor = 'not-allowed';
+      btn.textContent = '対象月外';
+    } else if(status === 'confirmed'){
+      btn.style.display = 'block';
+      btn.disabled = false;
+      btn.style.opacity = '1';
+      btn.style.cursor = 'pointer';
+      btn.textContent = '確認内容を更新';
+      btn.style.background = '#3b82f6';
+    } else {
+      btn.style.display = 'block';
+      btn.disabled = false;
+      btn.style.opacity = '1';
+      btn.style.cursor = 'pointer';
+      btn.textContent = 'この内容で確認しました';
+      btn.style.background = 'var(--clay)';
+    }
+  }
+}
+
+/** 月次確認の送信(オーナー用) */
+async function submitCoMonthlyConfirmation(){
+  if(!_ownerCompany) return;
+  const {year, month} = _coMcState;
+  const ym = `${year}-${String(month+1).padStart(2,'0')}`;
+  const correctionText = (document.getElementById('co-mc-correction-text')?.value || '').trim();
+  const adminId = `${_ownerCompany.companyCode || ''}-999`;
+  
+  const conf = _getCoMcConfirmation(year, month);
+  if(conf?.status === 'approved'){
+    toast('承認済みのデータは変更できません');
+    return;
+  }
+  
+  // 集計データを再取得
+  const rawData = _coMcGatherRawData(year, month);
+  const totalDel = rawData.reduce((a, r) => a + r.delivery + r.shu, 0);
+  const totalCol = rawData.reduce((a, r) => a + r.collection, 0);
+  const totalShu = rawData.reduce((a, r) => a + r.shu, 0);
+  const workDays = new Set(rawData.map(r => r.date)).size;
+  
+  const isUpdate = !!conf;
+  const msg = isUpdate
+    ? `${ym} の確認内容を更新しますか?\n\n配達: ${totalDel}\n集荷: ${totalCol}\n稼働: ${workDays}日`
+    : `${ym} の月次確認を送信しますか?\n\n配達: ${totalDel}\n集荷: ${totalCol}\n稼働: ${workDays}日\n\n確認後、内勤の承認待ちとなります。`;
+  
+  if(!confirm(msg)) return;
+  
+  const btn = document.getElementById('co-mc-confirm-btn');
+  if(btn){ btn.disabled = true; btn.textContent = '送信中...'; }
+  
+  try{
+    const newConf = {
+      ...(conf || {}),
+      yearMonth: ym,
+      driverId: adminId,
+      driverName: `${_ownerCompany.name} (管理者コード使用分)`,
+      driverType: 'corporate_admin',
+      companyId: _ownerCompany.id,
+      companyName: _ownerCompany.name,
+      status: 'confirmed',
+      confirmedAt: new Date().toISOString(),
+      correctionText: correctionText,
+      totalDel: totalDel,
+      totalCol: totalCol,
+      totalShu: totalShu,
+      workDays: workDays,
+      // 詳細データも保存(後で内勤側で再現できるように)
+      details: rawData.map(r => ({
+        date: r.date,
+        driverName: r.driverName,
+        customerName: r.customerName,
+        office: r.office,
+        delivery: r.delivery,
+        shu: r.shu,
+        collection: r.collection,
+      })),
+    };
+    
+    // ローカル更新
+    const idx = MONTHLY_CONFIRMATIONS.findIndex(c => 
+      c.yearMonth === ym && (
+        String(c.driverId) === adminId ||
+        (c.driverType === 'corporate_admin' && String(c.companyId) === String(_ownerCompany.id))
+      )
+    );
+    if(idx >= 0) MONTHLY_CONFIRMATIONS[idx] = newConf;
+    else MONTHLY_CONFIRMATIONS.push(newConf);
+    
+    // localStorage に保存
+    ls_set('nikki_monthly_confirmations', MONTHLY_CONFIRMATIONS);
+    
+    // Firebase 保存
+    if(typeof fbSet === 'function'){
+      await fbSet('monthly_confirmations', MONTHLY_CONFIRMATIONS);
+    }
+    
+    toast('✓ 月次確認を送信しました');
+    
+    // UIを更新
+    renderCoMcView();
+    
+  }catch(e){
+    alert('送信エラー: ' + e.message);
+    if(btn){ btn.disabled = false; btn.textContent = 'この内容で確認しました'; }
+  }
 }
 
 // 会社所属ドライバー一覧
@@ -12093,6 +12605,13 @@ function _completeLogin(d){
     _enterWorkMode(d);
     return;
   }
+  // 10001-999(管理者コード/突発ドライバー)は月次確認・設定を非表示
+  // 月次確認はオーナーが代理で提出するため
+  const isAdminCode = d._isSharedCode || /^\d{5}-999$/.test(String(d.id || ''));
+  const viewBtn = document.getElementById('mode-view-btn');
+  if(viewBtn){
+    viewBtn.style.display = isAdminCode ? 'none' : 'block';
+  }
   show('scr-mode');
 }
 
@@ -12131,6 +12650,14 @@ function _isManagerUser(d){
 // モード選択
 function enterMode(mode){
   if(!driver) return;
+  // 10001-999(管理者コード/突発ドライバー)は月次確認・設定をブロック
+  if(mode === 'view'){
+    const isAdminCode = driver._isSharedCode || /^\d{5}-999$/.test(String(driver.id || ''));
+    if(isAdminCode){
+      toast('管理者コードでは月次確認は使用できません(オーナーから提出)', 'err');
+      return;
+    }
+  }
   if(mode === 'work'){
     _enterWorkMode(driver);
   } else if(mode === 'view'){
