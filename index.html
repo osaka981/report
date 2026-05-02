@@ -13078,24 +13078,7 @@ function renderMonthlyView(){
 // 月次確認(Phase A: 2026/05/02)
 // ══════════════════════════════════════════════════
 // MONTHLY_CONFIRMATIONS はトップレベルで宣言済み
-
-/** Firebase から月次確認データを取得 */
-async function _loadMonthlyConfirmations(){
-  try{
-    const ref = window._fbRef('monthly_confirmations');
-    if(!ref) return;
-    const { onValue } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js');
-    onValue(ref, snap => {
-      if(!snap.exists()){ MONTHLY_CONFIRMATIONS = []; return; }
-      const v = snap.val();
-      MONTHLY_CONFIRMATIONS = Array.isArray(v) ? v : Object.values(v);
-      // 月次確認画面が開いていれば再描画
-      if($('scr-monthly') && $('scr-monthly').classList.contains('on')){
-        _updateMonthlyConfirmSection(_mvState.year, _mvState.month);
-      }
-    });
-  }catch(e){ console.warn('月次確認データ取得エラー:', e); }
-}
+// onValue で nikki/monthly_confirmations を購読済み
 
 /** 月次確認の状態タイプ判定 */
 function _getDriverType(){
@@ -13218,7 +13201,7 @@ async function submitMonthlyConfirmation(){
   
   const conf = _getMonthlyConfirmation(year, month);
   if(conf?.status === 'approved'){
-    showToast('承認済みのデータは変更できません');
+    toast('承認済みのデータは変更できません');
     return;
   }
   
@@ -13257,12 +13240,15 @@ async function submitMonthlyConfirmation(){
     if(idx >= 0) MONTHLY_CONFIRMATIONS[idx] = newConf;
     else MONTHLY_CONFIRMATIONS.push(newConf);
     
+    // localStorage に保存
+    ls_set('nikki_monthly_confirmations', MONTHLY_CONFIRMATIONS);
+    
     // Firebase 保存
-    if(typeof _fbSaveData === 'function'){
-      await _fbSaveData('monthly_confirmations', MONTHLY_CONFIRMATIONS);
+    if(typeof fbSet === 'function'){
+      await fbSet('monthly_confirmations', MONTHLY_CONFIRMATIONS);
     }
     
-    showToast('✓ 月次確認を送信しました');
+    toast('✓ 月次確認を送信しました');
     
     // UIを更新
     _updateMonthlyConfirmSection(year, month, data.totals);
