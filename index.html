@@ -12445,17 +12445,29 @@ function renderSurveyAnswerScreen(){
   const myResponses = (SURVEY_RESPONSES||[]).filter(r => String(r.surveyId) === String(_sraState.surveyId) && driverCustIds.includes(String(r.customerId)));
   const replied = myResponses.filter(r => r.status === 'replied' || r.status === 'no_change').length;
   const total = myResponses.length;
+  // 顧客本人回答 vs ドライバー代理 の内訳
+  const customerReplied = myResponses.filter(r => 
+    (r.status === 'replied' || r.status === 'no_change') && r.source === 'customer_email'
+  ).length;
+  const driverReplied = replied - customerReplied;
   // 進捗バー
   const progressEl = document.getElementById('sra-progress');
   if(progressEl){
     const pct = total > 0 ? Math.round(replied/total*100) : 0;
+    let breakdown = '';
+    if(replied > 0){
+      const parts = [];
+      if(customerReplied > 0) parts.push(`<span style="color:#0369a1;">✉ 顧客${customerReplied}</span>`);
+      if(driverReplied > 0) parts.push(`<span style="color:#059669;">代理${driverReplied}</span>`);
+      breakdown = `<div style="font-size:10px;color:var(--mid);margin-top:3px;">内訳: ${parts.join(' / ')}</div>`;
+    }
     progressEl.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
       <span style="font-size:12px;color:var(--ink);font-weight:600;">回答状況</span>
       <span style="font-size:12px;color:var(--ink);font-weight:600;">${replied}/${total}社 (${pct}%)</span>
     </div>
     <div style="background:#e5e7eb;height:6px;border-radius:3px;overflow:hidden;">
       <div style="height:100%;background:${pct >= 100 ? '#10b981' : (pct >= 50 ? '#3b82f6' : '#f59e0b')};width:${pct}%;"></div>
-    </div>`;
+    </div>${breakdown}`;
   }
   // 顧客リスト
   const listEl = document.getElementById('sra-customer-list');
@@ -12469,13 +12481,25 @@ function renderSurveyAnswerScreen(){
     listEl.innerHTML = myResponses.map(r => {
       // この顧客の関連 SCHEDULE_OVERRIDES
       const overrides = (SCHEDULE_OVERRIDES||[]).filter(o => 
-        (o.surveyId === _sraState.surveyId) && 
+        (o.surveyId === _sraState.surveyId || o.surveySourceId === _sraState.surveyId) && 
         String(o.customerId) === String(r.customerId)
       );
       const isReplied = r.status === 'replied' || r.status === 'no_change';
-      const summary = overrides.length === 0 
-        ? (r.status === 'no_change' ? '✓ 変更なし' : '未回答') 
-        : overrides.map(o => {
+      const isCustomerReply = r.source === 'customer_email';
+      // ソースタグ
+      const sourceTag = isReplied ? (
+        isCustomerReply
+          ? '<span style="background:#0ea5e9;color:#fff;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;margin-left:4px;">✉ 顧客回答</span>'
+          : '<span style="background:#10b981;color:#fff;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;margin-left:4px;">代理</span>'
+      ) : '';
+      // サマリー判定: status を最優先、overrides の有無は補助情報
+      let summary;
+      if(r.status === 'no_change'){
+        summary = '✓ 変更なし';
+      } else if(r.status === 'replied'){
+        // 回答済みだが overrides が見つからない場合、SURVEY_RESPONSES.schedules を参照
+        if(overrides.length > 0){
+          summary = overrides.map(o => {
             if(o.kind === 'rest') return `${o.date} 休`;
             if(o.kind === 'time'){
               const range = _fmtSchedTimeLabel(o.startTime, o.endTime);
@@ -12483,13 +12507,29 @@ function renderSurveyAnswerScreen(){
             }
             return o.date;
           }).join(', ');
-      const bg = isReplied ? 'rgba(16,185,129,.08)' : 'var(--card)';
-      const border = isReplied ? 'rgba(16,185,129,.3)' : 'var(--brd)';
+        } else if(r.schedules && r.schedules.length > 0){
+          // 顧客回答を直接表示(取り込み未完了の場合の対応)
+          summary = r.schedules.map(s => {
+            if(s.kind === 'rest') return `${s.date} 休`;
+            if(s.kind === 'time'){
+              const range = _fmtSchedTimeLabel(s.startTime, s.endTime);
+              return range ? `${s.date} ${range}` : s.date;
+            }
+            return s.date;
+          }).join(', ');
+        } else {
+          summary = '✓ 回答済み';
+        }
+      } else {
+        summary = '未回答';
+      }
+      const bg = isReplied ? (isCustomerReply ? 'rgba(14,165,233,.08)' : 'rgba(16,185,129,.08)') : 'var(--card)';
+      const border = isReplied ? (isCustomerReply ? 'rgba(14,165,233,.3)' : 'rgba(16,185,129,.3)') : 'var(--brd)';
       return `<div style="background:${bg};border:1.5px solid ${border};border-radius:10px;padding:10px 12px;display:flex;align-items:center;gap:8px;">
         <input type="checkbox" class="sra-cust-cb" data-cid="${esc_n(r.customerId)}" data-name="${esc_n(r.customerName||'')}" onchange="_sraUpdateBulkBtn()" style="width:18px;height:18px;flex-shrink:0;">
         <div style="flex:1;min-width:0;">
-          <div style="font-size:13px;font-weight:600;color:var(--ink);">${esc_n(r.customerName||'')}</div>
-          <div style="font-size:10px;color:${isReplied ? '#059669' : 'var(--mid)'};margin-top:2px;line-height:1.5;">${esc_n(summary)}</div>
+          <div style="font-size:13px;font-weight:600;color:var(--ink);">${esc_n(r.customerName||'')}${sourceTag}</div>
+          <div style="font-size:10px;color:${isReplied ? (isCustomerReply ? '#0369a1' : '#059669') : 'var(--mid)'};margin-top:2px;line-height:1.5;">${esc_n(summary)}</div>
         </div>
         <button class="btn b-prim btn-sm" onclick="_sraOpenSingleEdit('${esc_n(r.customerId)}', '${esc_n(r.customerName||'')}')" style="flex-shrink:0;">編集</button>
       </div>`;
