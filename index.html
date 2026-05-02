@@ -1207,6 +1207,31 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
     <div id="mv-view-list" class="mv-view" style="display:none;">
       <div id="mv-list-wrap"></div>
     </div>
+    
+    <!-- 確認・送信セクション(Phase A) -->
+    <div id="mv-confirm-section" style="margin-top:24px;background:var(--card);border:1.5px solid var(--brd);border-radius:12px;padding:14px 16px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div style="font-size:13px;font-weight:700;color:var(--ink);">📋 月次確認</div>
+        <div id="mv-confirm-status" style="font-size:11px;font-weight:700;"></div>
+      </div>
+      
+      <div id="mv-confirm-deadline" style="font-size:11px;color:var(--mid);margin-bottom:10px;line-height:1.6;"></div>
+      
+      <!-- 修正テキスト入力 -->
+      <div style="margin-bottom:12px;">
+        <label style="font-size:11px;font-weight:600;color:var(--ink);display:block;margin-bottom:4px;">修正・備考(任意)</label>
+        <textarea id="mv-correction-text" rows="3" placeholder="例: 5月15日の集荷数が3個少なく登録されています。" 
+          style="width:100%;padding:8px 10px;font-size:12px;border:1px solid var(--brd);border-radius:6px;background:var(--card);color:var(--ink);resize:vertical;box-sizing:border-box;"></textarea>
+      </div>
+      
+      <!-- 確認ボタン -->
+      <button id="mv-confirm-btn" onclick="submitMonthlyConfirmation()" 
+        style="width:100%;padding:12px;background:var(--clay);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">
+        この内容で確認しました
+      </button>
+      
+      <div id="mv-confirm-info" style="font-size:10px;color:var(--mid);margin-top:8px;line-height:1.6;"></div>
+    </div>
   </div>
 </div>
 
@@ -1941,6 +1966,19 @@ function setupRealtimeSync() {
       if(typeof renderColBlocks === 'function' && document.getElementById('scr-col')?.classList.contains('on')) renderColBlocks();
     }
   });
+  // 月次確認(Phase A: 2026/05/02)
+  onValue(ref(fbDB, 'nikki/monthly_confirmations'), snap => {
+    if(snap.exists()){
+      const v = snap.val();
+      const arr = Array.isArray(v) ? v : (v ? Object.values(v) : []);
+      MONTHLY_CONFIRMATIONS = arr;
+      ls_set('nikki_monthly_confirmations', MONTHLY_CONFIRMATIONS);
+      // 月次確認画面が開いていれば再描画
+      if(typeof _updateMonthlyConfirmSection === 'function' && document.getElementById('scr-monthly')?.classList.contains('on')){
+        _updateMonthlyConfirmSection(_mvState.year, _mvState.month);
+      }
+    }
+  });
   // アプリ内通知(Phase C)
   onValue(ref(fbDB, 'nikki/notifications'), snap => {
     if(snap.exists()){
@@ -2069,6 +2107,7 @@ let SCHEDULE_LOGS = ls_get(LS.SCHEDULE_LOGS, []);
 // 顧客申し送りメモ(Phase 1: 2026/05/01追加)
 let CUSTOMER_NOTES = ls_get(LS.CUSTOMER_NOTES, []);
 let NOTIFICATIONS = ls_get(LS.NOTIFICATIONS, []); // アプリ内通知 Phase C
+let MONTHLY_CONFIRMATIONS = ls_get('nikki_monthly_confirmations', []); // 月次確認 Phase A (2026/05/02追加)
 let COMPANIES = (()=>{ try{ return JSON.parse(localStorage.getItem('nikki_companies')||'[]'); }catch(e){ return []; } })(); // 委託会社マスタ(オーナーログイン用)
 // 営業所マスタ：DRIVERSから自動生成して初期値として使用
 let OFFICES = ls_get(LS.OFFICES,(()=>{
@@ -13029,6 +13068,208 @@ function renderMonthlyView(){
     _renderMvCalendar(data);
   } else {
     _renderMvList(data);
+  }
+  
+  // 月次確認セクションの状態を更新
+  _updateMonthlyConfirmSection(year, month, data.totals);
+}
+
+// ══════════════════════════════════════════════════
+// 月次確認(Phase A: 2026/05/02)
+// ══════════════════════════════════════════════════
+// MONTHLY_CONFIRMATIONS はトップレベルで宣言済み
+
+/** Firebase から月次確認データを取得 */
+async function _loadMonthlyConfirmations(){
+  try{
+    const ref = window._fbRef('monthly_confirmations');
+    if(!ref) return;
+    const { onValue } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js');
+    onValue(ref, snap => {
+      if(!snap.exists()){ MONTHLY_CONFIRMATIONS = []; return; }
+      const v = snap.val();
+      MONTHLY_CONFIRMATIONS = Array.isArray(v) ? v : Object.values(v);
+      // 月次確認画面が開いていれば再描画
+      if($('scr-monthly') && $('scr-monthly').classList.contains('on')){
+        _updateMonthlyConfirmSection(_mvState.year, _mvState.month);
+      }
+    });
+  }catch(e){ console.warn('月次確認データ取得エラー:', e); }
+}
+
+/** 月次確認の状態タイプ判定 */
+function _getDriverType(){
+  if(!driver) return 'personal';
+  // driverNo が「NNNNN-NNN」形式なら委託会社所属
+  if(/^\d{5}-\d{3}$/.test(String(driver.id || ''))) return 'corporate';
+  if(driver.companyId) return 'corporate';
+  return 'personal';
+}
+
+/** 確認期限を取得(個人=翌月3日、委託=翌月7日) */
+function _getMonthlyDeadline(year, month){
+  const deadline = new Date(year, month + 1, _getDriverType() === 'corporate' ? 7 : 3, 23, 59, 59);
+  return deadline;
+}
+
+/** 月次確認データを取得・新規作成 */
+function _getMonthlyConfirmation(year, month){
+  if(!driver) return null;
+  const ym = `${year}-${String(month+1).padStart(2,'0')}`;
+  const driverId = String(driver.id);
+  const found = MONTHLY_CONFIRMATIONS.find(c => 
+    c.yearMonth === ym && String(c.driverId) === driverId
+  );
+  return found || null;
+}
+
+/** 月次確認セクションのUI更新 */
+function _updateMonthlyConfirmSection(year, month, totals){
+  const section = $('mv-confirm-section');
+  if(!section || !driver) return;
+  
+  const ym = `${year}-${String(month+1).padStart(2,'0')}`;
+  const conf = _getMonthlyConfirmation(year, month);
+  const status = conf?.status || 'draft';
+  const deadline = _getMonthlyDeadline(year, month);
+  const now = new Date();
+  const isFuture = (year > now.getFullYear()) || (year === now.getFullYear() && month >= now.getMonth());
+  const isPastDeadline = now > deadline;
+  
+  // ステータス表示
+  const statusEl = $('mv-confirm-status');
+  if(statusEl){
+    if(status === 'approved'){
+      statusEl.innerHTML = '<span style="background:#10b981;color:#fff;padding:3px 10px;border-radius:10px;">✓ 承認済み(締め確定)</span>';
+    } else if(status === 'confirmed'){
+      statusEl.innerHTML = '<span style="background:#3b82f6;color:#fff;padding:3px 10px;border-radius:10px;">✓ 確認済み</span>';
+    } else if(isFuture){
+      statusEl.innerHTML = '<span style="background:#9ca3af;color:#fff;padding:3px 10px;border-radius:10px;">対象月外(まだ確認できません)</span>';
+    } else if(isPastDeadline){
+      statusEl.innerHTML = '<span style="background:#dc2626;color:#fff;padding:3px 10px;border-radius:10px;">⚠️ 期限超過</span>';
+    } else {
+      statusEl.innerHTML = '<span style="background:#f59e0b;color:#fff;padding:3px 10px;border-radius:10px;">未確認</span>';
+    }
+  }
+  
+  // 期限表示
+  const deadlineEl = $('mv-confirm-deadline');
+  if(deadlineEl){
+    const dlStr = `${deadline.getFullYear()}年${deadline.getMonth()+1}月${deadline.getDate()}日`;
+    const driverType = _getDriverType() === 'corporate' ? '委託会社' : '個人直属';
+    if(status === 'approved'){
+      deadlineEl.innerHTML = `承認日: ${conf.approvedAt ? new Date(conf.approvedAt).toLocaleDateString('ja-JP') : '不明'}<br>このデータは編集できません(締め確定済み)。`;
+    } else if(status === 'confirmed'){
+      deadlineEl.innerHTML = `確認日: ${conf.confirmedAt ? new Date(conf.confirmedAt).toLocaleDateString('ja-JP') : '不明'}<br>承認待ちです。修正があれば再度確認できます。`;
+    } else {
+      deadlineEl.innerHTML = `確認期限(${driverType}): <strong>${dlStr}まで</strong><br>${ym} の数量を確認し、修正があれば下記に記載してください。`;
+    }
+  }
+  
+  // 修正テキスト復元
+  const textEl = $('mv-correction-text');
+  if(textEl){
+    textEl.value = conf?.correctionText || '';
+    textEl.disabled = (status === 'approved');
+  }
+  
+  // 確認ボタン
+  const btn = $('mv-confirm-btn');
+  if(btn){
+    if(status === 'approved'){
+      btn.style.display = 'none';
+    } else if(isFuture){
+      btn.style.display = 'block';
+      btn.disabled = true;
+      btn.style.opacity = '0.5';
+      btn.style.cursor = 'not-allowed';
+      btn.textContent = '対象月外';
+    } else if(status === 'confirmed'){
+      btn.style.display = 'block';
+      btn.disabled = false;
+      btn.style.opacity = '1';
+      btn.style.cursor = 'pointer';
+      btn.textContent = '確認内容を更新';
+      btn.style.background = '#3b82f6';
+    } else {
+      btn.style.display = 'block';
+      btn.disabled = false;
+      btn.style.opacity = '1';
+      btn.style.cursor = 'pointer';
+      btn.textContent = 'この内容で確認しました';
+      btn.style.background = 'var(--clay)';
+    }
+  }
+  
+  // 補足情報
+  const infoEl = $('mv-confirm-info');
+  if(infoEl){
+    infoEl.textContent = '※ 確認後も承認されるまでは修正できます。承認されると編集できなくなります。';
+  }
+}
+
+/** 月次確認の送信 */
+async function submitMonthlyConfirmation(){
+  if(!driver) return;
+  const {year, month} = _mvState;
+  const ym = `${year}-${String(month+1).padStart(2,'0')}`;
+  const correctionText = ($('mv-correction-text')?.value || '').trim();
+  const data = _mvCollectMonth(year, month);
+  
+  const conf = _getMonthlyConfirmation(year, month);
+  if(conf?.status === 'approved'){
+    showToast('承認済みのデータは変更できません');
+    return;
+  }
+  
+  // 確認メッセージ
+  const isUpdate = !!conf;
+  const msg = isUpdate
+    ? `${ym} の確認内容を更新しますか?\n\n配達: ${data.totals.del}\n集荷: ${data.totals.col}\n稼働: ${data.totals.workDays}日`
+    : `${ym} の月次確認を送信しますか?\n\n配達: ${data.totals.del}\n集荷: ${data.totals.col}\n稼働: ${data.totals.workDays}日\n\n確認後、内勤の承認待ちとなります。`;
+  
+  if(!confirm(msg)) return;
+  
+  const btn = $('mv-confirm-btn');
+  if(btn){ btn.disabled = true; btn.textContent = '送信中...'; }
+  
+  try{
+    const newConf = {
+      ...(conf || {}),
+      yearMonth: ym,
+      driverId: String(driver.id),
+      driverName: driver.name || '',
+      driverType: _getDriverType(),
+      companyId: driver.companyId || null,
+      status: 'confirmed',
+      confirmedAt: new Date().toISOString(),
+      correctionText: correctionText,
+      totalDel: data.totals.del,
+      totalCol: data.totals.col,
+      totalShu: data.totals.shu,
+      workDays: data.totals.workDays,
+    };
+    
+    // ローカル更新
+    const idx = MONTHLY_CONFIRMATIONS.findIndex(c => 
+      c.yearMonth === ym && String(c.driverId) === String(driver.id)
+    );
+    if(idx >= 0) MONTHLY_CONFIRMATIONS[idx] = newConf;
+    else MONTHLY_CONFIRMATIONS.push(newConf);
+    
+    // Firebase 保存
+    if(typeof _fbSaveData === 'function'){
+      await _fbSaveData('monthly_confirmations', MONTHLY_CONFIRMATIONS);
+    }
+    
+    showToast('✓ 月次確認を送信しました');
+    
+    // UIを更新
+    _updateMonthlyConfirmSection(year, month, data.totals);
+    
+  }catch(e){
+    alert('送信エラー: ' + e.message);
+    if(btn){ btn.disabled = false; btn.textContent = 'この内容で確認しました'; }
   }
 }
 
