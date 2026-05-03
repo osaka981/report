@@ -1463,9 +1463,21 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
       
       <!-- 合計サマリー -->
       <div class="mv-sum-grid">
-        <div class="mv-sum-box"><div class="mv-sum-lbl">配達</div><div class="mv-sum-val del" id="co-mc-total-del">0</div></div>
-        <div class="mv-sum-box"><div class="mv-sum-lbl">定時集荷</div><div class="mv-sum-val shu" id="co-mc-total-shu">0</div></div>
-        <div class="mv-sum-box"><div class="mv-sum-lbl">集荷事業</div><div class="mv-sum-val col" id="co-mc-total-col">0</div></div>
+        <div class="mv-sum-box" onclick="coMcShowDetail('del')" style="cursor:pointer;">
+          <div class="mv-sum-lbl">完了+転送還付</div>
+          <div class="mv-sum-val del" id="co-mc-total-del">0</div>
+          <div style="font-size:9px;color:var(--mid);margin-top:2px;">タップで詳細</div>
+        </div>
+        <div class="mv-sum-box" onclick="coMcShowDetail('shu')" style="cursor:pointer;">
+          <div class="mv-sum-lbl">定時集荷</div>
+          <div class="mv-sum-val shu" id="co-mc-total-shu">0</div>
+          <div style="font-size:9px;color:var(--mid);margin-top:2px;">タップで詳細</div>
+        </div>
+        <div class="mv-sum-box" onclick="coMcShowDetail('col')" style="cursor:pointer;">
+          <div class="mv-sum-lbl">集荷事業</div>
+          <div class="mv-sum-val col" id="co-mc-total-col">0</div>
+          <div style="font-size:9px;color:var(--mid);margin-top:2px;">タップで詳細</div>
+        </div>
       </div>
       <div class="mv-workdays" id="co-mc-workdays">稼働 0 日</div>
       
@@ -8446,19 +8458,27 @@ function _coMcGatherRawData(year, month){
     
     const f = r.form || {};
     const del = f.del || {};
-    const delTotal = (del.kanryo||0) + (del.tenso||0) + (del.kangenpu||0);
+    const mochidashi = del.mochidashi || del.持出 || 0;
+    const kanryo = del.kanryo || 0;
+    const tenso = del.tenso || 0;
+    const kangenpu = del.kangenpu || 0;
     const yakan = del.yakan || 0;
     const ogata = del.ogata || 0;
+    const delMain = kanryo + tenso + kangenpu; // 完了+転送還付
     
-    if(delTotal > 0 || yakan > 0 || ogata > 0){
+    if(delMain > 0 || yakan > 0 || ogata > 0 || mochidashi > 0){
       result.push({
         date: r.date,
         driverName: r.driver.name || r.driver._inputName || '(不明)',
         customerName: r.postOffice || '(郵便局)',
         office: r.driver.office || '',
-        delivery: delTotal + yakan + ogata,
+        delivery: delMain,  // 完了+転送還付
+        yakan: yakan,
+        ogata: ogata,
+        mochidashi: mochidashi,
         shu: 0,
         collection: 0,
+        type: 'delivery',
       });
     }
     
@@ -8472,8 +8492,12 @@ function _coMcGatherRawData(year, month){
           customerName: c.name || c.companyName || '(集荷会社)',
           office: r.driver.office || '',
           delivery: 0,
+          yakan: 0,
+          ogata: 0,
+          mochidashi: 0,
           shu: cnt,
           collection: 0,
+          type: 'shu',
         });
       }
     });
@@ -8499,8 +8523,12 @@ function _coMcGatherRawData(year, month){
             customerName: b.custName || '(顧客不明)',
             office: r.driver.office || '',
             delivery: 0,
+            yakan: 0,
+            ogata: 0,
+            mochidashi: 0,
             shu: 0,
             collection: totalCnt,
+            type: 'col',
           });
         }
       } else if(b.type === 'route'){
@@ -8515,8 +8543,12 @@ function _coMcGatherRawData(year, month){
               customerName: c.custName || c.name || '(顧客不明)',
               office: r.driver.office || '',
               delivery: 0,
+              yakan: 0,
+              ogata: 0,
+              mochidashi: 0,
               shu: 0,
               collection: totalCnt,
+              type: 'col',
             });
           }
         });
@@ -8525,6 +8557,152 @@ function _coMcGatherRawData(year, month){
   });
   
   return result;
+}
+
+/** 詳細モーダル(配達/定時集荷/集荷事業) */
+function coMcShowDetail(type){
+  if(!_ownerCompany) return;
+  const {year, month} = _coMcState;
+  const rawData = _coMcGatherRawData(year, month);
+  
+  // フィルタ適用(現在の絞り込み状態を引き継ぐ)
+  const fName = document.getElementById('co-mc-name-filter')?.value || '';
+  const fCust = document.getElementById('co-mc-cust-filter')?.value || '';
+  const fOff = document.getElementById('co-mc-office-filter')?.value || '';
+  
+  let filtered = rawData;
+  if(fName) filtered = filtered.filter(r => r.driverName === fName);
+  if(fCust) filtered = filtered.filter(r => r.customerName === fCust);
+  if(fOff) filtered = filtered.filter(r => r.office === fOff);
+  
+  // typeで分岐
+  let title, contentHtml;
+  if(type === 'del'){
+    title = '配達 詳細(完了+転送還付・夜間・大型・持出数)';
+    const delData = filtered.filter(r => r.type === 'delivery');
+    const totalKanryo = delData.reduce((a,r) => a + r.delivery, 0);
+    const totalYakan = delData.reduce((a,r) => a + r.yakan, 0);
+    const totalOgata = delData.reduce((a,r) => a + r.ogata, 0);
+    const totalMochi = delData.reduce((a,r) => a + r.mochidashi, 0);
+    
+    contentHtml = `
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px;">
+        <div style="background:var(--bg3);padding:10px;border-radius:6px;text-align:center;">
+          <div style="font-size:10px;color:var(--mid);">持出数</div>
+          <div style="font-size:18px;font-weight:700;color:var(--ink);">${totalMochi.toLocaleString()}</div>
+        </div>
+        <div style="background:var(--bg3);padding:10px;border-radius:6px;text-align:center;">
+          <div style="font-size:10px;color:var(--mid);">完了+転送還付</div>
+          <div style="font-size:18px;font-weight:700;color:var(--ink);">${totalKanryo.toLocaleString()}</div>
+        </div>
+        <div style="background:var(--bg3);padding:10px;border-radius:6px;text-align:center;">
+          <div style="font-size:10px;color:var(--mid);">夜間</div>
+          <div style="font-size:18px;font-weight:700;color:var(--ink);">${totalYakan.toLocaleString()}</div>
+        </div>
+        <div style="background:var(--bg3);padding:10px;border-radius:6px;text-align:center;">
+          <div style="font-size:10px;color:var(--mid);">大型</div>
+          <div style="font-size:18px;font-weight:700;color:var(--ink);">${totalOgata.toLocaleString()}</div>
+        </div>
+      </div>
+      <div style="font-size:10.5px;color:var(--mid);margin-bottom:6px;">日別内訳</div>
+      <table style="width:100%;border-collapse:collapse;font-size:11px;">
+        <thead style="background:var(--bg3);"><tr>
+          <th style="padding:5px 8px;border:1px solid var(--brd);text-align:left;">日付</th>
+          <th style="padding:5px 8px;border:1px solid var(--brd);text-align:left;">氏名</th>
+          <th style="padding:5px 8px;border:1px solid var(--brd);text-align:right;">持出</th>
+          <th style="padding:5px 8px;border:1px solid var(--brd);text-align:right;">完了+還付</th>
+          <th style="padding:5px 8px;border:1px solid var(--brd);text-align:right;">夜間</th>
+          <th style="padding:5px 8px;border:1px solid var(--brd);text-align:right;">大型</th>
+        </tr></thead>
+        <tbody>
+          ${delData.length === 0 ? '<tr><td colspan="6" style="padding:18px;text-align:center;color:var(--mid);">データなし</td></tr>' : 
+            delData.sort((a,b)=>a.date.localeCompare(b.date)).map(r => `
+            <tr>
+              <td style="padding:4px 8px;border:1px solid var(--brd);">${esc_n(r.date)}</td>
+              <td style="padding:4px 8px;border:1px solid var(--brd);">${esc_n(r.driverName)}</td>
+              <td style="padding:4px 8px;border:1px solid var(--brd);text-align:right;">${r.mochidashi||'-'}</td>
+              <td style="padding:4px 8px;border:1px solid var(--brd);text-align:right;">${r.delivery||'-'}</td>
+              <td style="padding:4px 8px;border:1px solid var(--brd);text-align:right;">${r.yakan||'-'}</td>
+              <td style="padding:4px 8px;border:1px solid var(--brd);text-align:right;">${r.ogata||'-'}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`;
+  } else if(type === 'shu'){
+    title = '定時集荷 詳細(集荷会社別)';
+    const shuData = filtered.filter(r => r.type === 'shu');
+    // 会社別集計
+    const byCust = {};
+    shuData.forEach(r => {
+      if(!byCust[r.customerName]) byCust[r.customerName] = {total:0, days:[]};
+      byCust[r.customerName].total += r.shu;
+      byCust[r.customerName].days.push({date:r.date, driverName:r.driverName, count:r.shu});
+    });
+    contentHtml = `
+      <div style="font-size:10.5px;color:var(--mid);margin-bottom:6px;">集荷会社別</div>
+      <table style="width:100%;border-collapse:collapse;font-size:11px;">
+        <thead style="background:var(--bg3);"><tr>
+          <th style="padding:5px 8px;border:1px solid var(--brd);text-align:left;">集荷会社</th>
+          <th style="padding:5px 8px;border:1px solid var(--brd);text-align:right;">合計</th>
+          <th style="padding:5px 8px;border:1px solid var(--brd);text-align:left;">内訳(日付/氏名/件数)</th>
+        </tr></thead>
+        <tbody>
+          ${Object.keys(byCust).length === 0 ? '<tr><td colspan="3" style="padding:18px;text-align:center;color:var(--mid);">データなし</td></tr>' :
+            Object.entries(byCust).sort((a,b) => b[1].total - a[1].total).map(([name, info]) => `
+            <tr>
+              <td style="padding:4px 8px;border:1px solid var(--brd);">${esc_n(name)}</td>
+              <td style="padding:4px 8px;border:1px solid var(--brd);text-align:right;font-weight:700;">${info.total.toLocaleString()}</td>
+              <td style="padding:4px 8px;border:1px solid var(--brd);font-size:10px;color:var(--mid);">${info.days.map(d => `${d.date.slice(5)} ${esc_n(d.driverName)} ${d.count}件`).join(' / ')}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`;
+  } else if(type === 'col'){
+    title = '集荷事業 詳細(顧客別)';
+    const colData = filtered.filter(r => r.type === 'col');
+    // 顧客別集計
+    const byCust = {};
+    colData.forEach(r => {
+      if(!byCust[r.customerName]) byCust[r.customerName] = {total:0, days:[]};
+      byCust[r.customerName].total += r.collection;
+      byCust[r.customerName].days.push({date:r.date, driverName:r.driverName, count:r.collection});
+    });
+    contentHtml = `
+      <div style="font-size:10.5px;color:var(--mid);margin-bottom:6px;">顧客別</div>
+      <table style="width:100%;border-collapse:collapse;font-size:11px;">
+        <thead style="background:var(--bg3);"><tr>
+          <th style="padding:5px 8px;border:1px solid var(--brd);text-align:left;">顧客</th>
+          <th style="padding:5px 8px;border:1px solid var(--brd);text-align:right;">合計</th>
+          <th style="padding:5px 8px;border:1px solid var(--brd);text-align:left;">内訳(日付/氏名/件数)</th>
+        </tr></thead>
+        <tbody>
+          ${Object.keys(byCust).length === 0 ? '<tr><td colspan="3" style="padding:18px;text-align:center;color:var(--mid);">データなし</td></tr>' :
+            Object.entries(byCust).sort((a,b) => b[1].total - a[1].total).map(([name, info]) => `
+            <tr>
+              <td style="padding:4px 8px;border:1px solid var(--brd);">${esc_n(name)}</td>
+              <td style="padding:4px 8px;border:1px solid var(--brd);text-align:right;font-weight:700;">${info.total.toLocaleString()}</td>
+              <td style="padding:4px 8px;border:1px solid var(--brd);font-size:10px;color:var(--mid);">${info.days.map(d => `${d.date.slice(5)} ${esc_n(d.driverName)} ${d.count}件`).join(' / ')}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`;
+  } else {
+    return;
+  }
+  
+  document.getElementById('co-mc-detail-modal')?.remove();
+  
+  const modalHtml = `
+    <div id="co-mc-detail-modal" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9050;display:flex;align-items:center;justify-content:center;padding:14px;" onclick="if(event.target===this) this.remove()">
+      <div style="background:var(--card);border-radius:12px;padding:18px 20px;max-width:680px;width:100%;max-height:84vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.3);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+          <div style="font-size:14px;font-weight:700;color:var(--ink);">${esc_n(title)}</div>
+          <button onclick="document.getElementById('co-mc-detail-modal').remove()" style="background:transparent;border:none;font-size:18px;cursor:pointer;color:var(--mid);width:30px;height:30px;border-radius:50%;">×</button>
+        </div>
+        <div style="overflow-x:auto;">${contentHtml}</div>
+        <div style="margin-top:14px;text-align:right;">
+          <button class="settings-btn" onclick="document.getElementById('co-mc-detail-modal').remove()" style="padding:8px 16px;background:var(--clay);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;">閉じる</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
 }
 
 /** フィルタ選択肢の更新 */
@@ -8750,12 +8928,14 @@ function _updateCoMcConfirmSection(year, month, totalDel, totalShu, totalCol, wo
       btn.textContent = '確認内容を更新';
       btn.style.background = '#3b82f6';
     } else {
+      // 未確認時は集計内容で表示変更
+      const isEmpty = (totalDel === 0 && totalShu === 0 && totalCol === 0);
       btn.style.display = 'block';
       btn.disabled = false;
       btn.style.opacity = '1';
       btn.style.cursor = 'pointer';
-      btn.textContent = 'この内容で確認しました';
-      btn.style.background = 'var(--clay)';
+      btn.textContent = isEmpty ? '「該当なし」として送信' : 'この内容で確認しました';
+      btn.style.background = isEmpty ? '#9ca3af' : 'var(--clay)';
     }
   }
 }
@@ -8776,15 +8956,23 @@ async function submitCoMonthlyConfirmation(){
   
   // 集計データを再取得
   const rawData = _coMcGatherRawData(year, month);
-  const totalDel = rawData.reduce((a, r) => a + r.delivery + r.shu, 0);
+  const totalDel = rawData.reduce((a, r) => a + r.delivery + r.shu + (r.yakan||0) + (r.ogata||0), 0);
   const totalCol = rawData.reduce((a, r) => a + r.collection, 0);
   const totalShu = rawData.reduce((a, r) => a + r.shu, 0);
   const workDays = new Set(rawData.map(r => r.date)).size;
+  const isEmpty = rawData.length === 0;
   
   const isUpdate = !!conf;
-  const msg = isUpdate
-    ? `${ym} の確認内容を更新しますか?\n\n配達: ${totalDel}\n集荷: ${totalCol}\n稼働: ${workDays}日`
-    : `${ym} の月次確認を送信しますか?\n\n配達: ${totalDel}\n集荷: ${totalCol}\n稼働: ${workDays}日\n\n確認後、内勤の承認待ちとなります。`;
+  let msg;
+  if(isEmpty){
+    msg = isUpdate
+      ? `${ym} を「該当なし」として更新しますか?\n\n管理者コード使用分: 0件\n突発ドライバーの稼働はありませんでした。`
+      : `${ym} を「該当なし」として送信しますか?\n\n管理者コード使用分: 0件\n突発ドライバーの稼働はありませんでした。`;
+  } else {
+    msg = isUpdate
+      ? `${ym} の確認内容を更新しますか?\n\n配達: ${totalDel}\n集荷: ${totalCol}\n稼働: ${workDays}日`
+      : `${ym} の月次確認を送信しますか?\n\n配達: ${totalDel}\n集荷: ${totalCol}\n稼働: ${workDays}日\n\n確認後、内勤の承認待ちとなります。`;
+  }
   
   if(!confirm(msg)) return;
   
@@ -8803,6 +8991,7 @@ async function submitCoMonthlyConfirmation(){
       status: 'confirmed',
       confirmedAt: new Date().toISOString(),
       correctionText: correctionText,
+      isEmpty: isEmpty, // 該当なしフラグ
       totalDel: totalDel,
       totalCol: totalCol,
       totalShu: totalShu,
@@ -9205,11 +9394,19 @@ function _renderOwnerMonthly(){
     const isAdmin = String(s.drv.driverNo||s.drv.id||'').endsWith('-999');
     const drvId = (s.drv.id||s.drv.driverNo||'').replace(/'/g,"\\'");
     const office = s.drv.office || '-';
-    return `<div onclick="showOwnerDriverDetail('${drvId}')" style="padding:11px 6px;border-bottom:1px solid var(--div);cursor:pointer;">
+    // 管理者(10001-999)の表示は「会社名 (管理者コード)」
+    const displayName = isAdmin
+      ? `${esc_n(_ownerCompany?.name || '当社')} <span style="font-size:10px;color:var(--mid);">(管理者コード)</span>`
+      : esc_n(s.drv.name||'(名前なし)');
+    // 管理者タップ時は月次確認タブに切替、通常ドライバーは詳細表示
+    const onClickAction = isAdmin
+      ? `coSwitchTab('mc')`
+      : `showOwnerDriverDetail('${drvId}')`;
+    return `<div onclick="${onClickAction}" style="padding:11px 6px;border-bottom:1px solid var(--div);cursor:pointer;${isAdmin?'background:rgba(193,114,76,.04);':''}">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
         <div>
-          <div style="font-size:12.5px;font-weight:700;color:var(--clay);text-decoration:underline;">${isAdmin?'(管理者) ':''}${esc_n(s.drv.name||'(名前なし)')}</div>
-          <div style="font-size:9.5px;color:var(--mid);font-family:var(--mono);">${esc_n(s.drv.id||s.drv.driverNo||'-')} / ${esc_n(office)}</div>
+          <div style="font-size:12.5px;font-weight:700;color:var(--clay);text-decoration:underline;">${displayName}</div>
+          <div style="font-size:9.5px;color:var(--mid);font-family:var(--mono);">${esc_n(s.drv.id||s.drv.driverNo||'-')}${isAdmin?' / 突発ドライバー集計':' / '+esc_n(office)}</div>
         </div>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--mid)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
       </div>
@@ -9219,6 +9416,7 @@ function _renderOwnerMonthly(){
         <span>大型 <span style="color:var(--ink);font-weight:600;">${s.ogataCnt}</span></span>
         <span>集荷 <span style="color:var(--ink);font-weight:600;">${s.shuCnt}</span></span>
         ${s.colCnt>0 ? `<span>集荷事業 <span style="color:var(--amber);font-weight:600;">${s.colCnt}</span></span>` : ''}
+        ${isAdmin?'<span style="color:var(--clay);font-weight:600;">→ 月次確認へ</span>':''}
       </div>
     </div>`;
   }).join('');
