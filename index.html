@@ -15712,7 +15712,7 @@ function renderBlock(b){
 }
 
 // ── 品目入力グリッドHTML ──
-function itemsGridHtml(blockId, custIdx, items, color){
+function itemsGridHtml(blockId, custIdx, items, color, customerName){
   const btnClass = color==='g' ? 'col-ibp-g' : 'col-ibp-b';
   const numClass = color==='g' ? 'col-inum col-inum-g' : 'col-inum';
   const cell=(k,lbl,val)=>{
@@ -15731,6 +15731,51 @@ function itemsGridHtml(blockId, custIdx, items, color){
   const fold140Id=`fold140-${blockId}-${custIdx}`;
   const fold140ChevId=`foldchev-${blockId}-${custIdx}`;
   const has140=(items['ゆうパック_140']||0)+(items['ゆうパック_160']||0)>0;
+  
+  // カスタム品目(顧客固有)取得
+  let customItemsHtml = '';
+  if(customerName){
+    // CUSTOMERSから該当顧客のotherItemsを取得
+    const norm = (s) => String(s||'').replace(/[\s・,、.]+/g, '').toLowerCase();
+    const targetNorm = norm(customerName);
+    const cust = (CUSTOMERS||[]).find(c => norm(c.name) === targetNorm);
+    const customItems = (cust?.otherItems||[]).filter(o => o.name);
+    
+    if(customItems.length > 0){
+      const foldCustomId = `foldcustom-${blockId}-${custIdx}`;
+      const foldCustomChevId = `foldcustomchev-${blockId}-${custIdx}`;
+      // 既に値が入ってるカスタム品目があれば自動展開
+      const hasCustomVal = customItems.some(o => (items[`__custom__${o.name}`]||0) > 0);
+      
+      const customCells = customItems.map(o => {
+        const k = `__custom__${o.name}`;
+        const v = items[k] || 0;
+        const nc = v>0?(color==='g'?'col-inum col-inum-g':'col-inum'):'col-inum-z';
+        const unit = o.unit || '月額';
+        return `<div class="col-ic">
+          <div class="col-il">${esc_n(o.name)} <span style="font-size:9px;color:var(--mid);">[${esc_n(unit)}]</span></div>
+          <div class="col-irow">
+            <button class="col-ibm" onclick="colAdj('${blockId}',${custIdx},'${k}',-1)">−</button>
+            <input class="${nc}" type="number" value="${v}" min="0"
+              oninput="colNi(this,'${blockId}',${custIdx},'${k}')" onfocus="this.select()">
+            <button class="${btnClass}" onclick="colAdj('${blockId}',${custIdx},'${k}',1)">＋</button>
+          </div>
+        </div>`;
+      }).join('');
+      
+      customItemsHtml = `
+        <div class="col-fold-trigger" style="margin-top:8px;background:rgba(193,114,76,.08);border-color:rgba(193,114,76,.3);" onclick="colToggleFold('${foldCustomId}','${foldCustomChevId}')">
+          <span class="col-fold-lbl" style="color:var(--clay);font-weight:700;">📋 カスタム品目 (${customItems.length}件)</span>
+          <span class="col-fold-chev" id="${foldCustomChevId}">${hasCustomVal?'▼ 閉じる':'▶ 展開'}</span>
+        </div>
+        <div id="${foldCustomId}" style="display:${hasCustomVal?'block':'none'};">
+          <div class="col-g2" style="margin-top:6px;">
+            ${customCells}
+          </div>
+        </div>`;
+    }
+  }
+  
   return `
     <div class="col-igl">ゆうパック</div>
     <div class="col-g2">
@@ -15759,7 +15804,8 @@ function itemsGridHtml(blockId, custIdx, items, color){
       ${cell('クリックポスト','クリポス',items)}
       ${cell('ケース','ケース',items)}
       ${cell('定形外(ゆうメール)','定形外',items)}
-    </div>`;
+    </div>
+    ${customItemsHtml}`;
 }
 
 // 品目をカテゴリー別に集計
@@ -15873,7 +15919,7 @@ function renderRouteBlock(b){
       </div>
       ${schedDetail}
       <div class="col-iw" style="border:none;padding:0;background:transparent;">
-        ${itemsGridHtml(b.id, idx, cust.items||{}, 'b')}
+        ${itemsGridHtml(b.id, idx, cust.items||{}, 'b', cust.customerName)}
       </div>
       <div style="display:flex;gap:6px;margin-top:8px;">
         <button onclick="colRouteCustConfirm(${b.id},${idx})" style="flex:2;padding:9px;background:var(--ok);color:#faf8f5;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">✓ 数量確定</button>
@@ -16003,7 +16049,7 @@ function renderIndivBlock(b){
     <div id="blk-body-${b.id}" style="display:${bodyDisp};">
       ${indivSchedDetail}
       <div class="col-iw" style="border-top:none;">
-        ${itemsGridHtml(b.id,0,b.items||{},'g')}
+        ${itemsGridHtml(b.id,0,b.items||{},'g',b.custName)}
       </div>
       <div style="display:flex;gap:6px;padding:0 14px 6px;">
         <button onclick="colIndivConfirm(${b.id})" style="flex:2;padding:9px;background:var(--sage);color:#faf8f5;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">✓ 数量確定</button>
