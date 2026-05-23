@@ -404,8 +404,8 @@ textarea.fi{resize:none;}
 <link rel="apple-touch-icon" href="./icon-app-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="日報">
-<meta name="theme-color" content="#607080">
+<meta name="apple-mobile-web-app-title" content="日報981">
+<meta name="theme-color" content="#a56a1a">
 <script type="module">
 // Firebase SDK (CDN)
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -416,6 +416,11 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
 </script>
 </head>
 <body>
+<!-- 未送信バッジ(オフライン耐性) タップで今すぐ送信 -->
+<div id="pend-badge" onclick="_pendFlush(true)" style="display:none;position:fixed;right:14px;bottom:74px;z-index:9500;background:#9a7a3a;color:#fff;border-radius:20px;padding:8px 14px;font-size:12px;font-weight:700;box-shadow:0 3px 10px rgba(0,0,0,.3);cursor:pointer;align-items:center;gap:6px;font-family:'Noto Sans JP',sans-serif;">
+  <span style="font-size:14px;">⟳</span>
+  <span class="pb-txt">未送信 0件</span>
+</div>
 
 
 <!-- ══ FIREBASE 設定画面 ══ -->
@@ -1868,6 +1873,9 @@ async function initFirebase() {
     if (badge) badge.style.display = 'block';
     await syncFromFirebase(); // 起動時にクラウドから読み込み
     setupRealtimeSync();      // リアルタイム更新を購読
+    // 起動時: 未送信キューがあれば再送信
+    _pendBadgeUpdate();
+    if(_pendCount() > 0){ setTimeout(()=>_pendFlush(false), 1200); }
   } catch(e) {
     console.error('Firebase初期化エラー:', e);
     fbOnline = false;
@@ -1939,12 +1947,117 @@ async function syncFromFirebase() {
 // Firebase書き込み
 async function fbSet(key, value) {
   ls_set('nikki_' + key, value); // localStorageは常に更新
-  if (!fbDB) return;
+  if (!fbDB) { _pendQueueAdd(key, value); _pendBadgeUpdate(); return; }
   const { ref, set } = window._fbImports;
   try {
     await set(ref(fbDB, 'nikki/' + key), value);
-  } catch(e) { console.error('fb write error:', e); }
+    _pendQueueRemove(key);   // 送信成功 → キューから除去
+  } catch(e) {
+    console.error('fb write error:', e);
+    _pendQueueAdd(key, value); // 失敗 → 未送信キューに記録(最新値で上書き)
+  }
+  _pendBadgeUpdate();
 }
+
+// ══════════════════════════════════════════════
+// 未送信キュー(オフライン耐性) 2026/05/23
+// localStorage保存は必ず成功するので、データ消失はしない。
+// Firebase書込が失敗した分をキューに貯め、オンライン復帰時に再送信する。
+// 同一keyは最新値で上書き(二重送信なし・最新が確実に届く)
+// ══════════════════════════════════════════════
+const PEND_KEY = 'nikki_pending_queue';
+function _pendQueueGet(){
+  try { return JSON.parse(localStorage.getItem(PEND_KEY) || '{}') || {}; }
+  catch { return {}; }
+}
+function _pendQueueSave(q){
+  try { localStorage.setItem(PEND_KEY, JSON.stringify(q)); } catch {}
+}
+function _pendQueueAdd(key, value){
+  const q = _pendQueueGet();
+  q[key] = { value, ts: Date.now() };  // 同一keyは最新で上書き
+  _pendQueueSave(q);
+}
+function _pendQueueRemove(key){
+  const q = _pendQueueGet();
+  if(q[key]){ delete q[key]; _pendQueueSave(q); }
+}
+function _pendCount(){ return Object.keys(_pendQueueGet()).length; }
+
+// 未送信キューを再送信(成功した分だけキューから消す)
+let _pendFlushing = false;
+async function _pendFlush(showResult){
+  if(_pendFlushing) return;
+  if(!fbDB){ if(showResult) _toast('未接続のため送信できません'); return; }
+  const q = _pendQueueGet();
+  const keys = Object.keys(q);
+  if(keys.length === 0){ if(showResult) _toast('未送信データはありません'); return; }
+  _pendFlushing = true;
+  _pendBadgeUpdate('送信中…');
+  const { ref, set } = window._fbImports;
+  let ok = 0, fail = 0;
+  for(const key of keys){
+    try {
+      await set(ref(fbDB, 'nikki/' + key), q[key].value);
+      _pendQueueRemove(key);  // 成功を確認してから削除(消失防止の生命線)
+      ok++;
+    } catch(e){
+      console.error('再送信失敗:', key, e);
+      fail++;  // 失敗 → キューに残す(次回再試行)
+    }
+  }
+  _pendFlushing = false;
+  _pendBadgeUpdate();
+  if(showResult || fail > 0){
+    _toast(fail === 0 ? `送信完了(${ok}件)` : `送信 ${ok}件 / 未送信 ${fail}件`);
+  }
+}
+
+// 未送信バッジの表示更新
+function _pendBadgeUpdate(label){
+  const el = document.getElementById('pend-badge');
+  if(!el) return;
+  const n = _pendCount();
+  if(label){ el.style.display='flex'; el.querySelector('.pb-txt').textContent = label; return; }
+  if(n > 0){
+    el.style.display = 'flex';
+    el.querySelector('.pb-txt').textContent = `未送信 ${n}件`;
+  } else {
+    el.style.display = 'none';
+  }
+}
+
+// 簡易トースト
+function _toast(msg){
+  let t = document.getElementById('pend-toast');
+  if(!t){
+    t = document.createElement('div');
+    t.id = 'pend-toast';
+    t.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(40,40,40,.92);color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;z-index:99999;transition:opacity .3s;';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.opacity = '1';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(()=>{ t.style.opacity = '0'; }, 2500);
+}
+
+// オンライン復帰を検知して自動再送信
+window.addEventListener('online', ()=>{
+  console.log('[online] 復帰検知 → 未送信キューを再送信');
+  _toast('オンライン復帰');
+  setTimeout(()=>_pendFlush(false), 800);
+});
+window.addEventListener('offline', ()=>{
+  console.log('[offline] オフライン検知');
+  _pendBadgeUpdate();
+});
+// 定期チェック(60秒ごと、未送信があればリトライ)
+setInterval(()=>{
+  if(navigator.onLine && _pendCount() > 0 && !_pendFlushing){
+    _pendFlush(false);
+  }
+}, 60000);
 
 // リアルタイム同期購読（他のスマホの変更を受信）
 function setupRealtimeSync() {
