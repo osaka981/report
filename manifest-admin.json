@@ -1,0 +1,26 @@
+{
+  "name": "大阪急配 日報管理システム",
+  "short_name": "日報管理",
+  "description": "大阪急配株式会社 日報管理システム",
+  "start_url": "./report_admin_v3.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#5d3b0d",
+  "theme_color": "#5d3b0d",
+  "lang": "ja",
+  "icons": [
+    {
+      "src": "./icon-admin-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-admin-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
