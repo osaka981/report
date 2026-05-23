@@ -112,8 +112,8 @@ html,body{min-height:100vh;background:var(--page);font-family:var(--sans);color:
 <link rel="apple-touch-icon" href="./icon-admin-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="管理">
-<meta name="theme-color" content="#4a443e">
+<meta name="apple-mobile-web-app-title" content="日報管理">
+<meta name="theme-color" content="#5d3b0d">
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
@@ -1799,14 +1799,6 @@ function toast(msg,t='ok'){const el=$('toast'),ico=$('t-ico'),ms=$('t-msg');ico.
 </div>
 
 <script>
-if('serviceWorker' in navigator){
-  window.addEventListener('load', ()=>{
-    navigator.serviceWorker.register('./sw.js')
-      .then(()=>console.log('SW registered'))
-      .catch(e=>console.log('SW error',e));
-  });
-}
-
 // ══ 訂正履歴管理 ══
 function setEditMonth(mode){
   const now=new Date();
