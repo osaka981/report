@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, interactive-widget=resizes-content">
 <title>軽貨物運送 日報アプリ</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700;900&family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap');
@@ -331,8 +331,8 @@ textarea.fi{resize:none;}
 /* ══ ログインPIN画面 ══ */
 .login-pd{width:14px;height:14px;border-radius:50%;border:1.5px solid var(--brd);background:transparent;transition:all .15s;}
 .login-pd.on{background:var(--clay);border-color:var(--clay);}
-.pin-key{padding:15px 0;background:var(--card);border:1px solid var(--brd);border-radius:10px;font-size:20px;font-weight:600;color:var(--ink);cursor:pointer;font-family:var(--mono);transition:transform .1s,background .15s;}
-.pin-key:active{transform:scale(.96);background:var(--inp);}
+.pin-key{padding:15px 0;background:var(--card);border:1px solid var(--brd);border-radius:10px;font-size:20px;font-weight:600;color:var(--ink);cursor:pointer;font-family:var(--mono);transition:transform .1s,background .15s;touch-action:manipulation;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;}
+.pin-key:active{background:var(--inp);}
 .pin-key-ghost{font-size:13px;color:var(--mid);font-weight:500;font-family:var(--sans);}
 .pin-lock-overlay{position:fixed;inset:0;z-index:5000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;}
 .pin-lock-box{background:var(--card);color:var(--ink);border-radius:12px;padding:24px 28px;text-align:center;max-width:280px;}
