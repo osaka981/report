@@ -12549,13 +12549,7 @@ async function _verifyLoginPin(){
     if(co.ownerInitialPinHash){
       if(inputHash === co.ownerInitialPinHash){
         // 強制変更画面へ
-        _initPinNew = '';
-        _initPinConfirm = '';
-        _initPinStep = 'new';
-        [0,1,2,3,4,5].forEach(i=>{ const el=$('ipd'+i); if(el) el.classList.remove('on'); });
-        $('init-pin-err').textContent = '';
-        $('pin-init-step').textContent = '新しいPINを入力 (1/2)';
-        const bb0 = $('pin-init-back-btn'); if(bb0) bb0.style.display = 'none';
+        _resetInitPinScreen();
         show('scr-pin-init');
         return;
       }
@@ -12571,13 +12565,7 @@ async function _verifyLoginPin(){
     if(inputHash === d.pinHash){
       // 正しい現PIN → 新PIN設定画面へ
       _changePinCurrent = _loginPin;
-      _initPinNew = '';
-      _initPinConfirm = '';
-      _initPinStep = 'new';
-      [0,1,2,3,4,5].forEach(i=>{ const el=$('ipd'+i); if(el) el.classList.remove('on'); });
-      $('pin-init-step').textContent = '新しいPINを入力 (1/2)';
-      $('init-pin-err').textContent = '';
-      const bb2 = $('pin-init-back-btn'); if(bb2) bb2.style.display = 'none';
+      _resetInitPinScreen();
       show('scr-pin-init');
       return;
     } else {
@@ -12599,16 +12587,7 @@ async function _verifyLoginPin(){
       return;
     }
     if(inputHash === initPinHash){
-      _initPinNew = '';
-      _initPinConfirm = '';
-      _initPinStep = 'new';
-      [0,1,2,3,4,5].forEach(i=>{
-        const el = $('ipd'+i);
-        if(el) el.classList.remove('on');
-      });
-      $('init-pin-err').textContent = '';
-      $('pin-init-step').textContent = '新しいPINを入力 (1/2)';
-      const bb1 = $('pin-init-back-btn'); if(bb1) bb1.style.display = 'none';
+      _resetInitPinScreen();
       show('scr-pin-init');
       return;
     } else {
@@ -12649,6 +12628,33 @@ let _initPinConfirm = '';
 let _initPinStep = 'new'; // 'new' or 'confirm'
 
 let _initPinVisible = false; // 目のマークで表示切替
+
+// ★ 2026/06/20: PIN初期化画面を開くときの共通リセット
+//   連続ログイン時に前の人の入力値・目マーク表示状態・数字表示が残る問題を防ぐ。
+//   状態変数だけでなく _updateInitPinDisplay() と数字表示要素も確実にクリアする。
+function _resetInitPinScreen(){
+  _initPinNew = '';
+  _initPinConfirm = '';
+  _initPinStep = 'new';
+  _initPinVisible = false;
+  // 目マークのアイコンも閉じた状態に戻す
+  const open = $('init-pin-eye-open');
+  const closed = $('init-pin-eye-closed');
+  if(open && closed){ open.style.display = ''; closed.style.display = 'none'; }
+  const eyeBtn = $('init-pin-eye-btn');
+  if(eyeBtn) eyeBtn.style.opacity = '.6';
+  // 数字表示要素の中身をクリア
+  const visible = $('init-pin-visible');
+  if(visible){ visible.textContent = ''; visible.style.display = 'none'; }
+  // ドット表示
+  [0,1,2,3,4,5].forEach(i=>{ const el=$('ipd'+i); if(el) el.classList.remove('on'); });
+  const dotsWrap = $('init-pin-dots-wrap');
+  if(dotsWrap) dotsWrap.style.display = 'flex';
+  if($('init-pin-err')) $('init-pin-err').textContent = '';
+  if($('pin-init-step')) $('pin-init-step').textContent = '新しいPINを入力 (1/2)';
+  const bb = $('pin-init-back-btn'); if(bb) bb.style.display = 'none';
+  _updateInitPinDisplay();
+}
 
 function toggleInitPinVisible(){
   _initPinVisible = !_initPinVisible;
