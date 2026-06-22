@@ -331,8 +331,8 @@ textarea.fi{resize:none;}
 /* ══ ログインPIN画面 ══ */
 .login-pd{width:14px;height:14px;border-radius:50%;border:1.5px solid var(--brd);background:transparent;transition:all .15s;}
 .login-pd.on{background:var(--clay);border-color:var(--clay);}
-.pin-key{padding:15px 0;background:var(--card);border:1px solid var(--brd);border-radius:10px;font-size:20px;font-weight:600;color:var(--ink);cursor:pointer;font-family:var(--mono);transition:transform .1s,background .15s;touch-action:manipulation;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;}
-.pin-key:active{background:var(--inp);}
+.pin-key{padding:15px 0;background:var(--card);border:1px solid var(--brd);border-radius:10px;font-size:20px;font-weight:600;color:var(--ink);cursor:pointer;font-family:var(--mono);transition:background .08s,transform .08s,border-color .08s;touch-action:manipulation;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;}
+.pin-key:active,.pin-key.kp-press{background:var(--clay);color:#faf8f5;border-color:var(--clay);transform:scale(.97);}
 .pin-key-ghost{font-size:13px;color:var(--mid);font-weight:500;font-family:var(--sans);}
 .pin-lock-overlay{position:fixed;inset:0;z-index:5000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;}
 .pin-lock-box{background:var(--card);color:var(--ink);border-radius:12px;padding:24px 28px;text-align:center;max-width:280px;}
@@ -2090,8 +2090,33 @@ function setupRealtimeSync() {
       console.warn(`Firebase nikki/drivers のデータ破損の可能性: ${arr.length}件中${valid.length}件のみ有効。上書きをスキップ`);
       return;
     }
-    DRIVERS = arr;
-    fbSet('drivers', DRIVERS);
+    // ★ 2026/06/20: 本人設定済みPIN保護マージ
+    //   経営管理側が nikki/drivers を再構築上書きすると、経営管理は本人PIN(pinHash)を
+    //   持たないため pinHash が null で来てしまい、日報で設定した本人PINが消えて
+    //   「時間が経つと初期PINに戻る」バグが起きていた。
+    //   受信データに pinHash が無い/nullで、かつローカルに本人設定済みPINがある場合は
+    //   ローカルの pinHash/pinInitialized を維持する。
+    const prevById = {};
+    (DRIVERS||[]).forEach(p=>{ if(p && p.id!=null) prevById[String(p.id)] = p; });
+    const merged = arr.map(d=>{
+      const prev = prevById[String(d.id)];
+      if(prev && prev.pinHash && prev.pinInitialized && !d.pinHash){
+        // 受信側に本人PINが無い → ローカルの本人PINを維持
+        return Object.assign({}, d, {
+          pinHash: prev.pinHash,
+          pinInitialized: true,
+          pinInitializedAt: prev.pinInitializedAt || d.pinInitializedAt || null
+        });
+      }
+      return d;
+    });
+    // マージで本人PINを補った差分があれば、それをFirebaseにも書き戻して恒久化
+    const restored = merged.some((d,i)=> d.pinHash && !arr[i].pinHash);
+    DRIVERS = merged;
+    if(restored){
+      console.warn('[drivers同期] 本人PINが上書きされかけたため復元し書き戻します');
+      fbSet('drivers', DRIVERS);
+    }
   });
   // 委託会社データ(Step C): オーナーログイン認証で使用
   onValue(ref(fbDB, 'companies'), snap => {
@@ -12503,6 +12528,33 @@ function downloadOwnerCSV(year, month){
 }
 
 // PINキーパッド入力
+// ★ 2026/06/20: テンキー感度改善 + タップ時の色フィードバック
+//   onclick はタッチ環境で遅延・誤判定が起きやすいため、pointerdownで即時反応させ、
+//   押下中は .kp-press クラスで色を変える。clickとの二重発火はガードする。
+function _bindPinKeypads(){
+  document.querySelectorAll('.pin-key').forEach(btn=>{
+    if(btn._kpBound) return;
+    btn._kpBound = true;
+    let fired = false;
+    const press = ()=>{ btn.classList.add('kp-press'); };
+    const release = ()=>{ btn.classList.remove('kp-press'); };
+    btn.addEventListener('pointerdown', (e)=>{
+      press();
+      fired = true;
+      // onclick属性の処理を即時実行(遅延回避)
+      const oc = btn.getAttribute('onclick');
+      if(oc){ try{ (new Function(oc)).call(btn, e); }catch(_){} }
+      // 二重発火防止: onclick属性を一時無効化
+      btn.onclick = (ev)=>{ ev.preventDefault(); };
+      setTimeout(()=>{ fired = false; }, 350);
+    });
+    btn.addEventListener('pointerup', release);
+    btn.addEventListener('pointercancel', release);
+    btn.addEventListener('pointerleave', release);
+  });
+}
+document.addEventListener('DOMContentLoaded', ()=>setTimeout(_bindPinKeypads, 300));
+
 async function loginPinKey(k){
   if(_isPinLocked()){
     $('login-pin-err').textContent = `ロック中: あと${_getLockRemainSec()}秒`;
