@@ -1081,7 +1081,6 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
       </div>
       <div style="display:flex;align-items:baseline;gap:10px;margin-top:6px;">
         <div style="font-size:28px;font-weight:700;font-family:var(--mono);color:var(--clay);" id="co-work-disp">--:--</div>
-        <div style="font-size:11px;color:var(--mid);">（15分刻み丸め後）</div>
       </div>
       <div style="font-size:11px;color:var(--mid);margin-top:4px;" id="co-time-detail"></div>
     </div>
@@ -14594,7 +14593,7 @@ function confirmClockOut(){
     <div class="sum-row" style="border-top:none;">
       <span>退勤時刻</span><span class="fw7">${now.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}</span>
     </div>
-    ${wm!=null?`<div class="sum-row"><span>稼働時間（丸め後）</span><span class="fw7" style="color:var(--clay)">${fmtMin(wm)}</span></div>`:''}
+    ${wm!=null?`<div class="sum-row"><span>稼働時間</span><span class="fw7" style="color:var(--clay)">${fmtMin(wm)}</span></div>`:''}
     ${att.adjustedOut?`<div class="sum-row"><span>帰社修正時刻</span><span class="fw7" style="color:var(--amber)">${new Date(att.adjustedOut).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}</span></div>`:''}
   `;
   // 退勤完了後はログアウトボタンを目立たせるが、修正・トップに戻るボタンは表示維持
