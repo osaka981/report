@@ -541,7 +541,7 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
   <div class="topbar">
     <div class="tb-eye">軽貨物運送　日報システム</div>
     <div class="tb-title" style="color:var(--clay);">ドライバー日報</div>
-    <div class="tb-sub">本日もよろしくお願いします</div>
+    <div class="tb-sub" id="login-greeting">本日もよろしくお願いします</div>
   </div>
   <div class="p16">
     <div class="card mb12">
@@ -2297,6 +2297,118 @@ function _applyDateMaxToReportInputs(){
 // ページロード時に既存のmax属性を除去
 document.addEventListener('DOMContentLoaded', ()=>{
   _applyDateMaxToReportInputs();
+});
+
+// ══════════════════════════════════════════════════
+// ログイン画面の挨拶(メッセージ + 大阪市の天気 + 今日は何の日)
+//   2026/06/23 実装。表示先 = #login-greeting
+//   ・メッセージは日替わり(同じ日は同じ)
+//   ・天気は Open-Meteo(APIキー不要・大阪市固定)を裏で取得し、取れたら付加
+//   ・記念日は該当日のみ表示
+//   ・取得失敗してもメッセージは必ず出る(フォールバック)
+// ══════════════════════════════════════════════════
+
+// 応援メッセージ(自由に追加可。先頭に足すほど・末尾に足すどちらでもOK)
+const GREET_MESSAGES = [
+  // ── 安全運転 ──
+  '今日も安全運転でいきましょう','車間距離に余裕を持って','焦らず一つずつ確実に','一時停止、しっかり確認を',
+  'バック時は今一度確認を','スピードは控えめに','交差点は特に慎重に','早めのライト点灯を',
+  '無理な追い越しは避けて','疲れたら迷わず休憩を','シートベルト、締めましたか','歩行者を最優先に',
+  '雨の日は速度を落として','カーブの先に注意を','住宅街は徐行で','子どもの飛び出しに注意',
+  // ── 体調・健康 ──
+  'こまめに水分補給を','しっかり朝ごはん食べましたか','無理せず自分のペースで','腰を大事に、正しい姿勢で',
+  '休憩中はひと息ついて','睡眠は足りていますか','重い荷物は膝を使って','深呼吸でリフレッシュ',
+  '体が資本です、ご自愛を','肩の力を抜いていきましょう','適度なストレッチを','目が疲れたら遠くを見て',
+  // ── 季節・天候 ──
+  '熱中症に気をつけて','寒さ対策は万全に','花粉の季節、お大事に','日差しが強い日は日除けを',
+  '路面凍結に注意を','台風情報をチェック','乾燥する季節、喉を大切に','汗をかいたら着替えを',
+  // ── 応援・ねぎらい ──
+  '本日もよろしくお願いします','いつもありがとうございます','今日も一日がんばりましょう','あなたの仕事が誰かを支えています',
+  '無事に一日を終えられますように','いってらっしゃい、お気をつけて','今日も良い一日になりますように','地域の暮らしを運ぶ大切な仕事です',
+  'コツコツ積み重ねが力に','あなたのおかげで荷物が届きます','笑顔でいきましょう','今日も安全第一で',
+  '一便一便、丁寧に','ご安全に','今日のがんばりが明日につながる','落ち着いていきましょう',
+  // ── 曜日・時期(汎用) ──
+  '今週も無事にいきましょう','一週間お疲れさまです','今日もよろしくお願いします','新しい一日の始まりです',
+];
+
+// 記念日(MM-DD: 表示名)。祝日・季節行事・ユニーク記念日を織り交ぜ。
+const ANNIVERSARIES = {
+  '01-01':'元日','01-07':'七草の日','01-11':'鏡開き','01-20':'大寒',
+  '02-02':'節分','02-03':'節分','02-09':'肉の日','02-11':'建国記念の日','02-14':'バレンタインデー','02-22':'猫の日','02-23':'天皇誕生日',
+  '03-03':'ひな祭り','03-09':'ありがとうの日','03-14':'ホワイトデー','03-21':'春分の日',
+  '04-01':'エイプリルフール','04-29':'昭和の日',
+  '05-03':'憲法記念日','05-04':'みどりの日','05-05':'こどもの日','05-09':'アイスクリームの日',
+  '06-01':'衣替え','06-04':'蒸し料理の日','06-16':'和菓子の日',
+  '07-07':'七夕','07-10':'納豆の日','07-20':'ハンバーガーの日',
+  '08-07':'バナナの日','08-08':'そろばんの日','08-11':'山の日','08-31':'野菜の日',
+  '09-09':'救急の日','09-23':'秋分の日',
+  '10-01':'コーヒーの日','10-10':'目の愛護デー','10-31':'ハロウィン',
+  '11-03':'文化の日','11-11':'ポッキーの日','11-22':'いい夫婦の日','11-23':'勤労感謝の日','11-29':'いい肉の日',
+  '12-22':'冬至','12-24':'クリスマスイブ','12-25':'クリスマス','12-31':'大晦日',
+};
+
+// 天気コード → 絵文字+短いラベル(Open-Meteo WMO weather code)
+function _weatherLabel(code){
+  if(code===0) return {ic:'☀',t:'快晴'};
+  if(code===1||code===2) return {ic:'🌤',t:'晴れ'};
+  if(code===3) return {ic:'☁',t:'くもり'};
+  if(code===45||code===48) return {ic:'🌫',t:'霧'};
+  if(code>=51&&code<=57) return {ic:'🌦',t:'霧雨'};
+  if(code>=61&&code<=67) return {ic:'🌧',t:'雨'};
+  if(code>=71&&code<=77) return {ic:'❄',t:'雪'};
+  if(code>=80&&code<=82) return {ic:'🌧',t:'にわか雨'};
+  if(code>=85&&code<=86) return {ic:'❄',t:'にわか雪'};
+  if(code>=95) return {ic:'⛈',t:'雷雨'};
+  return {ic:'',t:''};
+}
+
+// 日替わりメッセージ(同じ日は同じものを返す)
+function _todayMessage(){
+  const now = new Date();
+  const seed = now.getFullYear()*10000 + (now.getMonth()+1)*100 + now.getDate();
+  const idx = seed % GREET_MESSAGES.length;
+  return GREET_MESSAGES[idx];
+}
+
+// 今日の記念日(該当なしは空文字)
+function _todayAnniversary(){
+  const now = new Date();
+  const key = String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+  return ANNIVERSARIES[key] || '';
+}
+
+// 挨拶を組み立てて表示(天気は後から差し替え)
+function _renderLoginGreeting(weather){
+  const el = document.getElementById('login-greeting');
+  if(!el) return;
+  const msg = _todayMessage();
+  const anniv = _todayAnniversary();
+  let parts = [];
+  if(weather) parts.push(`大阪市 ${weather.ic} ${weather.temp}℃`);
+  if(anniv) parts.push(`今日は${anniv}`);
+  parts.push(msg);
+  el.textContent = parts.join('　/　');
+}
+
+// 大阪市の天気を取得(Open-Meteo, APIキー不要)
+async function _fetchOsakaWeather(){
+  try{
+    // 大阪市の緯度経度
+    const url = 'https://api.open-meteo.com/v1/forecast?latitude=34.6937&longitude=135.5023&current=temperature_2m,weather_code&timezone=Asia%2FTokyo';
+    const res = await fetch(url);
+    if(!res.ok) return null;
+    const data = await res.json();
+    const cur = data && data.current;
+    if(!cur) return null;
+    const wl = _weatherLabel(cur.weather_code);
+    return { ic: wl.ic, t: wl.t, temp: Math.round(cur.temperature_2m) };
+  }catch(e){ return null; }
+}
+
+// 起動時: まずメッセージ+記念日を即表示し、裏で天気を取得して差し替え
+document.addEventListener('DOMContentLoaded', ()=>{
+  _renderLoginGreeting(null); // 即座にメッセージ表示(天気なし)
+  _fetchOsakaWeather().then(w=>{ if(w) _renderLoginGreeting(w); });
 });
 
 
