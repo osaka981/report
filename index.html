@@ -12971,6 +12971,7 @@ function _completeLogin(d){
   if(existingAtt){
     // 出勤中の再ログイン → 即業務画面
     _enterWorkMode(d);
+    setTimeout(()=>_checkBirthday(d), 400);
     return;
   }
   // 10001-999(管理者コード/突発ドライバー)は月次確認・設定を非表示
@@ -12981,6 +12982,50 @@ function _completeLogin(d){
     viewBtn.style.display = isAdminCode ? 'none' : 'block';
   }
   show('scr-mode');
+  // ★ 2026/06/23: 誕生日お祝いモーダル
+  setTimeout(()=>_checkBirthday(d), 400);
+}
+
+// ★ 誕生日チェック&お祝いモーダル
+//   driver.birth(YYYY-MM-DD)の月日が今日と一致したら祝福モーダルを表示。
+//   1日1回まで(同じ日に何度ログインしても1回)。
+function _checkBirthday(d){
+  try{
+    if(!d || !d.birth) return;
+    const b = new Date(d.birth);
+    if(isNaN(b.getTime())) return;
+    const now = new Date();
+    if(b.getMonth() !== now.getMonth() || b.getDate() !== now.getDate()) return;
+    // 同じ日に表示済みなら出さない
+    const todayKey = `bday_shown_${d.id}_${now.getFullYear()}${now.getMonth()+1}${now.getDate()}`;
+    try{ if(localStorage.getItem(todayKey)) return; }catch(_){}
+    try{ localStorage.setItem(todayKey, '1'); }catch(_){}
+    // 年齢計算
+    let age = now.getFullYear() - b.getFullYear();
+    // 祝福モーダルを表示
+    _showBirthdayModal(d.name || '', age);
+  }catch(e){ console.warn('birthday check failed', e); }
+}
+
+function _showBirthdayModal(name, age){
+  // 既存モーダルがあれば除去
+  const old = document.getElementById('birthday-modal');
+  if(old) old.remove();
+  const wrap = document.createElement('div');
+  wrap.id = 'birthday-modal';
+  wrap.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);padding:24px;';
+  wrap.innerHTML = `
+    <div style="background:var(--card,#fff);border-radius:18px;max-width:340px;width:100%;padding:28px 24px;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.3);position:relative;overflow:hidden;">
+      <div style="font-size:46px;line-height:1;margin-bottom:10px;">🎂</div>
+      <div style="font-size:20px;font-weight:800;color:var(--clay,#a56a1a);margin-bottom:6px;">お誕生日おめでとうございます</div>
+      <div style="font-size:14px;color:var(--ink,#333);margin-bottom:4px;font-weight:700;">${name} さん</div>
+      <div style="font-size:13px;color:var(--mid,#888);line-height:1.6;margin-bottom:18px;">
+        いつも安全運転で業務にあたっていただき<br>ありがとうございます。<br>素敵な一年になりますように。
+      </div>
+      <button onclick="document.getElementById('birthday-modal').remove()" style="width:100%;padding:12px;border:none;border-radius:10px;background:var(--clay,#a56a1a);color:#fff;font-size:14px;font-weight:700;cursor:pointer;">ありがとう</button>
+    </div>`;
+  document.body.appendChild(wrap);
+  wrap.addEventListener('click', (e)=>{ if(e.target===wrap) wrap.remove(); });
 }
 
 // モード選択画面の通知バッジ更新
