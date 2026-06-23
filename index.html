@@ -13946,6 +13946,37 @@ function _mvCollectMonth(year, month){
   return {byDate, totals:total};
 }
 
+// ★ 2026/06/23: 本人による日報削除
+//   カレンダー詳細の「この日の日報を削除」から呼ばれる。
+//   承認済みの月は削除不可。未承認なら、その日・本人のYP_LOGS/COL_LOGSを削除する。
+async function mvDeleteDay(iso){
+  if(!driver){ alert('ログイン情報が確認できません'); return; }
+  // 対象日の年月から承認状態を判定
+  const dt = new Date(iso + 'T00:00:00');
+  const conf = _getMonthlyConfirmation(dt.getFullYear(), dt.getMonth());
+  if(conf && conf.status === 'approved'){
+    alert('この月は承認済み(締め確定)のため削除できません。\n修正が必要な場合は管理者にご連絡ください。');
+    return;
+  }
+  // 対象件数を数える
+  const myYp = (YP_LOGS||[]).filter(r=>r.driver&&r.driver.id===driver.id&&r.date===iso);
+  const myCol = (COL_LOGS||[]).filter(r=>r.driver&&r.driver.id===driver.id&&r.date===iso);
+  const cnt = myYp.length + myCol.length;
+  if(cnt === 0){ alert('この日に削除できる日報はありません'); return; }
+  if(!confirm(`${_fmtDateJp(iso)} の日報(${cnt}件)を削除します。\nこの操作は元に戻せません。よろしいですか?`)) return;
+  // 本人・該当日のログを除外
+  YP_LOGS = (YP_LOGS||[]).filter(r=>!(r.driver&&r.driver.id===driver.id&&r.date===iso));
+  COL_LOGS = (COL_LOGS||[]).filter(r=>!(r.driver&&r.driver.id===driver.id&&r.date===iso));
+  await fbSet('yp_logs', YP_LOGS);
+  await fbSet('col_logs', COL_LOGS);
+  // 詳細パネルを閉じて再描画
+  _mvState.selectedDate = null;
+  if($('mv-day-detail')) $('mv-day-detail').style.display = 'none';
+  renderMonthlyView();
+  if(typeof toast === 'function') toast('削除しました', 'ok');
+  else alert('削除しました');
+}
+
 // 月次確認を描画
 function renderMonthlyView(){
   const {year, month} = _mvState;
@@ -14359,6 +14390,15 @@ function _buildDayDetailHTML(iso, dayData, withCloseBtn){
       });
       html += `</div>`;
     }
+  }
+
+  // ★ 2026/06/23: 本人による日報削除ボタン(カレンダー詳細時のみ)
+  //   誤入力した日報を本人が削除できる。承認済みの月は mvDeleteDay 側で拒否する。
+  if(withCloseBtn){
+    html += `<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--brd);">
+      <button onclick="mvDeleteDay('${iso}')" style="width:100%;padding:9px;border-radius:8px;background:rgba(196,68,68,.08);border:1px solid rgba(196,68,68,.3);color:#c44;font-size:12px;font-weight:700;cursor:pointer;">この日の日報を削除</button>
+      <div style="font-size:10px;color:var(--light);margin-top:5px;text-align:center;">誤って入力した場合に削除できます(承認済みの月は削除できません)</div>
+    </div>`;
   }
 
   return html;
