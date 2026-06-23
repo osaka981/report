@@ -1013,7 +1013,7 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
       <div id="col-cust-add-panel" style="display:none;background:rgba(90,138,90,.07);border:1.5px solid rgba(90,138,90,.3);border-radius:10px;padding:12px;margin-bottom:6px;">
         <div style="font-size:11px;font-weight:700;color:var(--sage);margin-bottom:8px;">顧客を選択して追加</div>
         <input type="text" id="col-cust-add-search" class="fi fi-sm" placeholder="顧客名・地域で検索（例：ゆっく、東亜、港区）" oninput="filterCustAddPanel(this.value)" style="margin-bottom:6px;">
-        <div id="col-cust-add-list" style="display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto;"></div>
+        <div id="col-cust-add-list" style="display:flex;flex-direction:column;gap:4px;max-height:360px;overflow-y:auto;"></div>
       </div>
       <!-- チャーターを追加 -->
       <button class="col-add-btn col-add-charter" onclick="addCharterBlock()">
@@ -15387,7 +15387,7 @@ function renderCustAddList(q){
   }
   // 集荷日報の選択日付
   const targetDateStr = ($('col-date')?.value) || '';
-  list.innerHTML=custs.slice(0,20).map(cu=>{
+  list.innerHTML=custs.slice(0,200).map(cu=>{
     // 休業予定検索(ID + 名前マッチ)
     const upcomingScheds = _findCustomerUpcomingSchedules(cu.id, cu.name, targetDateStr);
     const todayMatch = upcomingScheds.find(s => s.date === targetDateStr);
