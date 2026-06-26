@@ -2118,13 +2118,16 @@ function setupRealtimeSync() {
     }
   });
   // 委託会社データ(Step C): オーナーログイン認証で使用
-  onValue(ref(fbDB, 'companies'), snap => {
-    if (!snap.exists()) return;
-    const v = snap.val();
-    const arr = Array.isArray(v) ? v : (v ? Object.values(v) : null);
-    if (!arr || !arr.length) return;
+  // ★ 2026/06/25: ノードを経営管理と同じ nikki/companies に統一。
+  //   従来は 'companies'(プレフィックスなし)を読んでいたため、経営管理の
+  //   nikki/companies と別ノードになり、削除が反映されず復活していた。
+  //   空(全削除)も正しく反映する。
+  onValue(ref(fbDB, 'nikki/companies'), snap => {
+    const v = snap.exists() ? snap.val() : [];
+    const arr = Array.isArray(v) ? v : (v ? Object.values(v) : []);
     COMPANIES = arr;
     try{ ls_set('nikki_companies', COMPANIES); }catch(e){}
+    if(typeof renderOwnerCompanies==='function') try{ renderOwnerCompanies(); }catch(e){}
   });
   onValue(ref(fbDB, 'nikki/col_routes'), snap => {
     if(snap.exists()){
@@ -12936,7 +12939,11 @@ async function _processPinInit(){
       COMPANIES[coIdx].ownerPinInitializedAt = co.ownerPinInitializedAt;
     }
     if(typeof fbSet === 'function'){
-      try{ fbSet('companies', COMPANIES); }catch(e){}
+      // ★ 2026/06/25: 委託会社マスタ全体(COMPANIES)をFirebaseへ書き戻すのを廃止。
+      //   従来はここで fbSet('companies', COMPANIES) していたため、日報側に残った
+      //   古い委託会社が nikki/companies に書き戻され、経営管理で削除しても復活していた。
+      //   オーナーPINの更新は drivers ノード経由 or 経営管理側の同期に委ねる。
+      //   ここではローカル(localStorage)のみ更新する。
     }
     try{ localStorage.setItem('nikki_companies', JSON.stringify(COMPANIES)); }catch(e){}
 
