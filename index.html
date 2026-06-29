@@ -1387,6 +1387,7 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
       <button class="settings-btn" onclick="coSwitchTab('noti')" id="co-tab-noti-btn" style="white-space:nowrap;padding:7px 12px;position:relative;">お知らせ
         <span id="co-noti-tab-badge" style="display:none;position:absolute;top:-4px;right:-4px;background:#dc2626;color:#fff;border-radius:9px;min-width:18px;height:18px;font-size:10px;font-weight:700;align-items:center;justify-content:center;padding:0 5px;line-height:1;text-align:center;box-sizing:border-box;">0</span>
       </button>
+      <button class="settings-btn" onclick="coSwitchTab('settings')" id="co-tab-settings-btn" style="white-space:nowrap;padding:7px 12px;">設定</button>
       <button class="settings-btn" onclick="ownerLogout()" style="white-space:nowrap;padding:7px 12px;">ログアウト</button>
     </div>
   </div>
@@ -1566,6 +1567,27 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
           <button id="co-noti-mark-all" onclick="_markAllOwnerNotificationsRead()" style="background:transparent;border:1px solid var(--brd);color:var(--mid);font-size:10px;padding:4px 8px;border-radius:5px;cursor:pointer;">すべて既読</button>
         </div>
         <div id="co-noti-list"></div>
+      </div>
+    </div>
+    <!-- 設定ビュー(PIN変更) 2026/06/29 -->
+    <div id="co-view-settings" class="co-view" style="display:none;">
+      <div class="card mb10">
+        <div style="font-size:12px;font-weight:700;color:var(--ink);margin-bottom:12px;">🔐 オーナーPINの変更</div>
+        <div style="font-size:11px;color:var(--mid);margin-bottom:12px;line-height:1.6;">現在のPINを確認のうえ、新しいPIN(数字4桁以上)に変更できます。</div>
+        <div style="margin-bottom:10px;">
+          <label style="display:block;font-size:11px;font-weight:700;color:var(--mid);margin-bottom:4px;">現在のPIN</label>
+          <input type="password" id="co-pin-current" inputmode="numeric" autocomplete="off" class="fi" style="width:100%;letter-spacing:3px;" placeholder="現在のPIN">
+        </div>
+        <div style="margin-bottom:10px;">
+          <label style="display:block;font-size:11px;font-weight:700;color:var(--mid);margin-bottom:4px;">新しいPIN</label>
+          <input type="password" id="co-pin-new" inputmode="numeric" autocomplete="off" class="fi" style="width:100%;letter-spacing:3px;" placeholder="新しいPIN(4桁以上)">
+        </div>
+        <div style="margin-bottom:14px;">
+          <label style="display:block;font-size:11px;font-weight:700;color:var(--mid);margin-bottom:4px;">新しいPIN(確認)</label>
+          <input type="password" id="co-pin-confirm" inputmode="numeric" autocomplete="off" class="fi" style="width:100%;letter-spacing:3px;" placeholder="もう一度入力">
+        </div>
+        <div id="co-pin-msg" style="display:none;font-size:11px;margin-bottom:10px;"></div>
+        <button onclick="changeOwnerPinFromSettings()" style="width:100%;padding:11px;border:none;border-radius:9px;background:var(--clay);color:#fff;font-size:13px;font-weight:700;cursor:pointer;">PINを変更する</button>
       </div>
     </div>
   </div>
@@ -8676,7 +8698,7 @@ function _osqApplyPicker(){
 
 function coSwitchTab(tab){
   _ownerMvState.tab = tab;
-  ['monthly','mc','drivers','schedule','csv','noti'].forEach(t=>{
+  ['monthly','mc','drivers','schedule','csv','noti','settings'].forEach(t=>{
     const view = $('co-view-'+t);
     const btn  = $('co-tab-'+t+'-btn');
     if(view) view.style.display = (t===tab)?'':'none';
@@ -8695,6 +8717,50 @@ function coSwitchTab(tab){
     const notis = _getOwnerNotifications(_ownerCompany.id);
     _renderOwnerNotificationsTab(notis);
   }
+  else if(tab === 'settings'){
+    ['co-pin-current','co-pin-new','co-pin-confirm'].forEach(id=>{ const el=$(id); if(el) el.value=''; });
+    const msg=$('co-pin-msg'); if(msg){ msg.style.display='none'; msg.textContent=''; }
+  }
+}
+
+// ★ オーナーPIN変更(設定タブから) 2026/06/29
+async function changeOwnerPinFromSettings(){
+  const msg = $('co-pin-msg');
+  const showMsg = (text, ok)=>{ if(!msg) return; msg.style.display='block'; msg.textContent=text; msg.style.color = ok ? 'var(--clay)' : '#dc2626'; };
+  const co = _ownerCompany;
+  if(!co){ showMsg('オーナー情報が取得できません', false); return; }
+  const cur = ($('co-pin-current')?.value||'').trim();
+  const nw  = ($('co-pin-new')?.value||'').trim();
+  const cf  = ($('co-pin-confirm')?.value||'').trim();
+  if(!cur||!nw||!cf){ showMsg('すべての項目を入力してください', false); return; }
+  if(!/^\d{4,}$/.test(nw)){ showMsg('新しいPINは数字4桁以上で入力してください', false); return; }
+  if(nw!==cf){ showMsg('新しいPIN(確認)が一致しません', false); return; }
+  // 現PIN確認
+  const curHash = await _sha256(cur);
+  const validHash = co.ownerPinHash || co.ownerInitialPinHash;
+  if(!validHash || curHash !== validHash){ showMsg('現在のPINが正しくありません', false); return; }
+  // 新PIN保存
+  const newHash = await _sha256(nw);
+  const nowIso = new Date().toISOString();
+  co.ownerPinHash = newHash;
+  co.ownerPinInitialized = true;
+  co.ownerPinInitializedAt = nowIso;
+  const coIdx = COMPANIES.findIndex(x=>x.id===co.id);
+  if(coIdx>=0){ COMPANIES[coIdx].ownerPinHash = newHash; COMPANIES[coIdx].ownerPinInitialized = true; }
+  // 専用ノードに保存(マスタは書き戻さない)
+  try{
+    if(typeof fbSet==='function') await fbSet(`owner_pins/${co.id}`, { ownerPinHash:newHash, ownerPinInitialized:true, ownerPinInitializedAt:nowIso });
+  }catch(e){ console.warn('オーナーPIN保存失敗', e); }
+  try{
+    const op = JSON.parse(localStorage.getItem('nikki_owner_pins')||'{}');
+    op[String(co.id)] = { ownerPinHash:newHash, ownerPinInitialized:true, ownerPinInitializedAt:nowIso };
+    localStorage.setItem('nikki_owner_pins', JSON.stringify(op));
+    window._ownerPins = op;
+  }catch(e){}
+  try{ localStorage.setItem('nikki_companies', JSON.stringify(COMPANIES)); }catch(e){}
+  showMsg('PINを変更しました', true);
+  ['co-pin-current','co-pin-new','co-pin-confirm'].forEach(id=>{ const el=$(id); if(el) el.value=''; });
+  if(typeof toast==='function') toast('PINを変更しました','ok');
 }
 
 function coShiftMonth(delta){
@@ -12123,24 +12189,50 @@ function _renderOwnerDrivers(){
     const pinColor = d.pinHash ? 'var(--ok)' : (d.initialPinHash ? 'var(--amber)' : 'var(--light)');
     const wt = _getWorkTypeInfo(d);
     const officeText = d.office || '(郵便局なし)';
-    return `<div style="padding:10px 4px;border-bottom:1px solid var(--div);">
+    const isActive = d.active !== false;
+    const did = String(d.id||'').replace(/'/g,"\\'");
+    return `<div style="padding:10px 4px;border-bottom:1px solid var(--div);${isActive?'':'opacity:.55;'}">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
         <div style="flex:1;">
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
             <span style="font-size:12px;font-weight:700;color:var(--ink);">${isAdmin?'(管理者) ':''}${esc_n(d.name||'(名前なし)')}</span>
             <span style="display:inline-block;font-size:9px;background:${wt.bg};color:${wt.color};padding:1px 7px;border-radius:8px;font-weight:600;">${wt.label}</span>
+            ${isActive?'':'<span style="display:inline-block;font-size:9px;background:rgba(220,38,38,.12);color:#b91c1c;padding:1px 7px;border-radius:8px;font-weight:600;">退職</span>'}
           </div>
           <div style="font-size:10px;color:var(--mid);font-family:var(--mono);margin-top:2px;">${esc_n(d.id||d.driverNo||'-')}</div>
           <div style="font-size:9.5px;color:var(--light);margin-top:1px;">${esc_n(officeText)}</div>
         </div>
         <div style="font-size:10px;color:${pinColor};font-weight:600;text-align:right;">${pinStatus}</div>
       </div>
-      <div style="display:flex;gap:5px;margin-top:5px;flex-wrap:wrap;">
+      <div style="display:flex;gap:5px;margin-top:5px;flex-wrap:wrap;align-items:center;">
+        <label style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:var(--ink);cursor:pointer;border:1px solid var(--brd);border-radius:6px;padding:3px 8px;">
+          <input type="checkbox" ${isActive?'checked':''} onchange="ownerToggleDriverActive('${did}', this.checked)" style="margin:0;">稼働中
+        </label>
         <button class="settings-btn" style="font-size:10px;padding:4px 10px;" onclick="_coOpenEditDriverModal('${d.id||''}')">編集</button>
         <button class="settings-btn" style="font-size:10px;padding:4px 10px;" onclick="ownerResetDriverPin('${d.id||''}')">PINリセット</button>
       </div>
     </div>`;
   }).join('');
+}
+
+// ★ 2026/06/29: 所属ドライバー一覧から稼働中/退職を直接切替
+async function ownerToggleDriverActive(driverId, isActive){
+  if(!driverId) return;
+  const d = DRIVERS.find(x=>String(x.id)===String(driverId));
+  if(!d){ alert('ドライバーが見つかりません'); _renderOwnerDrivers(); return; }
+  if(!isActive){
+    if(!confirm(`${d.name} を退職扱いにしますか?\n\n退職扱いにすると、このドライバーは稼働中の所属ドライバーから外れます。`)){
+      _renderOwnerDrivers(); // チェック状態を元に戻す
+      return;
+    }
+  }
+  d.active = isActive;
+  const idx = DRIVERS.findIndex(x=>String(x.id)===String(driverId));
+  if(idx>=0) DRIVERS[idx] = d;
+  try{ if(typeof fbSet==='function') await fbSet('drivers', DRIVERS); }catch(e){ console.warn('fbSet failed', e); }
+  try{ if(typeof ls_set==='function') ls_set(LS.DRIVERS, DRIVERS); }catch(e){ try{ localStorage.setItem('nikki_drivers', JSON.stringify(DRIVERS)); }catch(e2){} }
+  if(typeof toast==='function') toast(isActive?'稼働中に戻しました':'退職扱いにしました','ok');
+  _renderOwnerDrivers();
 }
 
 async function ownerResetDriverPin(driverId){
