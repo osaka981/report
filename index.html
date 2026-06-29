@@ -3317,7 +3317,15 @@ function _parseLoginId(raw){
     }
   }
 
-  // 5桁(先頭1): 委託会社オーナー(委託会社番号そのもの)
+  // ★ 2026/06/27: 経営管理が発行するオーナーIDは「9 + 委託会社番号5桁 = 6桁」
+  //   (_buildOwnerLoginId: '9'+padStart(5))。この6桁・先頭9を最優先で判定する。
+  //   例: 委託会社番号10001 → オーナーID 910001
+  if(clean.length===6 && clean.startsWith('9')){
+    const companyCode = clean.slice(1); // 先頭9を除いた5桁
+    return {type:'owner', companyCode, id:clean};
+  }
+
+  // 5桁(先頭1): 委託会社オーナー(委託会社番号そのもの)※旧形式の互換
   if(clean.length===5 && clean.startsWith('1')){
     return {type:'owner', companyCode:clean, id:clean};
   }
@@ -3387,6 +3395,7 @@ async function doLogin(){
     // 委託会社オーナーログイン(委託会社番号 10001 等の5桁)
     const co = (COMPANIES||[]).find(c=>{
       return c.ownerLoginId===parsed.id ||
+             (parsed.companyCode && String(c.companyCode)===String(parsed.companyCode)) ||
              String(c.companyCode)===String(parsed.id) ||
              String(c.id)===String(parsed.id);
     });
