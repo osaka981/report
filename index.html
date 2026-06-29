@@ -1379,15 +1379,15 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
     <div id="co-tb-name" class="tb-title" style="color:var(--clay);"></div>
     <div id="co-tb-sub" class="tb-sub"></div>
     <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">
-      <button class="settings-btn" onclick="coSwitchTab('monthly')" id="co-tab-monthly-btn" style="flex:1;">月次集計</button>
-      <button class="settings-btn" onclick="coSwitchTab('mc')" id="co-tab-mc-btn" style="flex:1;">月次確認</button>
-      <button class="settings-btn" onclick="coSwitchTab('drivers')" id="co-tab-drivers-btn" style="flex:1;">ドライバー</button>
-      <button class="settings-btn" onclick="coSwitchTab('schedule')" id="co-tab-schedule-btn" style="flex:1;">休業表</button>
-      <button class="settings-btn" onclick="coSwitchTab('csv')" id="co-tab-csv-btn" style="flex:1;">CSV</button>
-      <button class="settings-btn" onclick="coSwitchTab('noti')" id="co-tab-noti-btn" style="flex:1;position:relative;">お知らせ
+      <button class="settings-btn" onclick="coSwitchTab('monthly')" id="co-tab-monthly-btn" style="white-space:nowrap;padding:7px 12px;">月次集計</button>
+      <button class="settings-btn" onclick="coSwitchTab('mc')" id="co-tab-mc-btn" style="white-space:nowrap;padding:7px 12px;">月次確認</button>
+      <button class="settings-btn" onclick="coSwitchTab('drivers')" id="co-tab-drivers-btn" style="white-space:nowrap;padding:7px 12px;">ドライバー</button>
+      <button class="settings-btn" onclick="coSwitchTab('schedule')" id="co-tab-schedule-btn" style="white-space:nowrap;padding:7px 12px;">休業表</button>
+      <button class="settings-btn" onclick="coSwitchTab('csv')" id="co-tab-csv-btn" style="white-space:nowrap;padding:7px 12px;">CSV</button>
+      <button class="settings-btn" onclick="coSwitchTab('noti')" id="co-tab-noti-btn" style="white-space:nowrap;padding:7px 12px;position:relative;">お知らせ
         <span id="co-noti-tab-badge" style="display:none;position:absolute;top:-4px;right:-4px;background:#dc2626;color:#fff;border-radius:9px;min-width:18px;height:18px;font-size:10px;font-weight:700;align-items:center;justify-content:center;padding:0 5px;line-height:1;text-align:center;box-sizing:border-box;">0</span>
       </button>
-      <button class="settings-btn" onclick="ownerLogout()">ログアウト</button>
+      <button class="settings-btn" onclick="ownerLogout()" style="white-space:nowrap;padding:7px 12px;">ログアウト</button>
     </div>
   </div>
   <div class="p16">
@@ -17610,15 +17610,25 @@ async function _hideNotificationFromMyList(notiId){
   if(!confirm(`通知「${n.title}」を自分の一覧から削除しますか?\n\n※ 自分の表示からのみ消えます。送信者・他の受信者には影響しません。`)){
     return;
   }
-  const myId = String(driver?.id || driver?.companyId || '');
+  // ★ 2026/06/29: 表示フィルタは個人=driver.id、オーナー=companyId で hiddenFor を判定する。
+  //   オーナーは driver.id(910001等)と companyId(委託会社内部ID)が別物のため、
+  //   片方だけ追加すると非表示にならない。考えられる全候補IDを追加する。
+  const candidateIds = [
+    driver?.id, driver?.companyId, driver?.companyCode,
+    driver?._company?.id, driver?._company?.companyCode,
+    (typeof _ownerCompany!=='undefined' && _ownerCompany) ? _ownerCompany.id : null,
+    (typeof _ownerCompany!=='undefined' && _ownerCompany) ? _ownerCompany.companyCode : null
+  ].filter(v=>v!==undefined && v!==null && v!=='').map(v=>String(v));
   if(!n.hiddenFor) n.hiddenFor = [];
-  if(!n.hiddenFor.includes(myId)){
-    n.hiddenFor.push(myId);
-  }
+  candidateIds.forEach(cid=>{ if(!n.hiddenFor.map(x=>String(x)).includes(cid)) n.hiddenFor.push(cid); });
   ls_set(LS.NOTIFICATIONS, NOTIFICATIONS);
   await fbSet('notifications', NOTIFICATIONS);
   toast('通知を削除しました','ok');
   _closeNotificationDetail();
+  // オーナー通知一覧を再描画
+  if(typeof _ownerCompany!=='undefined' && _ownerCompany && typeof _renderOwnerNotificationsTab==='function'){
+    try{ _renderOwnerNotificationsTab(_getOwnerNotifications(_ownerCompany.id)); }catch(e){}
+  }
 }
 
 function _closeNotificationDetail(){
