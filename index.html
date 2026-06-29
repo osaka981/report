@@ -2126,7 +2126,17 @@ function setupRealtimeSync() {
     const v = snap.exists() ? snap.val() : [];
     const arr = Array.isArray(v) ? v : (v ? Object.values(v) : []);
     COMPANIES = arr;
+    _applyOwnerPins(); // ★ 専用ノードのPINを反映
     try{ ls_set('nikki_companies', COMPANIES); }catch(e){}
+    if(typeof renderOwnerCompanies==='function') try{ renderOwnerCompanies(); }catch(e){}
+  });
+  // ★ 2026/06/29: オーナーPIN専用ノード。委託会社マスタとは別に永続化。
+  //   マスタを書き戻さずPINだけ保存することで、委託会社の復活バグを起こさず
+  //   オーナーPINが初回ログイン後リロードで消える問題を解消する。
+  onValue(ref(fbDB, 'nikki/owner_pins'), snap => {
+    window._ownerPins = snap.exists() ? (snap.val()||{}) : {};
+    try{ localStorage.setItem('nikki_owner_pins', JSON.stringify(window._ownerPins)); }catch(e){}
+    _applyOwnerPins();
     if(typeof renderOwnerCompanies==='function') try{ renderOwnerCompanies(); }catch(e){}
   });
   onValue(ref(fbDB, 'nikki/col_routes'), snap => {
@@ -2442,6 +2452,23 @@ let CUSTOMER_NOTES = ls_get(LS.CUSTOMER_NOTES, []);
 let NOTIFICATIONS = ls_get(LS.NOTIFICATIONS, []); // アプリ内通知 Phase C
 let MONTHLY_CONFIRMATIONS = ls_get('nikki_monthly_confirmations', []); // 月次確認 Phase A (2026/05/02追加)
 let COMPANIES = (()=>{ try{ return JSON.parse(localStorage.getItem('nikki_companies')||'[]'); }catch(e){ return []; } })(); // 委託会社マスタ(オーナーログイン用)
+// ★ 2026/06/29: オーナーPIN専用ストア(委託会社マスタとは独立)。
+window._ownerPins = (()=>{ try{ return JSON.parse(localStorage.getItem('nikki_owner_pins')||'{}'); }catch(e){ return {}; } })();
+// owner_pins の内容を COMPANIES の各社に反映(PINが消えないようにする)
+function _applyOwnerPins(){
+  try{
+    const op = window._ownerPins || {};
+    (COMPANIES||[]).forEach(c=>{
+      const p = op[String(c.id)];
+      if(p && p.ownerPinHash){
+        c.ownerPinHash = p.ownerPinHash;
+        c.ownerPinInitialized = p.ownerPinInitialized!==false;
+        if(p.ownerPinInitializedAt) c.ownerPinInitializedAt = p.ownerPinInitializedAt;
+      }
+    });
+  }catch(e){ console.warn('_applyOwnerPins failed', e); }
+}
+_applyOwnerPins();
 // 営業所マスタ：DRIVERSから自動生成して初期値として使用
 let OFFICES = ls_get(LS.OFFICES,(()=>{
   const names=[...new Set([
@@ -12948,13 +12975,24 @@ async function _processPinInit(){
       COMPANIES[coIdx].ownerPinInitializedAt = co.ownerPinInitializedAt;
     }
     if(typeof fbSet === 'function'){
-      // ★ 2026/06/25: 委託会社マスタ全体(COMPANIES)をFirebaseへ書き戻すのを廃止。
-      //   従来はここで fbSet('companies', COMPANIES) していたため、日報側に残った
-      //   古い委託会社が nikki/companies に書き戻され、経営管理で削除しても復活していた。
-      //   オーナーPINの更新は drivers ノード経由 or 経営管理側の同期に委ねる。
-      //   ここではローカル(localStorage)のみ更新する。
+      // ★ 2026/06/29: オーナーPINを専用ノード nikki/owner_pins/{companyId} に個別保存。
+      //   委託会社マスタ(companies)全体は書き戻さない(復活バグ防止)。
+      //   PINだけを独立ノードに保存することで、マスタに触れずに永続化する。
+      try{
+        await fbSet(`owner_pins/${co.id}`, {
+          ownerPinHash: hash,
+          ownerPinInitialized: true,
+          ownerPinInitializedAt: co.ownerPinInitializedAt,
+        });
+      }catch(e){ console.warn('オーナーPIN保存失敗', e); }
     }
     try{ localStorage.setItem('nikki_companies', JSON.stringify(COMPANIES)); }catch(e){}
+    // ローカルにもPINを保存(オフライン/再読込時のフォールバック)
+    try{
+      const op = JSON.parse(localStorage.getItem('nikki_owner_pins')||'{}');
+      op[String(co.id)] = { ownerPinHash: hash, ownerPinInitialized: true, ownerPinInitializedAt: co.ownerPinInitializedAt };
+      localStorage.setItem('nikki_owner_pins', JSON.stringify(op));
+    }catch(e){}
 
     toast && toast('オーナーPINを設定しました');
     _completeOwnerLogin(co);
