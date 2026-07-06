@@ -914,6 +914,7 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
     <div class="card mb8" id="yp-card-k"><div class="row-hd"><div class="row-ico" style="background:rgba(107,124,106,.11)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--sage)" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div><span class="row-lbl" style="color:var(--sage)">配達完了数</span></div><div class="stpr"><button class="sbtn" onclick="ypStep('k',-1)">−</button><input type="number" id="yp-k" class="sval" min="0" value="0" autocomplete="off" inputmode="numeric" oninput="valYP()"><button class="sbtn p" style="background:var(--sage)" onclick="ypStep('k',1)">＋</button></div></div>
     <div class="card mb8"><div class="row-hd"><div class="row-ico" style="background:rgba(96,112,128,.1)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--slate)" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></div><span class="row-lbl" style="color:var(--slate)">夜間配達（20時以降）</span><span class="tag" style="background:rgba(96,112,128,.1);color:var(--slate);margin-left:auto;">内計</span></div><div class="stpr"><button class="sbtn" onclick="ypStep('y',-1)">−</button><input type="number" id="yp-y" class="sval" min="0" value="0" autocomplete="off" inputmode="numeric" oninput="valYP()"><button class="sbtn p" style="background:var(--slate)" onclick="ypStep('y',1)">＋</button></div><div id="yp-y-err" class="xs mt8" style="color:var(--rust);display:none;">⚠ 完了数を超えています</div></div>
     <div class="card mb8"><div class="row-hd"><div class="row-ico" style="background:rgba(136,128,120,.09)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--stone)" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></div><span class="row-lbl" style="color:var(--stone)">転送還付</span></div><div class="stpr"><button class="sbtn" onclick="ypStep('t',-1)">−</button><input type="number" id="yp-t" class="sval" min="0" value="0" autocomplete="off" inputmode="numeric" oninput="valYP()"><button class="sbtn p" style="background:var(--stone)" onclick="ypStep('t',1)">＋</button></div></div>
+    <div class="card mb8"><div class="row-hd"><div class="row-ico" style="background:rgba(107,124,106,.11)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--sage)" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg></div><span class="row-lbl" style="color:var(--sage)">170サイズ超（大型）</span><span class="tag" style="background:rgba(107,124,106,.11);color:var(--sage);margin-left:auto;">内計</span></div><div class="stpr"><button class="sbtn" onclick="ypStep('o',-1)">−</button><input type="number" id="yp-o" class="sval" min="0" value="0" autocomplete="off" inputmode="numeric" oninput="valYP()"><button class="sbtn p" style="background:var(--sage)" onclick="ypStep('o',1)">＋</button></div><div id="yp-o-err" class="xs mt8" style="color:var(--rust);display:none;">⚠ 完了数を超えています</div></div>
     <div class="card mb8"><div class="row-hd"><div class="row-ico" style="background:rgba(154,122,58,.1)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.63"/></svg></div><span class="row-lbl" style="color:var(--amber)">持ち戻り</span></div><div class="stpr"><button class="sbtn" onclick="ypStep('mo',-1)">−</button><input type="number" id="yp-mo" class="sval" min="0" value="0" autocomplete="off" inputmode="numeric" oninput="valYP()"><button class="sbtn p" style="background:var(--amber)" onclick="ypStep('mo',1)">＋</button></div></div>
     <div class="card mb8"><div class="row-hd"><div class="row-ico" style="background:rgba(136,128,120,.09)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--stone)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><span class="row-lbl" style="color:var(--stone)">翌日配達廻し</span></div><div class="stpr"><button class="sbtn" onclick="ypStep('yo',-1)">−</button><input type="number" id="yp-yo" class="sval" min="0" value="0" autocomplete="off" inputmode="numeric" oninput="valYP()"><button class="sbtn p" style="background:var(--stone)" onclick="ypStep('yo',1)">＋</button></div></div>
     <!-- 旧「集荷」入力欄は集荷タブに移動済みのため非表示で隠し維持 (互換用) -->
@@ -14939,7 +14940,7 @@ let _isAfterClockOut = false;
 // ══ ゆうパック ══
 function ypReset(){['yp-m','yp-k','yp-y','yp-t','yp-mo','yp-yo','yp-s'].forEach(id=>{const e=$(id);if(e)e.value=0;});$('yp-note').value='';$('yp-date').value=today();_ypColCounts={};_ypSpotEntries=[];setYpBizMode('del', true);valYP();}
 const ypN=id=>Math.max(0,parseInt($(id)?.value)||0);
-function ypStep(k,d){const map={m:'yp-m',k:'yp-k',y:'yp-y',t:'yp-t',mo:'yp-mo',yo:'yp-yo',s:'yp-s'};const el=$(map[k]);if(!el)return;el.value=Math.max(0,(parseInt(el.value)||0)+d);valYP();}
+function ypStep(k,d){const map={m:'yp-m',k:'yp-k',y:'yp-y',t:'yp-t',mo:'yp-mo',yo:'yp-yo',o:'yp-o',s:'yp-s'};const el=$(map[k]);if(!el)return;el.value=Math.max(0,(parseInt(el.value)||0)+d);valYP();}
 function valYP(){
   const m=ypN('yp-m'),k=ypN('yp-k'),y=ypN('yp-y'),t=ypN('yp-t'),mo=ypN('yp-mo'),yo=ypN('yp-yo');
   const sum=k+t+mo+yo; const yOk=y<=k; const mOk=m===0&&sum===0?true:m===sum;
@@ -14993,8 +14994,9 @@ function submitYP(){
 
   // 宅配データ収集
   const m=ypN('yp-m'),k=ypN('yp-k'),y=ypN('yp-y'),t=ypN('yp-t'),mo=ypN('yp-mo'),yo=ypN('yp-yo');
+  const o=ypN('yp-o'); // ★ 2026/07/06: 170サイズ超(大型)
   const shukkaLegacy = ypN('yp-s'); // 旧「集荷(件数)」枠 (後方互換)
-  const hasDelInput = (m > 0 || k > 0 || t > 0 || mo > 0 || yo > 0);
+  const hasDelInput = (m > 0 || k > 0 || t > 0 || mo > 0 || yo > 0 || o > 0);
 
   // 集荷データ収集
   const canCol = _driverHasCol(driver, postOffice);
@@ -15076,6 +15078,7 @@ function submitYP(){
     form.del = {
       mochidashi: m, kanryo: k, yakan: y,
       tenso: t, mochimodoiri: mo_final, 翌日廻し: yo,
+      ogata: o, // ★ 2026/07/06: 170サイズ超(大型)。完了+転送還付の内数。
       shukka: shukkaLegacy, // 旧「集荷件数」枠は宅配側にそのまま残す
     };
     // 後方互換のため旧形式フィールドもトップレベルに残す
@@ -18524,6 +18527,7 @@ function applyCorrection(){
     $('yp-t').value=f.tenso||0;
     $('yp-mo').value=f.mochimodoiri||0;
     $('yp-yo').value=f['翌日廻し']||0;
+    var _o=$('yp-o'); if(_o) _o.value=(f.del&&f.del.ogata)||f.ogata||0; // ★ 大型復元
     $('yp-s').value=f.shukka||0;
     $('yp-date').value=rec.date;
     valYP();
