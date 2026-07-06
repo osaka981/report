@@ -1892,8 +1892,11 @@ async function initFirebase() {
     console.log('Firebase接続OK');
     const badge = document.getElementById('fb-status');
     if (badge) badge.style.display = 'block';
-    await syncFromFirebase(); // 起動時にクラウドから読み込み
-    setupRealtimeSync();      // リアルタイム更新を購読
+    // ★ 2026/07/06: 起動高速化。Firebase読み込みを「待たない」。
+    //   localStorageのデータで即座に画面表示し、クラウド読込は裏で実行する。
+    //   電波が悪くても立ち上がりが速い。データはリアルタイム同期で追いつく。
+    setupRealtimeSync();      // リアルタイム更新を購読(裏でデータが最新化される)
+    syncFromFirebase();       // await しない → 裏で実行(完了を待たずに先へ進む)
     // 起動時: 未送信キューがあれば再送信
     _pendBadgeUpdate();
     if(_pendCount() > 0){ setTimeout(()=>_pendFlush(false), 1200); }
@@ -1944,16 +1947,22 @@ async function syncFromFirebase() {
   if (!fbDB) return;
   const { ref, get } = window._fbImports;
   const keys = ['drivers','customers','offices','regions','yp_logs','col_logs','att_logs','edit_logs','sec_pin','adm_pin'];
-  for (const k of keys) {
-    try {
-      const snap = await get(ref(fbDB, 'nikki/' + k));
-      if (snap.exists()) {
-        const val = snap.val();
-        const lsKey = 'nikki_' + k;
-        localStorage.setItem(lsKey, typeof val === 'string' ? val : JSON.stringify(val));
-      }
-    } catch(e) { /* ignore */ }
+  // ★ 2026/07/06: 各取得に3秒タイムアウトを設け、全キーを並列取得(順番待ちしない)。
+  //   電波が悪くても、応答が無いキーは諦めて先へ進む。
+  function getWithTimeout(k, ms){
+    return Promise.race([
+      get(ref(fbDB, 'nikki/' + k)).then(function(snap){
+        if (snap.exists()) {
+          const val = snap.val();
+          localStorage.setItem('nikki_' + k, typeof val === 'string' ? val : JSON.stringify(val));
+        }
+        return true;
+      }).catch(function(){ return false; }),
+      new Promise(function(resolve){ setTimeout(function(){ resolve(false); }, ms); })
+    ]);
   }
+  // 全キーを並列で取得(それぞれ3秒でタイムアウト)
+  await Promise.all(keys.map(function(k){ return getWithTimeout(k, 3000); }));
   // グローバル変数を再ロード
   DRIVERS   = ls_get(LS.DRIVERS, DRIVERS);
   CUSTOMERS = ls_get(LS.CUSTOMERS, CUSTOMERS);
@@ -1963,6 +1972,9 @@ async function syncFromFirebase() {
   COL_LOGS  = ls_get(LS.COL_LOGS, []);
   ATT_LOGS  = ls_get(LS.ATT_LOGS, []);
   console.log('Firebase同期完了');
+  // ★ 2026/07/06: 起動を待たない方式にしたため、裏で読込完了後に
+  //   ログイン画面(ドライバー一覧)を再描画して最新データを反映する。
+  try{ if(typeof renderIdList==='function') renderIdList(); }catch(e){}
 }
 
 // Firebase書き込み
