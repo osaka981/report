@@ -785,15 +785,15 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
     </div>
 
     <!-- IDリスト モーダル(管理者用) -->
-    <div id="admin-idlist-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:16px;">
-      <div style="background:#ffffff;border-radius:14px;max-width:440px;width:100%;max-height:82vh;display:flex;flex-direction:column;padding:18px;">
+    <div id="admin-idlist-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:16px;" onclick="if(event.target===this)closeAdminIdList()">
+      <div style="background:#ffffff;border-radius:14px;max-width:440px;width:100%;max-height:82vh;display:flex;flex-direction:column;padding:18px;" onclick="event.stopPropagation()">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
           <div style="font-size:15px;font-weight:800;color:#2c2825;">IDリスト（社員番号）</div>
           <button onclick="closeAdminIdList()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#7a6f66;">✕</button>
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;" id="idlist-filter-btns"></div>
         <input type="text" id="idlist-search" placeholder="名前・番号で絞り込み..." oninput="filterIdList()" style="width:100%;padding:9px 12px;border-radius:8px;font-size:12px;border:1px solid #ddd8d0;background:#f5f2ee;color:#2c2825;outline:none;font-family:var(--sans);margin-bottom:8px;box-sizing:border-box;">
-        <div id="idlist-body" style="flex:1;overflow-y:auto;border:1px solid #ddd8d0;border-radius:7px;background:#ffffff;"></div>
+        <div id="idlist-body" style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;border:1px solid #ddd8d0;border-radius:7px;background:#ffffff;"></div>
         <div style="font-size:10px;color:#9a8f84;margin-top:8px;text-align:center;">※ 番号を忘れた従事員への案内用です</div>
       </div>
     </div>
@@ -2692,6 +2692,8 @@ function openAdminIdList(){
   _adminIdListMode = true;
   const modal = $('admin-idlist-modal');
   if(modal) modal.style.display = 'flex';
+  // 背景スクロールを固定(iOS Safariのラバーバンド対策)
+  _lockBodyScroll();
   // フィルタボタンを初期化(再構築のため空に)
   const fw = $('idlist-filter-btns'); if(fw) fw.innerHTML = '';
   renderIdList();
@@ -2700,6 +2702,26 @@ function closeAdminIdList(){
   _adminIdListMode = false;
   const modal = $('admin-idlist-modal');
   if(modal) modal.style.display = 'none';
+  _unlockBodyScroll();
+}
+
+// ★ 2026/07/07: モーダル表示中の背景スクロール固定(スクロール位置を保持)
+let _bodyScrollY = 0;
+function _lockBodyScroll(){
+  _bodyScrollY = window.scrollY || window.pageYOffset || 0;
+  document.body.style.position = 'fixed';
+  document.body.style.top = `-${_bodyScrollY}px`;
+  document.body.style.left = '0';
+  document.body.style.right = '0';
+  document.body.style.width = '100%';
+}
+function _unlockBodyScroll(){
+  document.body.style.position = '';
+  document.body.style.top = '';
+  document.body.style.left = '';
+  document.body.style.right = '';
+  document.body.style.width = '';
+  window.scrollTo(0, _bodyScrollY);
 }
 
 function toggleIdList(){
