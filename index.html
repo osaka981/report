@@ -97,7 +97,7 @@ html,body{min-height:100vh;background:var(--page);font-family:var(--sans);color:
 .sec-btn{background:none;border:1px solid rgba(255,255,255,.28);color:rgba(255,255,255,.65);border-radius:6px;padding:7px 16px;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--mono);}
 
 /* ══ MAIN APP ══ */
-.app{max-width:430px;margin:0 auto;min-height:100vh;background:var(--page);}
+.app{max-width:430px;margin:0 auto;min-height:100vh;background:var(--page);overflow-x:hidden;}
 .screen{display:none;}
 .screen.on{display:block;}
 .topbar{background:var(--card);border-bottom:1px solid var(--brd);padding:15px 18px 17px;position:sticky;top:0;z-index:100;}
@@ -115,10 +115,10 @@ html,body{min-height:100vh;background:var(--page);font-family:var(--sans);color:
 .fi:focus{border-color:var(--clay);}
 .fi-sm{padding:7px 10px;font-size:12px;}
 .sel{width:100%;padding:9px 12px;border-radius:8px;font-size:13px;border:1px solid var(--brd);background:var(--inp);color:var(--ink);outline:none;font-family:var(--sans);cursor:pointer;}
-.stpr{display:flex;align-items:center;gap:7px;}
-.sbtn{width:34px;height:34px;border-radius:8px;border:1px solid var(--brd);background:var(--card);font-size:16px;cursor:pointer;color:var(--mid);}
+.stpr{display:flex;align-items:center;gap:7px;width:100%;max-width:100%;}
+.sbtn{flex:0 0 34px;width:34px;height:34px;border-radius:8px;border:1px solid var(--brd);background:var(--card);font-size:16px;cursor:pointer;color:var(--mid);}
 .sbtn.p{border:none;background:var(--clay);color:#faf8f5;}
-.sval{flex:1;padding:6px;border-radius:8px;font-size:17px;font-weight:700;border:1px solid var(--brd);background:var(--inp);color:var(--ink);text-align:center;outline:none;font-family:var(--sans);}
+.sval{flex:1 1 0;width:0;min-width:0;padding:6px;border-radius:8px;font-size:17px;font-weight:700;border:1px solid var(--brd);background:var(--inp);color:var(--ink);text-align:center;outline:none;font-family:var(--sans);}
 .irow{display:grid;grid-template-columns:1fr auto;align-items:center;gap:7px;padding:7px 0;border-bottom:1px solid var(--div);}
 .irow:last-child{border-bottom:none;}
 .ir-lbl{color:var(--mid);font-size:12px;}
