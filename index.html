@@ -558,19 +558,6 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
       <button class="btn-main mt8" style="background:var(--clay);color:#faf8f5;" onclick="doLogin()">ログイン</button>
     </div>
 
-    <!-- IDリスト（試し入力・運用確認用） -->
-    <div class="card mb12">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-        <div style="font-size:11px;font-weight:700;color:var(--mid);">IDリスト</div>
-        <button onclick="toggleIdList()" id="idlist-toggle-btn" style="background:none;border:1px solid var(--brd);border-radius:5px;padding:3px 10px;font-size:10px;color:var(--mid);cursor:pointer;">▼ 表示</button>
-      </div>
-      <div id="idlist-wrap" style="display:none;">
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;" id="idlist-filter-btns"></div>
-        <input type="text" id="idlist-search" class="fi" placeholder="名前で絞り込み..." oninput="filterIdList()" style="font-size:12px;margin-bottom:8px;">
-        <div id="idlist-body" style="max-height:240px;overflow-y:auto;border:1px solid var(--brd);border-radius:7px;"></div>
-      </div>
-    </div>
-
   </div>
 </div>
 
@@ -776,12 +763,31 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
           </div>
         </div>
       </button>
+      <!-- ★ 2026/07/07: IDリスト(社員番号確認用・管理者のみ) -->
+      <button onclick="openAdminIdList()" style="display:block;width:100%;padding:14px 16px;margin-bottom:14px;background:var(--card);color:var(--ink);border:1.5px solid rgba(193,114,76,.4);border-radius:10px;cursor:pointer;text-align:left;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--clay)" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h4M7 13h7M7 17h5"/></svg>
+          <div style="flex:1;">
+            <div style="font-size:13px;font-weight:700;color:var(--clay);">IDリスト</div>
+            <div style="font-size:10px;color:var(--mid);margin-top:2px;">従事員の社員番号を確認</div>
+          </div>
+        </div>
+      </button>
     </div>
 
-    <!-- ログアウト -->
-    <button onclick="doLogout()" style="display:block;width:100%;padding:11px;background:transparent;color:var(--rust);border:1px solid rgba(139,74,58,.3);border-radius:8px;cursor:pointer;font-size:12px;">
-      ログアウト
-    </button>
+    <!-- IDリスト モーダル(管理者用) -->
+    <div id="admin-idlist-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:16px;">
+      <div style="background:var(--bg,#fff);border-radius:14px;max-width:440px;width:100%;max-height:82vh;display:flex;flex-direction:column;padding:18px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <div style="font-size:15px;font-weight:800;color:var(--ink);">IDリスト（社員番号）</div>
+          <button onclick="closeAdminIdList()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--mid);">✕</button>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;" id="idlist-filter-btns"></div>
+        <input type="text" id="idlist-search" class="fi" placeholder="名前・番号で絞り込み..." oninput="filterIdList()" style="font-size:12px;margin-bottom:8px;">
+        <div id="idlist-body" style="flex:1;overflow-y:auto;border:1px solid var(--brd);border-radius:7px;"></div>
+        <div style="font-size:10px;color:var(--light);margin-top:8px;text-align:center;">※ 番号を忘れた従事員への案内用です</div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -2671,6 +2677,22 @@ function displayId(id){
   return String(id).replace(/^0+/, '') || id;
 }
 
+// ★ 2026/07/07: 管理者メニューのIDリスト(社員番号確認用)
+let _adminIdListMode = false;
+function openAdminIdList(){
+  _adminIdListMode = true;
+  const modal = $('admin-idlist-modal');
+  if(modal) modal.style.display = 'flex';
+  // フィルタボタンを初期化(再構築のため空に)
+  const fw = $('idlist-filter-btns'); if(fw) fw.innerHTML = '';
+  renderIdList();
+}
+function closeAdminIdList(){
+  _adminIdListMode = false;
+  const modal = $('admin-idlist-modal');
+  if(modal) modal.style.display = 'none';
+}
+
 function toggleIdList(){
   idListOpen = !idListOpen;
   const wrap = $('idlist-wrap');
@@ -2743,15 +2765,15 @@ function renderIdList(){
       '個数制（歩合）':'歩合','時間単価':'時間単価',
       '時間給':'時間給','日額':'日額','月給':'月給',
     }[d.kyuyo] || '';
-    return `<div onclick="selectDriverId('${d.id}')"
-      style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--div);cursor:pointer;transition:background .1s;"
+    return `<div onclick="${_adminIdListMode ? '' : `selectDriverId('${d.id}')`}"
+      style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--div);${_adminIdListMode?'':'cursor:pointer;'}transition:background .1s;"
       onmouseover="this.style.background='var(--inp)'" onmouseout="this.style.background=''">
       <div style="font-family:var(--mono);font-size:14px;font-weight:700;color:${color};min-width:44px;">${dispId}</div>
       <div style="flex:1;">
         <div style="font-size:13px;font-weight:700;">${d.name}</div>
         <div style="font-size:10px;color:var(--light);">${offLabel}${kyuLabel?' ／ '+kyuLabel:''}</div>
       </div>
-      <div style="font-size:9px;color:var(--light);">タップで入力</div>
+      <div style="font-size:9px;color:var(--light);">${_adminIdListMode ? '番号確認' : 'タップで入力'}</div>
     </div>`;
   }).join('');
 }
