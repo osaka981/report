@@ -18918,8 +18918,33 @@ function toast(msg,t='ok'){
 if('serviceWorker' in navigator){
   window.addEventListener('load', ()=>{
     navigator.serviceWorker.register('./sw.js')
-      .then(()=>console.log('SW registered'))
+      .then((reg)=>{
+        console.log('SW registered');
+        // ★ 2026/07/07: 案B(次回起動時に自動反映)の自動更新。
+        //   起動のたびに新バージョンを確認。見つかれば裏でダウンロードし、
+        //   次回アプリを完全に開き直したときに新バージョンになる(入力を邪魔しない)。
+        reg.update(); // 起動時に更新チェック
+        // 定期的にも更新チェック(アプリを開きっぱなしのiPhone対策)
+        setInterval(()=>{ reg.update(); }, 60*60*1000); // 1時間ごと
+        // 新バージョンが見つかったら、裏で準備(即リロードはしない=案B)
+        reg.addEventListener('updatefound', ()=>{
+          const nw = reg.installing;
+          if(!nw) return;
+          nw.addEventListener('statechange', ()=>{
+            if(nw.state === 'installed' && navigator.serviceWorker.controller){
+              // 新バージョンの準備完了。次回起動時に自動で切り替わる。
+              console.log('新バージョンを準備しました(次回起動時に反映)');
+            }
+          });
+        });
+      })
       .catch(e=>console.log('SW error',e));
+    // ページを再表示(バックグラウンド→復帰)したときも更新チェック
+    document.addEventListener('visibilitychange', ()=>{
+      if(document.visibilityState === 'visible'){
+        navigator.serviceWorker.getRegistration().then(r=>{ if(r) r.update(); });
+      }
+    });
   });
 }
 </script>
