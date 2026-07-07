@@ -786,15 +786,15 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
 
     <!-- IDリスト モーダル(管理者用) -->
     <div id="admin-idlist-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:16px;">
-      <div style="background:var(--bg,#fff);border-radius:14px;max-width:440px;width:100%;max-height:82vh;display:flex;flex-direction:column;padding:18px;">
+      <div style="background:#ffffff;border-radius:14px;max-width:440px;width:100%;max-height:82vh;display:flex;flex-direction:column;padding:18px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-          <div style="font-size:15px;font-weight:800;color:var(--ink);">IDリスト（社員番号）</div>
-          <button onclick="closeAdminIdList()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--mid);">✕</button>
+          <div style="font-size:15px;font-weight:800;color:#2c2825;">IDリスト（社員番号）</div>
+          <button onclick="closeAdminIdList()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#7a6f66;">✕</button>
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;" id="idlist-filter-btns"></div>
-        <input type="text" id="idlist-search" class="fi" placeholder="名前・番号で絞り込み..." oninput="filterIdList()" style="font-size:12px;margin-bottom:8px;">
-        <div id="idlist-body" style="flex:1;overflow-y:auto;border:1px solid var(--brd);border-radius:7px;"></div>
-        <div style="font-size:10px;color:var(--light);margin-top:8px;text-align:center;">※ 番号を忘れた従事員への案内用です</div>
+        <input type="text" id="idlist-search" placeholder="名前・番号で絞り込み..." oninput="filterIdList()" style="width:100%;padding:9px 12px;border-radius:8px;font-size:12px;border:1px solid #ddd8d0;background:#f5f2ee;color:#2c2825;outline:none;font-family:var(--sans);margin-bottom:8px;box-sizing:border-box;">
+        <div id="idlist-body" style="flex:1;overflow-y:auto;border:1px solid #ddd8d0;border-radius:7px;background:#ffffff;"></div>
+        <div style="font-size:10px;color:#9a8f84;margin-top:8px;text-align:center;">※ 番号を忘れた従事員への案内用です</div>
       </div>
     </div>
   </div>
@@ -2729,7 +2729,7 @@ function renderIdList(){
     allBtn.dataset.office = '';
     allBtn.textContent = '全員';
     allBtn.onclick = () => setIdListFilter('');
-    allBtn.style.cssText = 'padding:4px 10px;border-radius:14px;border:1px solid var(--brd);background:var(--clay);color:#faf8f5;font-size:10px;cursor:pointer;';
+    allBtn.style.cssText = 'padding:4px 10px;border-radius:14px;border:1px solid #ddd8d0;background:var(--clay);color:#faf8f5;font-size:10px;cursor:pointer;';
     filterWrap.appendChild(allBtn);
     offices.forEach(o => {
       const btn = document.createElement('button');
@@ -2737,7 +2737,7 @@ function renderIdList(){
       btn.dataset.office = o;
       btn.textContent = o;
       btn.onclick = () => setIdListFilter(o);
-      btn.style.cssText = 'padding:4px 10px;border-radius:14px;border:1px solid var(--brd);background:var(--inp);color:var(--mid);font-size:10px;cursor:pointer;';
+      btn.style.cssText = 'padding:4px 10px;border-radius:14px;border:1px solid #ddd8d0;background:#f5f2ee;color:#7a6f66;font-size:10px;cursor:pointer;';
       filterWrap.appendChild(btn);
     });
   }
@@ -2762,7 +2762,7 @@ function renderIdList(){
   if(!body) return;
 
   if(list.length === 0){
-    body.innerHTML = '<div style="padding:12px;text-align:center;color:var(--light);font-size:11px;">該当なし</div>';
+    body.innerHTML = '<div style="padding:12px;text-align:center;color:#9a8f84;font-size:11px;">該当なし</div>';
     return;
   }
 
@@ -2775,14 +2775,14 @@ function renderIdList(){
       '時間給':'時間給','日額':'日額','月給':'月給',
     }[d.kyuyo] || '';
     return `<div onclick="${_adminIdListMode ? '' : `selectDriverId('${d.id}')`}"
-      style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--div);${_adminIdListMode?'':'cursor:pointer;'}transition:background .1s;"
-      onmouseover="this.style.background='var(--inp)'" onmouseout="this.style.background=''">
+      style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid #e8e3dc;${_adminIdListMode?'':'cursor:pointer;'}transition:background .1s;"
+      onmouseover="this.style.background='#f5f2ee'" onmouseout="this.style.background=''">
       <div style="font-family:var(--mono);font-size:14px;font-weight:700;color:${color};min-width:44px;">${dispId}</div>
       <div style="flex:1;">
-        <div style="font-size:13px;font-weight:700;">${d.name}</div>
-        <div style="font-size:10px;color:var(--light);">${offLabel}${kyuLabel?' ／ '+kyuLabel:''}</div>
+        <div style="font-size:13px;font-weight:700;color:#2c2825;">${d.name}</div>
+        <div style="font-size:10px;color:#7a6f66;">${offLabel}${kyuLabel?' ／ '+kyuLabel:''}</div>
       </div>
-      <div style="font-size:9px;color:var(--light);">${_adminIdListMode ? '番号確認' : 'タップで入力'}</div>
+      <div style="font-size:9px;color:#9a8f84;">${_adminIdListMode ? '番号確認' : 'タップで入力'}</div>
     </div>`;
   }).join('');
 }
@@ -2790,8 +2790,8 @@ function renderIdList(){
 function setIdListFilter(office){
   document.querySelectorAll('.idlist-filter-btn').forEach(btn => {
     const isActive = btn.dataset.office === office;
-    btn.style.background = isActive ? 'var(--clay)' : 'var(--inp)';
-    btn.style.color = isActive ? '#faf8f5' : 'var(--mid)';
+    btn.style.background = isActive ? 'var(--clay)' : '#f5f2ee';
+    btn.style.color = isActive ? '#faf8f5' : '#7a6f66';
     btn.classList.toggle('active', isActive);
   });
   renderIdList();
