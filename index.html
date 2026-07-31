@@ -15952,7 +15952,11 @@ function _visibleNotes(){
 }
 
 let _notesQuery = '';
-let _notesDays  = 30;
+// ★ 2026/07/31: 期間の絞り込みを「◯日以内／◯日以降」に変更。
+//   旧: 7日=過去7日以内 / 30日=過去30日以内 で、古いメモを探す手段が「すべて」しかなかった。
+//   新: recent=直近30日以内 / old=30日より前(棚卸し用) / all=全件
+let _notesMode  = 'recent';
+const NOTES_BORDER_DAYS = 30;
 
 /** 顧客マスタに存在する顧客名か(古い・テストの申し送りを見分けるため) */
 function _custExists(name){
@@ -15983,7 +15987,7 @@ async function _deleteNoteFromList(noteId){
 
 function openNotesList(){
   if(!driver){ show('scr-login'); return; }
-  _notesQuery = ''; _notesDays = 30;
+  _notesQuery = ''; _notesMode = 'recent';
   closeNotesList();
   const div = document.createElement('div');
   div.id = 'notes-list-overlay';
@@ -16010,7 +16014,7 @@ function closeNotesList(){
   document.getElementById('notes-list-overlay')?.remove();
 }
 
-function setNotesDays(d){ _notesDays = d; renderNotesList(); }
+function setNotesMode(m){ _notesMode = m; renderNotesList(); }
 
 function renderNotesList(){
   const body = document.getElementById('notes-list-body');
@@ -16019,19 +16023,20 @@ function renderNotesList(){
   // 期間ボタン
   const pe = document.getElementById('notes-period');
   if(pe){
-    pe.innerHTML = [[7,'7日'],[30,'30日'],[0,'すべて']].map(([d,lb])=>{
-      const on = _notesDays === d;
-      return `<button onclick="setNotesDays(${d})" style="flex:1;padding:6px;border-radius:7px;font-size:11px;cursor:pointer;border:1px solid ${on?'var(--clay)':'var(--brd)'};background:${on?'var(--clay)':'transparent'};color:${on?'#fff':'var(--mid)'};">${lb}</button>`;
+    pe.innerHTML = [['recent','30日以内'],['old','30日以降'],['all','すべて']].map(([m,lb])=>{
+      const on = _notesMode === m;
+      return `<button onclick="setNotesMode('${m}')" style="flex:1;padding:6px;border-radius:7px;font-size:11px;cursor:pointer;border:1px solid ${on?'var(--clay)':'var(--brd)'};background:${on?'var(--clay)':'transparent'};color:${on?'#fff':'var(--mid)'};">${lb}</button>`;
     }).join('');
   }
 
   let notes = _visibleNotes();
 
-  if(_notesDays > 0){
-    const from = Date.now() - _notesDays*86400000;
+  if(_notesMode !== 'all'){
+    const border = Date.now() - NOTES_BORDER_DAYS*86400000;
     notes = notes.filter(n => {
       const t = Date.parse(n.createdAt||'');
-      return isNaN(t) ? true : t >= from;
+      if(isNaN(t)) return _notesMode === 'old';   // 日付不明は古い側に寄せる
+      return _notesMode === 'recent' ? (t >= border) : (t < border);
     });
   }
   const q = String(_notesQuery||'').trim().toLowerCase();
@@ -16046,8 +16051,11 @@ function renderNotesList(){
   if(cnt) cnt.textContent = notes.length + '件';
 
   if(!notes.length){
+    const emptyMsg = _notesMode === 'recent' ? '直近30日以内の申し送りはありません'
+                   : _notesMode === 'old'    ? '30日より前の申し送りはありません'
+                   : '申し送りはありません';
     body.innerHTML = `<div style="background:var(--card);border:1.5px solid var(--brd);border-radius:10px;padding:32px 16px;text-align:center;color:var(--mid);font-size:12px;">
-      該当する申し送りはありません</div>`;
+      ${emptyMsg}${_notesQuery?'（検索条件に一致するものがありません）':''}</div>`;
     return;
   }
 
