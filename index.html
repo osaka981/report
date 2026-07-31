@@ -16733,6 +16733,12 @@ function renderRouteBlock(b){
   </div>`;
 }
 
+/** ★ 2026/07/31: 数量が1つでも入力されているか */
+function _colHasQty(items){
+  if(!items || typeof items !== 'object') return false;
+  return Object.values(items).some(v => (Number(v)||0) > 0);
+}
+
 function colRouteCustConfirm(blockId, custIdx){
   const b = colBlocks.find(x=>x.id===blockId);
   if(!b || !b.customers || !b.customers[custIdx]) return;
@@ -16744,6 +16750,13 @@ function colRouteCustConfirm(blockId, custIdx){
 function colRouteCustRest(blockId, custIdx){
   const b = colBlocks.find(x=>x.id===blockId);
   if(!b || !b.customers || !b.customers[custIdx]) return;
+  // ★ 2026/07/31: 休業日は入力済みの数量を全消去するため、
+  //   数量が入っているときだけ確認する(「数量確定」と隣り合わせで誤タップしやすい)。
+  const cu = b.customers[custIdx];
+  if(_colHasQty(cu.items) && !confirm(
+      (cu.customerName||'この顧客') + ' を休業日にします。\n\n入力済みの数量はすべて消去されます。よろしいですか?')){
+    return;
+  }
   // 休業日 = items全クリア + restフラグ + confirmed
   b.customers[custIdx].items = {};
   b.customers[custIdx].rest = true;
@@ -16859,6 +16872,11 @@ function colIndivConfirm(blockId){
 function colIndivRest(blockId){
   const b = colBlocks.find(x=>x.id===blockId);
   if(!b) return;
+  // ★ 2026/07/31: 入力済み数量がある場合のみ確認(誤タップ対策)
+  if(_colHasQty(b.items) && !confirm(
+      (b.custName||'この顧客') + ' を休業日にします。\n\n入力済みの数量はすべて消去されます。よろしいですか?')){
+    return;
+  }
   b.items = {};
   b.rest = true;
   b.confirmed = true;
