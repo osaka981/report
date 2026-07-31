@@ -15954,13 +15954,41 @@ function _visibleNotes(){
 let _notesQuery = '';
 let _notesDays  = 30;
 
+/** 顧客マスタに存在する顧客名か(古い・テストの申し送りを見分けるため) */
+function _custExists(name){
+  const nm = String(name||'').replace(/[\s・]+/g,'').toLowerCase();
+  if(!nm) return true;
+  return (CUSTOMERS||[]).some(c => {
+    const cn = String(c.name||'').replace(/[\s・]+/g,'').toLowerCase();
+    return cn && (cn === nm || cn.includes(nm) || nm.includes(cn));
+  });
+}
+
+/** 一覧から削除してよいか(自社所属=全て / 委託会社=自分が書いた分のみ) */
+function _canDeleteNote(n){
+  if(!driver) return false;
+  if(!driver.companyId) return true;                       // 大阪急配所属
+  return String(n.createdBy) === String(driver.id);        // 委託会社は自分の分のみ
+}
+
+async function _deleteNoteFromList(noteId){
+  const n = (CUSTOMER_NOTES||[]).find(x => String(x.id) === String(noteId));
+  if(!n) return;
+  if(!confirm('この申し送りを削除しますか?\n\n' + (n.customerName||'') + '\n' + (n.content||''))) return;
+  CUSTOMER_NOTES = (CUSTOMER_NOTES||[]).filter(x => String(x.id) !== String(noteId));
+  await _saveCustomerNotes();
+  renderNotesList();
+  toast('削除しました', 'ok');
+}
+
 function openNotesList(){
   if(!driver){ show('scr-login'); return; }
   _notesQuery = ''; _notesDays = 30;
   closeNotesList();
   const div = document.createElement('div');
   div.id = 'notes-list-overlay';
-  div.style.cssText = 'position:fixed;inset:0;background:var(--bg);z-index:9000;overflow-y:auto;-webkit-overflow-scrolling:touch;';
+  // ★ --bg は未定義。このアプリの画面背景は --page。透明になって下の画面が透けていた。
+  div.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;width:100%;height:100%;background:var(--page);z-index:9000;overflow-y:auto;-webkit-overflow-scrolling:touch;';
   div.innerHTML = `
     <div style="position:sticky;top:0;background:var(--card);border-bottom:1.5px solid var(--brd);padding:12px 14px;z-index:2;">
       <div style="display:flex;align-items:center;gap:10px;">
@@ -16043,10 +16071,15 @@ function renderNotesList(){
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
         <div style="font-size:12.5px;font-weight:700;color:var(--ink);">${esc_n(cust)}</div>
         <div style="font-size:10px;color:var(--mid);">${byCust[cust].length}件</div>
+        ${_custExists(cust) ? '' : '<span style="font-size:9px;background:rgba(176,154,138,.22);color:var(--mid);border-radius:8px;padding:1px 6px;">現在の顧客一覧になし</span>'}
       </div>
       ${byCust[cust].map(n => `
         <div style="background:var(--card);border:1px solid var(--brd);border-radius:8px;padding:9px 12px;margin-bottom:5px;">
-          <div style="font-size:11.5px;color:var(--ink);line-height:1.55;white-space:pre-wrap;word-break:break-word;">${esc_n(n.content)}</div>
+          <div style="display:flex;gap:8px;align-items:flex-start;">
+            <div style="flex:1;font-size:11.5px;color:var(--ink);line-height:1.55;white-space:pre-wrap;word-break:break-word;">${esc_n(n.content)}</div>
+            ${_canDeleteNote(n) ? `<button onclick="_deleteNoteFromList('${esc_n(n.id)}')" title="削除"
+              style="background:none;border:none;color:var(--red);font-size:15px;cursor:pointer;padding:0 2px;line-height:1;flex-shrink:0;">×</button>` : ''}
+          </div>
           <div style="font-size:9.5px;color:var(--mid);margin-top:5px;">${esc_n(n.createdByName||'不明')}　${fmt(n.createdAt)}</div>
         </div>`).join('')}
     </div>`).join('');
