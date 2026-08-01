@@ -16918,9 +16918,11 @@ function _getUpcomingSchedules(customerId){
 let _schedState = {
   customerId: null,
   customerName: '',
-  selectedDate: null,           // 単一選択モードの選択日
-  selectedDates: [],            // 複数選択モードの選択日配列
-  multiMode: false,             // false=単一, true=複数
+  // ★ 2026/08/01: 単一選択を廃止。常に複数選択で、日付ごとに休業/時間変更を指定する。
+  selectedDate: null,           // (旧・単一選択。互換のため残置)
+  selectedDates: [],            // 選択日の配列
+  perDate: {},                  // 日付ごとの設定 {date:{kind,startTime,endTime,note}}
+  multiMode: true,
   viewYear: new Date().getFullYear(),
   viewMonth: new Date().getMonth(),
   // 入力値の一時保持(再描画でフォームが消えても保持)
@@ -16940,7 +16942,8 @@ function openScheduleModal(customerId, customerName){
     customerName: customerName || '',
     selectedDate: null,
     selectedDates: [],
-    multiMode: false,
+    perDate: {},
+    multiMode: true,
     viewYear: new Date().getFullYear(),
     viewMonth: new Date().getMonth(),
     formKind: 'rest',
@@ -17022,21 +17025,18 @@ function _renderScheduleModal(){
 
   const monthLabel = `${viewYear}年${viewMonth+1}月`;
 
-  // モード切替
-  const modeToggle = `<div style="display:flex;gap:4px;margin-bottom:8px;background:var(--inp);padding:3px;border-radius:8px;">
+  // ★ 2026/08/01: 単一/複数の切替は廃止。常に複数選択。
+  const modeToggle = `<div style="display:none;">
     <button onclick="_setSchedMultiMode(false)" style="flex:1;padding:6px;background:${!multiMode?'var(--card)':'transparent'};color:${!multiMode?'var(--ink)':'var(--mid)'};border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;${!multiMode?'box-shadow:0 1px 3px rgba(0,0,0,.08);':''}">単一選択</button>
     <button onclick="_setSchedMultiMode(true)" style="flex:1;padding:6px;background:${multiMode?'var(--card)':'transparent'};color:${multiMode?'var(--ink)':'var(--mid)'};border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;${multiMode?'box-shadow:0 1px 3px rgba(0,0,0,.08);':''}">複数選択</button>
   </div>`;
 
-  // 入力フォーム(モードに応じて切替)
+  // 入力フォーム(常に複数選択)
   let formHtml = '';
-  if(multiMode && selectedDates.length > 0){
+  if(selectedDates.length > 0){
     formHtml = _buildMultiScheduleForm(selectedDates);
-  } else if(!multiMode && selectedDate){
-    const selectedSched = scheduleByDate[selectedDate];
-    formHtml = _buildScheduleForm(selectedDate, selectedSched);
-  } else if(multiMode){
-    formHtml = `<div style="margin-top:12px;background:var(--inp);border-radius:8px;padding:14px;text-align:center;color:var(--mid);font-size:11.5px;">日付を複数選択してください(タップで追加/解除)</div>`;
+  } else {
+    formHtml = `<div style="margin-top:12px;background:var(--inp);border-radius:8px;padding:14px;text-align:center;color:var(--mid);font-size:11.5px;">日付をタップして選択してください(複数可)</div>`;
   }
 
   // 凡例
@@ -17100,13 +17100,9 @@ function _renderScheduleModal(){
   document.body.appendChild(div);
 }
 
-function _setSchedMultiMode(isMulti){
-  // フォームの入力値を退避
-  _saveFormStateToSchedState();
-  _schedState.multiMode = !!isMulti;
-  _schedState.selectedDate = null;
-  _schedState.selectedDates = [];
-  _renderScheduleModal();
+// ★ 2026/08/01: 単一選択モードは廃止。互換のため関数は残すが常に複数選択。
+function _setSchedMultiMode(){
+  _schedState.multiMode = true;
 }
 
 function _schedShiftMonth(delta){
@@ -17120,82 +17116,129 @@ function _schedShiftMonth(delta){
 
 function _pickScheduleDate(dateStr){
   _saveFormStateToSchedState();
-  if(_schedState.multiMode){
-    // 複数選択: トグル
-    const arr = _schedState.selectedDates || [];
-    if(arr.includes(dateStr)){
-      _schedState.selectedDates = arr.filter(d=>d!==dateStr);
-    } else {
-      _schedState.selectedDates = [...arr, dateStr].sort();
-    }
+  const arr = _schedState.selectedDates || [];
+  _schedState.perDate = _schedState.perDate || {};
+  if(arr.includes(dateStr)){
+    _schedState.selectedDates = arr.filter(d=>d!==dateStr);
+    delete _schedState.perDate[dateStr];
   } else {
-    _schedState.selectedDate = dateStr;
+    _schedState.selectedDates = [...arr, dateStr].sort();
+    if(!_schedState.perDate[dateStr]){
+      // 既に登録済みの予定があれば初期値として取り込む(編集できるように)
+      const ex = (SCHEDULE_OVERRIDES||[]).find(s =>
+        String(s.customerId)===String(_schedState.customerId) && s.date===dateStr);
+      _schedState.perDate[dateStr] = ex
+        ? {kind:ex.kind||'rest', startTime:ex.startTime||'', endTime:ex.endTime||'', note:ex.note||''}
+        : {kind:'rest', startTime:'', endTime:'', note:''};
+    }
   }
   _renderScheduleModal();
 }
 
+// ★ 日付ごとの種別を切り替え
+function _setDateKind(dateStr, kind){
+  _saveFormStateToSchedState();
+  _schedState.perDate = _schedState.perDate || {};
+  const cur = _schedState.perDate[dateStr] || {kind:'rest', startTime:'', endTime:'', note:''};
+  cur.kind = kind;
+  _schedState.perDate[dateStr] = cur;
+  _renderScheduleModal();
+}
+
+// ★ 選択中の全日を同じ種別にする
+function _setAllSchedKind(kind){
+  _saveFormStateToSchedState();
+  (_schedState.selectedDates||[]).forEach(d=>{
+    const cur = _schedState.perDate[d] || {kind:'rest', startTime:'', endTime:'', note:''};
+    cur.kind = kind;
+    _schedState.perDate[d] = cur;
+  });
+  _renderScheduleModal();
+}
+
+// ★ 1日目の内容(種別・時間・備考)を全日にコピー
+function _copyFirstSchedToAll(){
+  _saveFormStateToSchedState();
+  const list = _schedState.selectedDates || [];
+  if(list.length < 2) return;
+  const src = _schedState.perDate[list[0]];
+  if(!src) return;
+  list.slice(1).forEach(d=>{
+    _schedState.perDate[d] = {kind:src.kind, startTime:src.startTime, endTime:src.endTime, note:src.note};
+  });
+  _renderScheduleModal();
+  toast('1日目の内容を全日に反映しました','ok');
+}
+
 // フォームの現在値を_schedStateに退避(再描画前)
+// ★ 2026/08/01: 日付ごとの行から値を拾う
 function _saveFormStateToSchedState(){
-  const kindEl = document.querySelector('input[name="sched-kind"]:checked');
-  if(kindEl) _schedState.formKind = kindEl.value;
-  const startEl = document.getElementById('sched-start-time');
-  if(startEl) _schedState.formStart = startEl.value || '';
-  const endEl = document.getElementById('sched-end-time');
-  if(endEl) _schedState.formEnd = endEl.value || '';
-  const noteEl = document.getElementById('sched-note');
-  if(noteEl) _schedState.formNote = noteEl.value || '';
+  _schedState.perDate = _schedState.perDate || {};
+  document.querySelectorAll('[data-sched-date]').forEach(row=>{
+    const d = row.getAttribute('data-sched-date');
+    if(!d) return;
+    const cur = _schedState.perDate[d] || {kind:'rest', startTime:'', endTime:'', note:''};
+    const st = row.querySelector('.sd-start'); if(st) cur.startTime = st.value || '';
+    const en = row.querySelector('.sd-end');   if(en) cur.endTime   = en.value || '';
+    const nt = row.querySelector('.sd-note');  if(nt) cur.note      = nt.value || '';
+    _schedState.perDate[d] = cur;
+  });
 }
 
 // 複数日まとめて登録用フォーム
 function _buildMultiScheduleForm(selectedDates){
-  // 前回値の活用
-  const useLast = _schedLastInput;
-  const kind = _schedState.formKind || (useLast?.kind || 'rest');
-  const startTime = _schedState.formStart || (useLast?.startTime || '');
-  const endTime = _schedState.formEnd || (useLast?.endTime || '');
-  const note = _schedState.formNote || (useLast?.note || '');
-  const dateLabels = selectedDates.map(d=>d.slice(5).replace('-','/'));
-  const summary = dateLabels.length <= 5
-    ? dateLabels.join(', ')
-    : `${dateLabels.slice(0,4).join(', ')} 他${dateLabels.length-4}日`;
+  // ★ 2026/08/01: 日付ごとに「休業/時間変更」を指定できる形に変更。
+  //   一括ボタンで全日をまとめて揃えることもできる。
+  const pd = _schedState.perDate || {};
+  const wd = ['日','月','火','水','木','金','土'];
 
-  const lastInputBtn = _schedLastInput
-    ? `<button onclick="_applyLastSchedInput()" style="display:block;width:100%;padding:7px;margin-bottom:8px;background:rgba(74,122,155,.1);border:1px dashed rgba(74,122,155,.4);color:var(--slate);border-radius:6px;font-size:11px;cursor:pointer;">前回の設定を使用 (${_schedLastInput.kind==='rest'?'休業':'時間変更'}${_schedLastInput.startTime?' '+_schedLastInput.startTime:''}${_schedLastInput.endTime?'〜'+_schedLastInput.endTime:''})</button>`
+  const rows = selectedDates.map(dateStr=>{
+    const c = pd[dateStr] || {kind:'rest', startTime:'', endTime:'', note:''};
+    const isTime = c.kind === 'time';
+    const dt = new Date(dateStr);
+    const label = `${dateStr.slice(5).replace('-','/')} (${wd[dt.getDay()]})`;
+    const dowColor = dt.getDay()===0?'var(--rust)':(dt.getDay()===6?'var(--slate)':'var(--ink)');
+    return `
+      <div data-sched-date="${dateStr}" style="background:var(--card);border:1px solid var(--brd);border-radius:8px;padding:8px 10px;margin-bottom:6px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="font-size:12px;font-weight:700;color:${dowColor};min-width:74px;">${label}</div>
+          <div style="display:flex;gap:4px;flex:1;">
+            <button onclick="_setDateKind('${dateStr}','rest')" style="flex:1;padding:6px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid ${!isTime?'var(--mid)':'var(--brd)'};background:${!isTime?'var(--mid)':'transparent'};color:${!isTime?'#fff':'var(--mid)'};">休業日</button>
+            <button onclick="_setDateKind('${dateStr}','time')" style="flex:1;padding:6px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid ${isTime?'var(--amber)':'var(--brd)'};background:${isTime?'var(--amber)':'transparent'};color:${isTime?'#fff':'var(--mid)'};">時間変更</button>
+          </div>
+          <button onclick="_pickScheduleDate('${dateStr}')" title="この日を選択から外す" style="background:none;border:none;color:var(--light);font-size:16px;cursor:pointer;padding:0 2px;line-height:1;">&times;</button>
+        </div>
+        ${isTime ? `
+        <div style="display:flex;align-items:center;gap:6px;margin-top:6px;">
+          <input type="time" class="sd-start" value="${c.startTime||''}" style="flex:1;padding:5px;border:1px solid var(--brd);border-radius:6px;font-size:12.5px;background:var(--inp);">
+          <span style="font-size:11px;color:var(--mid);">〜</span>
+          <input type="time" class="sd-end" value="${c.endTime||''}" style="flex:1;padding:5px;border:1px solid var(--brd);border-radius:6px;font-size:12.5px;background:var(--inp);">
+        </div>` : ''}
+        <input type="text" class="sd-note" value="${esc_n(c.note||'')}" placeholder="備考 (空欄可)"
+          style="width:100%;margin-top:6px;padding:5px 7px;border:1px solid var(--brd);border-radius:6px;font-size:11.5px;background:var(--inp);font-family:inherit;">
+      </div>`;
+  }).join('');
+
+  const copyBtn = selectedDates.length >= 2
+    ? `<button onclick="_copyFirstSchedToAll()" style="flex:1;padding:6px;border-radius:6px;font-size:10.5px;cursor:pointer;border:1px dashed var(--brd);background:transparent;color:var(--mid);">1日目の内容を全日に</button>`
     : '';
 
   return `
     <div style="margin-top:12px;background:var(--inp);border-radius:8px;padding:12px;">
-      <div style="font-size:12px;font-weight:700;margin-bottom:4px;">選択中: ${selectedDates.length}日</div>
-      <div style="font-size:10.5px;color:var(--mid);margin-bottom:10px;line-height:1.5;">${esc_n(summary)}</div>
-      ${lastInputBtn}
-      <!-- 種別タブ -->
-      <div style="display:flex;gap:6px;margin-bottom:10px;">
-        <label style="flex:1;cursor:pointer;">
-          <input type="radio" name="sched-kind" value="rest" ${kind==='rest'?'checked':''} onchange="_setSchedKind('rest')" style="display:none;">
-          <div style="padding:8px;text-align:center;border-radius:6px;font-size:11.5px;font-weight:600;background:${kind==='rest'?'var(--mid)':'var(--card)'};color:${kind==='rest'?'#fff':'var(--mid)'};border:1px solid var(--brd);">休業日</div>
-        </label>
-        <label style="flex:1;cursor:pointer;">
-          <input type="radio" name="sched-kind" value="time" ${kind==='time'?'checked':''} onchange="_setSchedKind('time')" style="display:none;">
-          <div style="padding:8px;text-align:center;border-radius:6px;font-size:11.5px;font-weight:600;background:${kind==='time'?'var(--amber)':'var(--card)'};color:${kind==='time'?'#fff':'var(--mid)'};border:1px solid var(--brd);">時間変更</div>
-        </label>
+      <div style="font-size:12px;font-weight:700;margin-bottom:8px;">選択中: ${selectedDates.length}日</div>
+
+      <div style="font-size:10px;color:var(--mid);margin-bottom:4px;">一括設定</div>
+      <div style="display:flex;gap:5px;margin-bottom:10px;">
+        <button onclick="_setAllSchedKind('rest')" style="flex:1;padding:6px;border-radius:6px;font-size:10.5px;cursor:pointer;border:1px solid var(--brd);background:transparent;color:var(--mid);">全て休業日</button>
+        <button onclick="_setAllSchedKind('time')" style="flex:1;padding:6px;border-radius:6px;font-size:10.5px;cursor:pointer;border:1px solid var(--brd);background:transparent;color:var(--mid);">全て時間変更</button>
+        ${copyBtn}
       </div>
-      <!-- 時間入力(時間変更時のみ) -->
-      <div id="sched-time-row" style="display:${kind==='time'?'block':'none'};margin-bottom:10px;">
-        <div style="font-size:10px;color:var(--mid);margin-bottom:4px;">時間 (空欄可・○時以降だけでもOK)</div>
-        <div style="display:flex;align-items:center;gap:6px;">
-          <input type="time" id="sched-start-time" value="${startTime}" style="flex:1;padding:6px;border:1px solid var(--brd);border-radius:6px;font-size:13px;background:var(--card);">
-          <span style="font-size:11px;color:var(--mid);">〜</span>
-          <input type="time" id="sched-end-time" value="${endTime}" style="flex:1;padding:6px;border:1px solid var(--brd);border-radius:6px;font-size:13px;background:var(--card);">
-        </div>
-        <div style="font-size:9.5px;color:var(--light);margin-top:4px;line-height:1.4;">※17:30までに郵便局入れが基本(特例あり要確認)</div>
-      </div>
-      <!-- 備考 -->
-      <div>
-        <div style="font-size:10px;color:var(--mid);margin-bottom:4px;">備考 (空欄可)</div>
-        <textarea id="sched-note" rows="2" placeholder="例: 17時以降、責任者と要連絡" style="width:100%;padding:6px;border:1px solid var(--brd);border-radius:6px;font-size:12px;font-family:inherit;background:var(--card);resize:vertical;box-sizing:border-box;">${esc_n(note)}</textarea>
-      </div>
-      <!-- ボタン -->
-      <button onclick="_saveMultiSchedule()" style="display:block;width:100%;padding:10px;margin-top:10px;background:var(--clay);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">${selectedDates.length}日分まとめて登録</button>
+
+      <div style="font-size:10px;color:var(--mid);margin-bottom:4px;">日付ごとの設定</div>
+      <div style="max-height:46vh;overflow-y:auto;-webkit-overflow-scrolling:touch;">${rows}</div>
+
+      <div style="font-size:9.5px;color:var(--light);margin-top:6px;line-height:1.4;">※17:30までに郵便局入れが基本(特例あり要確認)</div>
+      <button onclick="_saveMultiSchedule()" style="display:block;width:100%;padding:10px;margin-top:10px;background:var(--clay);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">予定を登録</button>
     </div>
   `;
 }
@@ -17212,21 +17255,16 @@ function _applyLastSchedInput(){
 
 // 複数日まとめて保存
 async function _saveMultiSchedule(){
+  _saveFormStateToSchedState();                     // 画面の入力値を取り込む
   const {customerId, customerName, selectedDates} = _schedState;
   if(!selectedDates || !selectedDates.length){ toast('日付を選択してください','err'); return; }
-  const kindEl = document.querySelector('input[name="sched-kind"]:checked');
-  const kind = kindEl?.value || 'rest';
-  const startTime = document.getElementById('sched-start-time')?.value || '';
-  const endTime = document.getElementById('sched-end-time')?.value || '';
-  const note = (document.getElementById('sched-note')?.value || '').trim();
+  const pd = _schedState.perDate || {};
 
-  // 前回値を保存(次回利用)
-  _schedLastInput = {kind, startTime: kind==='time'?startTime:'', endTime: kind==='time'?endTime:'', note};
-
-  let createdCount = 0;
-  let updatedCount = 0;
+  let createdCount = 0, updatedCount = 0;
   const newRecords = [];
   for(const dateStr of selectedDates){
+    const c = pd[dateStr] || {kind:'rest', startTime:'', endTime:'', note:''};
+    const kind = c.kind === 'time' ? 'time' : 'rest';
     const existing = (SCHEDULE_OVERRIDES||[]).find(s=>
       String(s.customerId)===String(customerId) && s.date === dateStr
     );
@@ -17235,9 +17273,9 @@ async function _saveMultiSchedule(){
       customerId, customerName,
       date: dateStr,
       kind,
-      startTime: kind==='time' ? startTime : '',
-      endTime: kind==='time' ? endTime : '',
-      note,
+      startTime: kind==='time' ? (c.startTime||'') : '',
+      endTime:   kind==='time' ? (c.endTime||'')   : '',
+      note: (c.note||'').trim(),
       createdBy: driver?.id || '',
       createdByName: driver?.name || '',
       createdAt: existing?.createdAt || new Date().toISOString(),
@@ -17254,22 +17292,33 @@ async function _saveMultiSchedule(){
   }
   ls_set(LS.SCHEDULE_OVERRIDES, SCHEDULE_OVERRIDES);
   await fbSet('schedule_overrides', SCHEDULE_OVERRIDES);
-  // 通知を1件まとめて生成(代表として最初のレコードを使用、件数は本文に)
+
+  // 通知(日ごとに種別が違い得るので、日付＋種別で列挙する)
   if(newRecords.length){
-    const first = newRecords[0].record;
+    const parts = newRecords.map(({record:r})=>{
+      const d = r.date.slice(5).replace('-','/');
+      if(r.kind === 'rest') return `${d} 休業`;
+      const t = _fmtSchedTimeLabel(r.startTime, r.endTime);
+      return `${d} 時間変更${t?' '+t:''}`;
+    });
+    const notes = [...new Set(newRecords.map(x=>x.record.note).filter(Boolean))];
     const summaryRec = {
-      ...first,
-      note: `${newRecords.length}日分: ${selectedDates.map(d=>d.slice(5).replace('-','/')).join(', ')}${note?` / ${note}`:''}`,
+      ...newRecords[0].record,
+      note: `${newRecords.length}日分: ${parts.join(' / ')}${notes.length?` / ${notes.join(' ')}`:''}`,
     };
     await _createScheduleNotification(summaryRec, 'create');
   }
   toast(`${createdCount}件登録${updatedCount?` / ${updatedCount}件更新`:''}`,'ok');
-  // 状態リセット
+
+  // ★ 2026/08/01: 登録後は入力をすべてクリアする。
+  //   旧実装は備考などを次回に持ち越しており、別件を登録するときに
+  //   前回の「休み」が残っていて紛らわしかった。
   _schedState.selectedDates = [];
-  _schedState.formKind = kind;
-  _schedState.formStart = kind==='time'?startTime:'';
-  _schedState.formEnd = kind==='time'?endTime:'';
-  _schedState.formNote = note;
+  _schedState.perDate = {};
+  _schedState.formKind = 'rest';
+  _schedState.formStart = '';
+  _schedState.formEnd = '';
+  _schedState.formNote = '';
   _renderScheduleModal();
   renderColBlocks();
 }
