@@ -14855,12 +14855,32 @@ function _buildDayDetailHTML(iso, dayData, withCloseBtn){
     const hasCol = (dayData.colBlocks.indiv?.length||0) + (dayData.colBlocks.route?.length||0) + (dayData.colBlocks.charter?.length||0) > 0;
     if(hasCol){
       html += `<div class="mv-dd-sec"><div class="mv-dd-sec-title col">集荷事業</div>`;
+      // ★ 2026/08/02: 個別集荷ブロックは作られ方によってフィールド名が2種類ある。
+      //   ・顧客追加から作成      → custName / custId
+      //   ・ルートを個別に展開    → customerName / customerId
+      //   片方しか見ていなかったため「(名称未設定)」と表示されていた。
+      const _blkName = (b)=>{
+        const nm = b.custName || b.customerName || '';
+        if(nm) return nm;
+        const id = b.custId ?? b.customerId;
+        if(id!=null){
+          const c = (CUSTOMERS||[]).find(x=>String(x.id)===String(id));
+          if(c && c.name) return c.name;
+        }
+        return '(名称未設定)';
+      };
       // 単独顧客
       (dayData.colBlocks.indiv||[]).forEach(b=>{
         const items = b.items || {};
         const tot = Object.values(items).reduce((s,v)=>s+(Number(v)||0),0);
+        // ★ 2026/08/02: 「本日集荷なし」も実績として表示する。
+        //   従来は数量0で読み飛ばしていたため、休んだ顧客が記録から消えて見えた。
+        if(b.rest){
+          html += `<div class="mv-dd-row mv-dd-total"><span>単独: ${_blkName(b)} <span style="font-size:10px;color:var(--amber);font-weight:700;">本日集荷なし</span></span><span style="color:var(--light);">−</span></div>`;
+          return;
+        }
         if(tot === 0) return;
-        html += `<div class="mv-dd-row mv-dd-total"><span>単独: ${b.customerName||'(名称未設定)'}</span><span>${tot}個</span></div>`;
+        html += `<div class="mv-dd-row mv-dd-total"><span>単独: ${_blkName(b)}</span><span>${tot}個</span></div>`;
         Object.entries(items).forEach(([k,v])=>{
           if(v>0) html += `<div class="mv-dd-row mv-dd-row-sub"><span>${k}</span><span>${v}</span></div>`;
         });
@@ -14877,12 +14897,12 @@ function _buildDayDetailHTML(iso, dayData, withCloseBtn){
           const tot = Object.values(items).reduce((s,v)=>s+(Number(v)||0),0);
           // 休業の顧客は休業表示
           if(c.rest){
-            html += `<div class="mv-dd-row mv-dd-row-sub" style="padding-left:14px;"><span style="color:var(--mid);">${c.customerName||'(顧客)'} <span style="font-size:10px;color:var(--light);">休業</span></span><span style="color:var(--light);">−</span></div>`;
+            html += `<div class="mv-dd-row mv-dd-row-sub" style="padding-left:14px;"><span style="color:var(--mid);">${_blkName(c)} <span style="font-size:10px;color:var(--amber);font-weight:700;">本日集荷なし</span></span><span style="color:var(--light);">−</span></div>`;
             return;
           }
           if(tot === 0) return;
           // 顧客名(計N個)
-          html += `<div class="mv-dd-row mv-dd-row-sub" style="padding-left:14px;font-weight:700;"><span>${c.customerName||'(顧客)'}</span><span>${tot}個</span></div>`;
+          html += `<div class="mv-dd-row mv-dd-row-sub" style="padding-left:14px;font-weight:700;"><span>${_blkName(c)}</span><span>${tot}個</span></div>`;
           // 品目内訳(さらに字下げ)
           Object.entries(items).forEach(([k,v])=>{
             if(v>0) html += `<div class="mv-dd-row mv-dd-row-sub" style="padding-left:28px;font-size:10px;color:var(--light);"><span>${k}</span><span>${v}</span></div>`;
@@ -14892,7 +14912,8 @@ function _buildDayDetailHTML(iso, dayData, withCloseBtn){
       // チャーター
       (dayData.colBlocks.charter||[]).forEach(ch=>{
         const qty = Number(ch.qty||0);
-        const label = ch.customerName || ch.routeName || 'チャーター';
+        const label = ch.customerName || ch.custName || ch.routeName
+          || (ch.charterData && (ch.charterData.customerName || ch.charterData.custName)) || 'チャーター';
         html += `<div class="mv-dd-row mv-dd-total"><span>チャーター: ${label}</span><span>${qty>0?qty+'個':'1本'}</span></div>`;
       });
       html += `</div>`;
