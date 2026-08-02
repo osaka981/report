@@ -1257,7 +1257,7 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
       </div>
       
       <!-- 確認ボタン -->
-      <button id="mv-confirm-btn" onclick="submitMonthlyConfirmation()" 
+      <button id="mv-confirm-btn" onclick="openMonthlyConfirmDialog()" 
         style="width:100%;padding:12px;background:var(--clay);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">
         この内容で確認しました
       </button>
@@ -14503,7 +14503,129 @@ function _updateMonthlyConfirmSection(year, month, totals){
 }
 
 /** 月次確認の送信 */
-async function submitMonthlyConfirmation(){
+// ══════════════════════════════════════════════════
+// ★ 2026/08/02: 月次確認の前に、日別の明細表を出して内容を確認できるようにする。
+//   従来は合計3つ(配達/集荷/稼働)だけのconfirm()で、日ごとの数字を見ずに
+//   確定していた。書面(個人別日別集計)と同じ並びの表を出す。
+// ══════════════════════════════════════════════════
+function _buildMonthlyDetailTable(year, month){
+  const data = _mvCollectMonth(year, month);
+  const lastDay = new Date(year, month+1, 0).getDate();
+  const wd = ['日','月','火','水','木','金','土'];
+  const t = {sum:0, kanryo:0, tenso:0, yakan:0, ogata:0, col:0};
+
+  const rows = [];
+  for(let d=1; d<=lastDay; d++){
+    const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const rec = data.byDate[dateStr];
+    const del = (rec && rec.del) || {};
+    const kanryo = Number(del.kanryo||0);
+    const tenso  = Number(del.tenso||0);
+    const yakan  = Number(del.yakan||0);
+    const ogata  = Number(del.ogata||0);
+    let col = 0;
+    if(rec){
+      Object.values(rec.shuCompanies||{}).forEach(n=>col += Number(n)||0);
+      const cb = rec.colBlocks;
+      if(cb){
+        (cb.indiv||[]).forEach(b=>Object.values(b.items||{}).forEach(v=>col += Number(v)||0));
+        (cb.route||[]).forEach(rt=>(rt.customers||[]).forEach(c=>Object.values(c.items||{}).forEach(v=>col += Number(v)||0)));
+        (cb.charter||[]).forEach(ch=>col += Number(ch.qty||0));
+      }
+    }
+    const sum = kanryo + tenso;
+    t.sum+=sum; t.kanryo+=kanryo; t.tenso+=tenso; t.yakan+=yakan; t.ogata+=ogata; t.col+=col;
+
+    const dow = new Date(year, month, d).getDay();
+    const dowColor = dow===0?'var(--rust)':(dow===6?'var(--slate)':'var(--ink)');
+    const zero = v => v ? String(v) : '';
+    const bg = (dow===0||dow===6) ? 'background:rgba(176,154,138,.08);' : '';
+    rows.push(`<tr style="${bg}">
+      <td style="text-align:center;">${d}</td>
+      <td style="text-align:center;color:${dowColor};">${wd[dow]}</td>
+      <td style="text-align:right;font-weight:700;">${sum||0}</td>
+      <td style="text-align:right;">${zero(kanryo)}</td>
+      <td style="text-align:right;">${zero(tenso)}</td>
+      <td style="text-align:right;">${zero(yakan)}</td>
+      <td style="text-align:right;">${zero(ogata)}</td>
+      <td style="text-align:right;">${zero(col)}</td>
+    </tr>`);
+  }
+
+  const th = 'padding:4px 3px;border:1px solid var(--brd);font-size:9px;font-weight:700;background:var(--inp);color:var(--mid);text-align:center;line-height:1.25;';
+  const tdCss = '<style>#mv-detail-tbl td{padding:3px;border:1px solid var(--brd);font-size:10.5px;color:var(--ink);}</style>';
+
+  return `${tdCss}
+    <table id="mv-detail-tbl" style="width:100%;border-collapse:collapse;table-layout:fixed;">
+      <thead>
+        <tr>
+          <th rowspan="2" style="${th}width:26px;">日</th>
+          <th rowspan="2" style="${th}width:24px;">曜</th>
+          <th rowspan="2" style="${th}">①+②<br>配達完了</th>
+          <th rowspan="2" style="${th}">①<br>配達完了</th>
+          <th rowspan="2" style="${th}">②<br>転送<br>返還</th>
+          <th colspan="2" style="${th}">①の詳細</th>
+          <th rowspan="2" style="${th}">集荷</th>
+        </tr>
+        <tr>
+          <th style="${th}">20-21時</th>
+          <th style="${th}">大170超</th>
+        </tr>
+      </thead>
+      <tbody>${rows.join('')}</tbody>
+      <tfoot>
+        <tr style="background:var(--inp);font-weight:700;">
+          <td colspan="2" style="text-align:center;">合計</td>
+          <td style="text-align:right;">${t.sum.toLocaleString()}</td>
+          <td style="text-align:right;">${t.kanryo.toLocaleString()}</td>
+          <td style="text-align:right;">${t.tenso.toLocaleString()}</td>
+          <td style="text-align:right;">${t.yakan.toLocaleString()}</td>
+          <td style="text-align:right;">${t.ogata.toLocaleString()}</td>
+          <td style="text-align:right;">${t.col.toLocaleString()}</td>
+        </tr>
+      </tfoot>
+    </table>`;
+}
+
+/** 確認前の明細ダイアログ */
+function openMonthlyConfirmDialog(){
+  if(!driver) return;
+  const {year, month} = _mvState;
+  const ym = `${year}年${month+1}月`;
+  const conf = _getMonthlyConfirmation(year, month);
+  if(conf?.status === 'approved'){ toast('承認済みのデータは変更できません'); return; }
+  const isUpdate = !!conf;
+
+  closeMonthlyConfirmDialog();
+  const div = document.createElement('div');
+  div.id = 'mv-confirm-wrap';
+  div.innerHTML = `
+    <div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:9200;" onclick="closeMonthlyConfirmDialog()"></div>
+    <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:calc(100% - 24px);max-width:440px;max-height:90vh;display:flex;flex-direction:column;background:var(--card);border-radius:14px;z-index:9201;box-shadow:0 12px 40px rgba(0,0,0,.3);overflow:hidden;">
+      <div style="padding:12px 14px;border-bottom:1px solid var(--brd);">
+        <div style="font-size:13.5px;font-weight:700;color:var(--ink);">${ym} 配達数の確認</div>
+        <div style="font-size:10.5px;color:var(--mid);margin-top:2px;">${esc_n(driver.name||'')} ／ 内容に相違がないかご確認ください</div>
+      </div>
+      <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:10px 12px;">
+        ${_buildMonthlyDetailTable(year, month)}
+        <div style="font-size:9.5px;color:var(--light);margin-top:8px;line-height:1.5;">
+          ※ この表は業務確認用です。金額は請求書をご確認ください。<br>
+          ※ 相違がある場合は、キャンセルして「修正・備考」欄に記入してください。
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;padding:10px 12px;border-top:1px solid var(--brd);">
+        <button onclick="closeMonthlyConfirmDialog()" style="flex:1;padding:11px;background:var(--inp);border:none;border-radius:8px;font-size:12.5px;color:var(--mid);cursor:pointer;">キャンセル</button>
+        <button onclick="submitMonthlyConfirmation(true)" style="flex:2;padding:11px;background:var(--clay);color:#fff;border:none;border-radius:8px;font-size:12.5px;font-weight:700;cursor:pointer;">${isUpdate?'この内容で更新する':'この内容で確認する'}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(div);
+}
+
+function closeMonthlyConfirmDialog(){
+  document.getElementById('mv-confirm-wrap')?.remove();
+}
+
+async function submitMonthlyConfirmation(skipConfirm){
   if(!driver) return;
   const {year, month} = _mvState;
   const ym = `${year}-${String(month+1).padStart(2,'0')}`;
@@ -14522,7 +14644,8 @@ async function submitMonthlyConfirmation(){
     ? `${ym} の確認内容を更新しますか?\n\n配達: ${data.totals.del}\n集荷: ${data.totals.col}\n稼働: ${data.totals.workDays}日`
     : `${ym} の月次確認を送信しますか?\n\n配達: ${data.totals.del}\n集荷: ${data.totals.col}\n稼働: ${data.totals.workDays}日\n\n確認後、内勤の承認待ちとなります。`;
   
-  if(!confirm(msg)) return;
+  if(!skipConfirm && !confirm(msg)) return;
+  closeMonthlyConfirmDialog();
   
   const btn = $('mv-confirm-btn');
   if(btn){ btn.disabled = true; btn.textContent = '送信中...'; }
