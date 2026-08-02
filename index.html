@@ -15909,17 +15909,60 @@ function openCustAddPanel(){
     $('col-cust-add-search')?.focus();
   }
 }
+// ★ 2026/08/03: 顧客選択リストの並び順
+//   従来は顧客マスタの登録順(=実質ランダム)で出ていた。
+//   郵便局ごとにまとめ、郵便局名はあいうえお順、局内は顧客番号順にする。
+//   郵便局名は漢字のため、そのまま並べても読み順にならない(漢字は画数順に並ぶ)。
+//   読み仮名の対応表を持ち、表にないものは末尾へ回して名称順にする。
+const POST_OFFICE_YOMI = {
+  '宇治':'うじ', '大阪北':'おおさかきた', '大阪港':'おおさかみなと',
+  '大阪南':'おおさかみなみ', '大阪西':'おおさかにし', '城東':'じょうとう',
+  '摂津':'せっつ', '中央':'ちゅうおう', '西成':'にしなり', '浜寺':'はまでら',
+  '東成':'ひがしなり', '枚方':'ひらかた', '平野':'ひらの', '藤井寺':'ふじいでら',
+  '都島':'みやこじま', '美原':'みはら', '淀川':'よどがわ', '堺':'さかい',
+  '住吉':'すみよし', '天王寺':'てんのうじ', '此花':'このはな', '港':'みなと',
+};
+function _officeYomi(region){
+  const r = String(region||'').trim();
+  if(!r) return { key:'\uFFFF\uFFFF', label:'(郵便局 未設定)' };   // 未設定は最後
+  const base = r.replace(/郵便局$/,'').trim();
+  const y = POST_OFFICE_YOMI[base];
+  return { key: y || ('\uFFFE' + base), label: r };   // 表に無ければ既知の後ろへ
+}
+function _custSortKey(cu){
+  const o = _officeYomi(cu.region);
+  const no = String(cu.custNo||'').replace(/[^0-9]/g,'');
+  const noKey = no ? String(parseInt(no,10)).padStart(5,'0') : '99999';
+  return { officeKey:o.key, officeLabel:o.label, noKey, name:String(cu.name||'') };
+}
+
 function renderCustAddList(q){
   const list=$('col-cust-add-list');
   if(!list) return;
-  const custs = CUSTOMERS.filter(c=>!q||matchZenHan(c.name,q)||matchZenHan(c.region||'',q));
+  let custs = CUSTOMERS.filter(c=>!q||matchZenHan(c.name,q)||matchZenHan(c.region||'',q));
   if(!custs.length){
     list.innerHTML='<div style="padding:8px;color:var(--light);font-size:11px;">該当なし</div>';
     return;
   }
+  // 郵便局(読み順) → 顧客番号 → 顧客名 で並べ替え
+  custs = custs.slice().sort((a,b)=>{
+    const ka=_custSortKey(a), kb=_custSortKey(b);
+    if(ka.officeKey !== kb.officeKey) return ka.officeKey < kb.officeKey ? -1 : 1;
+    if(ka.noKey !== kb.noKey) return ka.noKey < kb.noKey ? -1 : 1;
+    return ka.name.localeCompare(kb.name, 'ja');
+  });
   // 集荷日報の選択日付
   const targetDateStr = ($('col-date')?.value) || '';
+  let _lastOffice = null;
   list.innerHTML=custs.slice(0,200).map(cu=>{
+    // 郵便局が変わったら見出しを挟む
+    const _ol = _custSortKey(cu).officeLabel;
+    let officeHead = '';
+    if(_ol !== _lastOffice){
+      _lastOffice = _ol;
+      officeHead = `<div style="position:sticky;top:0;z-index:1;background:var(--inp);color:var(--mid);font-size:10px;font-weight:700;padding:4px 8px;border-radius:5px;margin-top:2px;">${esc_n(_ol)}</div>`;
+    }
+    return officeHead + (()=>{
     // 休業予定検索(ID + 名前マッチ)
     const upcomingScheds = _findCustomerUpcomingSchedules(cu.id, cu.name, targetDateStr);
     const todayMatch = upcomingScheds.find(s => s.date === targetDateStr);
@@ -15955,6 +15998,7 @@ function renderCustAddList(q){
         return noteCount > 0 ? `<div style="font-size:9px;color:#0369a1;margin-top:2px;">💬 申し送り ${noteCount}件</div>` : '';
       })()}
     </div>`;
+    })();
   }).join('');
 }
 
