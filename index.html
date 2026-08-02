@@ -15715,7 +15715,9 @@ function colRouteStopMemo(blockId, stopIdx, val){
 
 function openRouteSelectSheet(routes){
   // ルート選択シートをボトムシート形式で表示(アプリの max-width:420px に合わせる)
-  let html=`<div style="position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:420px;background:var(--card);border-radius:14px 14px 0 0;padding:16px;z-index:8500;box-shadow:0 -4px 24px rgba(0,0,0,.15);box-sizing:border-box;" id="route-select-sheet">
+  // ★ 2026/08/02: ボトムシート(bottom:0)だと画面下端に張り付き、PCでは遠すぎて
+  //   キャンセルが見切れることがあった。他のモーダル(予定登録)と同じ中央配置に変更。
+  let html=`<div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:calc(100% - 32px);max-width:420px;background:var(--card);border-radius:14px;padding:16px;z-index:8500;max-height:86vh;overflow-y:auto;box-sizing:border-box;box-shadow:0 12px 40px rgba(0,0,0,.25);" id="route-select-sheet">
     <div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:12px;">集荷ルートを選択</div>
     <div style="display:flex;flex-direction:column;gap:6px;max-height:60vh;overflow-y:auto;">
     ${routes.map(r=>{
