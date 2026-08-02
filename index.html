@@ -16649,7 +16649,7 @@ function renderRouteBlock(b){
           <span style="font-size:12px;font-weight:700;color:var(--ink);flex:1;">${esc_n(cust.customerName||`立ち寄り${seq}件目`)}</span>
           <button onclick="colRouteCustEdit(${b.id},${idx})" style="background:none;border:1px solid var(--amber);color:var(--amber);border-radius:6px;padding:3px 10px;font-size:11px;font-weight:600;cursor:pointer;">訂正</button>
         </div>
-        <div style="font-size:11px;color:var(--mid);margin-top:6px;padding-left:28px;">休業日 (集荷なし)</div>
+        <div style="font-size:11px;color:var(--amber);font-weight:700;margin-top:6px;padding-left:28px;">本日集荷なし</div>
       </div>`;
     }
 
@@ -16695,7 +16695,7 @@ function renderRouteBlock(b){
       </div>
       <div style="display:flex;gap:6px;margin-top:8px;">
         <button onclick="colRouteCustConfirm(${b.id},${idx})" style="flex:2;padding:9px;background:var(--ok);color:#faf8f5;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">✓ 数量確定</button>
-        <button onclick="colRouteCustRest(${b.id},${idx})" style="flex:1;padding:9px;background:rgba(176,154,138,.2);color:var(--mid);border:1px solid rgba(176,154,138,.5);border-radius:8px;font-size:11.5px;font-weight:600;cursor:pointer;">休業日</button>
+        <button onclick="colRouteCustRest(${b.id},${idx})" style="flex:1;padding:9px;background:var(--amber);color:#fff;border:1px solid var(--amber);border-radius:8px;font-size:11.5px;font-weight:700;cursor:pointer;">本日集荷なし</button>
       </div>
       <button onclick="openScheduleModal(${custIdForSched},'${esc_n(cust.customerName||'').replace(/'/g,"\\'")}')" style="margin-top:6px;width:100%;padding:8px;background:transparent;border:1px dashed var(--brd);color:var(--mid);border-radius:8px;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -16754,7 +16754,7 @@ function colRouteCustRest(blockId, custIdx){
   //   数量が入っているときだけ確認する(「数量確定」と隣り合わせで誤タップしやすい)。
   const cu = b.customers[custIdx];
   if(_colHasQty(cu.items) && !confirm(
-      (cu.customerName||'この顧客') + ' を休業日にします。\n\n入力済みの数量はすべて消去されます。よろしいですか?')){
+      (cu.customerName||'この顧客') + ' を「本日集荷なし」にします。\n\n入力済みの数量はすべて消去されます。よろしいですか?')){
     return;
   }
   // 休業日 = items全クリア + restフラグ + confirmed
@@ -16789,7 +16789,7 @@ function renderIndivBlock(b){
         <span class="col-block-tag col-tag-i">顧客個別</span>
         <button onclick="colIndivEdit(${b.id})" style="margin-left:auto;background:none;border:1px solid var(--amber);color:var(--amber);border-radius:6px;padding:3px 10px;font-size:11px;font-weight:600;cursor:pointer;">訂正</button>
       </div>
-      <div style="font-size:11px;color:var(--mid);padding:8px 14px 12px;">休業日 (集荷なし)</div>
+      <div style="font-size:11px;color:var(--amber);font-weight:700;padding:8px 14px 12px;">本日集荷なし</div>
     </div>`;
   }
 
@@ -16838,7 +16838,7 @@ function renderIndivBlock(b){
       </div>
       <div style="display:flex;gap:6px;padding:0 14px 6px;">
         <button onclick="colIndivConfirm(${b.id})" style="flex:2;padding:9px;background:var(--sage);color:#faf8f5;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">✓ 数量確定</button>
-        <button onclick="colIndivRest(${b.id})" style="flex:1;padding:9px;background:rgba(176,154,138,.2);color:var(--mid);border:1px solid rgba(176,154,138,.5);border-radius:8px;font-size:11.5px;font-weight:600;cursor:pointer;">休業日</button>
+        <button onclick="colIndivRest(${b.id})" style="flex:1;padding:9px;background:var(--amber);color:#fff;border:1px solid var(--amber);border-radius:8px;font-size:11.5px;font-weight:700;cursor:pointer;">本日集荷なし</button>
       </div>
       <div style="padding:0 14px 12px;">
         <button onclick="openScheduleModal(${indivCustId},'${esc_n(b.custName||'').replace(/'/g,"\\'")}')" style="width:100%;padding:8px;background:transparent;border:1px dashed var(--brd);color:var(--mid);border-radius:8px;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;">
@@ -16874,7 +16874,7 @@ function colIndivRest(blockId){
   if(!b) return;
   // ★ 2026/07/31: 入力済み数量がある場合のみ確認(誤タップ対策)
   if(_colHasQty(b.items) && !confirm(
-      (b.custName||'この顧客') + ' を休業日にします。\n\n入力済みの数量はすべて消去されます。よろしいですか?')){
+      (b.custName||'この顧客') + ' を「本日集荷なし」にします。\n\n入力済みの数量はすべて消去されます。よろしいですか?')){
     return;
   }
   b.items = {};
