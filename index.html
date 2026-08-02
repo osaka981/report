@@ -15714,10 +15714,18 @@ function getMyRoutes(){
   const myId = driver?.id;
   const routes = ls_get(LS.COL_ROUTES,[]);
   if(!routes.length) return [];
-  // 担当者IDが一致するルートを返す(staffIds/driverIds 両対応)
+  // ★ 2026/08/03: 委託会社のルートに対応。
+  //   ・companyId 付きのルート … その会社に所属するドライバーだけに表示
+  //   ・staffIds 付きのルート  … 本人だけに表示
+  //   ・どちらも無いルート      … 自社ドライバー全員に表示(従来動作)
+  const myCompany = driver && driver.companyId ? String(driver.companyId) : '';
   return routes.filter(r=>{
+    if(r.companyId){
+      return myCompany && String(r.companyId) === myCompany;
+    }
+    if(myCompany) return false;          // 委託会社ドライバーに自社ルートは出さない
     const ids = r.staffIds || r.driverIds || [];
-    if(!ids.length) return true; // 全員対象
+    if(!ids.length) return true;         // 全員対象
     return ids.includes(myId) || ids.includes(String(myId));
   });
 }
