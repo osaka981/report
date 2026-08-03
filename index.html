@@ -15948,6 +15948,33 @@ function renderCustAddList(q){
   const list=$('col-cust-add-list');
   if(!list) return;
   let custs = CUSTOMERS.filter(c=>!q||matchZenHan(c.name,q)||matchZenHan(c.region||'',q));
+
+  // ★ 2026/08/03: 委託会社所属のドライバーは、自社に単価登録のある顧客だけを表示する。
+  //   従来は全顧客が見えており、担当外・他社の顧客まで選べてしまっていた。
+  //   単価は経営管理システムの 委託会社編集 → 単価設定 → 集荷単価 に登録された
+  //   顧客(co.prices.custRoutes)を正とする。配送ルートに含まれる顧客も対象に含める。
+  const _myCoId = driver && driver.companyId ? String(driver.companyId) : '';
+  if(_myCoId){
+    const co = (COMPANIES||[]).find(c=>String(c.id)===_myCoId);
+    const allowed = new Set();
+    ((co && co.prices && co.prices.custRoutes) || []).forEach(e=>{
+      if(e && e.custId!=null) allowed.add(String(e.custId));
+    });
+    ((co && co.colRoutes) || []).forEach(r=>{
+      (r.customers||[]).forEach(cid=>{
+        const id = (cid && typeof cid==='object') ? (cid.custId ?? cid.id) : cid;
+        if(id!=null) allowed.add(String(id));
+      });
+    });
+    if(!allowed.size){
+      list.innerHTML='<div style="padding:10px;color:var(--light);font-size:11px;line-height:1.6;">'
+        + 'この会社に単価登録された顧客がありません。<br>'
+        + '経営管理システムの「委託会社管理 → 単価設定 → 集荷単価」で顧客を登録してください。</div>';
+      return;
+    }
+    custs = custs.filter(c=>allowed.has(String(c.id)));
+  }
+
   if(!custs.length){
     list.innerHTML='<div style="padding:8px;color:var(--light);font-size:11px;">該当なし</div>';
     return;
@@ -16289,6 +16316,61 @@ function renderNotesList(){
           <div style="font-size:9.5px;color:var(--mid);margin-top:5px;">${esc_n(n.createdByName||'不明')}　${fmt(n.createdAt)}</div>
         </div>`).join('')}
     </div>`).join('');
+}
+
+// ══════════════════════════════════════════════════
+// ★ 2026/08/03: 基本の訪問時間を集荷カード上部に表示する
+//   経営管理システムの顧客マスタ(visitFrom / visitTo / visitNote)を表示。
+//   ・両方あり … その時間内
+//   ・開始のみ … その時刻以降。17:30までに郵便局へ納入
+//   ・終了のみ … その時刻まで(早すぎると待機の可能性)
+//   その日だけの変更は「時間変更・休業予定日の登録」(SCHEDULE_OVERRIDES)を併記する。
+// ══════════════════════════════════════════════════
+const POST_DEADLINE = '17:30';   // 郵便局への納入締切
+
+function _visitTimeHtml(custId, custName, targetDateStr){
+  const cu = _findCustomerById(custId) || _findCustomerByName(custName||'');
+  const from = (cu && cu.visitFrom) || '';
+  const to   = (cu && cu.visitTo)   || '';
+  const note = (cu && cu.visitNote) || '';
+
+  // 当日の時間変更(例外)
+  let chg = null;
+  try{
+    chg = (SCHEDULE_OVERRIDES||[]).find(s=>
+      s && s.kind === 'time' && s.date === targetDateStr &&
+      (String(s.customerId) === String(custId) ||
+       (custName && String(s.customerName||'') === String(custName)))
+    ) || null;
+  }catch(e){}
+
+  if(!from && !to && !chg && !note) return '';
+
+  let baseText = '';
+  if(from && to)      baseText = `${from} 〜 ${to}`;
+  else if(from)       baseText = `${from} 〜　（${POST_DEADLINE}までに郵便局へ納入）`;
+  else if(to)         baseText = `〜 ${to} まで　（早く着くと待機の可能性あり）`;
+
+  let html = '<div style="padding:7px 14px 0;">';
+  html += '<div style="background:rgba(90,138,90,.10);border:1px solid rgba(90,138,90,.35);border-radius:7px;padding:6px 9px;">';
+
+  if(baseText){
+    const struck = chg ? 'text-decoration:line-through;opacity:.55;' : '';
+    html += `<div style="font-size:11.5px;font-weight:700;color:var(--sage);${struck}">🕐 ${esc_n(baseText)}</div>`;
+  }
+  if(chg){
+    const ct = (chg.startTime && chg.endTime) ? `${chg.startTime} 〜 ${chg.endTime}`
+             : chg.startTime ? `${chg.startTime} 〜　（${POST_DEADLINE}までに郵便局へ納入）`
+             : chg.endTime   ? `〜 ${chg.endTime} まで　（早く着くと待機の可能性あり）`
+             : '時間変更あり';
+    html += `<div style="font-size:12px;font-weight:700;color:#dc2626;margin-top:${baseText?'3px':'0'};">⏰ 本日は ${esc_n(ct)}</div>`;
+    if(chg.note) html += `<div style="font-size:10px;color:#dc2626;margin-top:1px;">${esc_n(chg.note)}</div>`;
+  }
+  if(note){
+    html += `<div style="font-size:10px;color:var(--mid);margin-top:3px;">${esc_n(note)}</div>`;
+  }
+  html += '</div></div>';
+  return html;
 }
 
 /** メモパネルのHTMLを生成(集荷ブロック内 + 顧客選択リスト両方で使う) */
@@ -16887,6 +16969,7 @@ function renderRouteBlock(b){
         <span style="display:inline-block;width:22px;height:22px;background:var(--slate);color:#fff;border-radius:50%;text-align:center;line-height:22px;font-size:10px;font-weight:700;">${seq}</span>
         <span style="font-size:12px;font-weight:700;color:var(--ink);flex:1;">${esc_n(cust.customerName||`立ち寄り${seq}件目`)}${schedBadge}</span>
       </div>
+      ${_visitTimeHtml(custIdForSched, cust.customerName, ($('col-date')?.value)||'')}
       ${schedDetail}
       <div class="col-iw" style="border:none;padding:0;background:transparent;">
         ${itemsGridHtml(b.id, idx, cust.items||{}, 'b', cust.customerName)}
@@ -17030,6 +17113,7 @@ function renderIndivBlock(b){
       <span class="col-block-chev" id="blk-chev-${b.id}" style="${chevStyle}">▼</span>
     </div>
     <div id="blk-body-${b.id}" style="display:${bodyDisp};">
+      ${_visitTimeHtml(b.custId ?? b.customerId, b.custName || b.customerName, ($('col-date')?.value)||'')}
       ${indivSchedDetail}
       <div class="col-iw" style="border-top:none;">
         ${itemsGridHtml(b.id,0,b.items||{},'g',b.custName)}
