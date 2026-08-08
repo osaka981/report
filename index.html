@@ -9824,7 +9824,10 @@ function _renderOwnerMonthly(){
   driverStats.sort((a,b)=>(b.delCnt+b.shuCnt+b.colCnt) - (a.delCnt+a.shuCnt+a.colCnt));
   rows.innerHTML = driverStats.map(s=>{
     const isAdmin = String(s.drv.driverNo||s.drv.id||'').endsWith('-999');
-    const drvId = (s.drv.id||s.drv.driverNo||'').replace(/'/g,"\\'");
+    // ★ 2026/08/08: id が数値のドライバーだと .replace が無く TypeError で
+    //   オーナー画面の月報描画が丸ごと止まり、ログイン直後に画面が進まなくなっていた。
+    //   必ず文字列化してから処理する。
+    const drvId = String(s.drv.id || s.drv.driverNo || '').replace(/'/g,"\\'");
     const office = s.drv.office || '-';
     // 管理者(10001-999)の表示は「会社名 (管理者コード)」
     const displayName = isAdmin
