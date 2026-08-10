@@ -3738,7 +3738,7 @@ function _osqRenderHome(){
   let delTotal = 0, colTotal = 0;
   ypToday.forEach(r=>{
     const f = r.form||{};
-    const del = f.del||{};
+    const del = f.del || f;   // ★ 2026/08/10 旧形式(form直下)にも対応
     delTotal += (parseInt(del.kanryo)||0) + (parseInt(del.tenso)||0);
   });
   colToday.forEach(r=>{
@@ -4721,7 +4721,7 @@ function _renderMgrStatsDrvTab(year, month, stats){
       driverStats[drvId] = {drv: drv || {id:drvId, name:`ID:${drvId}`}, kt:0, postCol:0, col:0, dayCount:0, byOffice:{}};
     }
     const f = r.form||{};
-    const del = f.del||{};
+    const del = f.del || f;   // ★ 2026/08/10 旧形式(form直下)にも対応
     const kn = parseInt(del.kanryo)||0;
     const ts = parseInt(del.tenso)||0;
     const md = parseInt(del.mochidashi)||0;
@@ -4939,7 +4939,7 @@ function _renderMgrStatsCompTab(year, month, stats){
     const ckey = _getCompKey(drvObj);
     if(!compStats[ckey]) compStats[ckey] = {key:ckey, name:_getCompName(ckey), drvIds:new Set(), kt:0, postCol:0, col:0, dayCount:0, byOffice:{}};
     const f = r.form||{};
-    const del = f.del||{};
+    const del = f.del || f;   // ★ 2026/08/10 旧形式(form直下)にも対応
     const kn = parseInt(del.kanryo)||0;
     const ts = parseInt(del.tenso)||0;
     const md = parseInt(del.mochidashi)||0;
@@ -5087,7 +5087,7 @@ function _renderCompanyDetail(companyKey, year, month){
       driverStats[drvId] = {drv: drvObj, kt:0, postCol:0, col:0, dayCount:0, byOffice:{}};
     }
     const f = r.form||{};
-    const del = f.del||{};
+    const del = f.del || f;   // ★ 2026/08/10 旧形式(form直下)にも対応
     const kn = parseInt(del.kanryo)||0;
     const ts = parseInt(del.tenso)||0;
     const md = parseInt(del.mochidashi)||0;
@@ -6260,7 +6260,7 @@ function _mgrCalcMonthStats(year, month){
 
   yp.forEach(r=>{
     const f = r.form || {};
-    const del = f.del || {};
+    const del = f.del || f;   // ★ 2026/08/10 旧形式(form直下)にも対応
     const md = parseInt(del.mochidashi)||0;
     const kn = parseInt(del.kanryo)||0;
     const ts = parseInt(del.tenso)||0;
@@ -6302,7 +6302,7 @@ function _mgrCalcMonthStats(year, month){
   const delByOffice = {};
   yp.forEach(r=>{
     const f = r.form || {};
-    const del = f.del || {};
+    const del = f.del || f;   // ★ 2026/08/10 旧形式(form直下)にも対応
     const office = r.postOffice || r.driver?.office || '不明';
     if(!delByOffice[office]) delByOffice[office] = {kanryo:0, tenso:0, mochidashi:0, mochimo:0, yakan:0, ogata:0, dayCount:0};
     const md = parseInt(del.mochidashi)||0;
@@ -8889,7 +8889,7 @@ function _coMcGatherRawData(year, month){
     if(!isAdminCode) return;
     
     const f = r.form || {};
-    const del = f.del || {};
+    const del = f.del || f;   // ★ 2026/08/10 旧形式(form直下)にも対応
     const mochidashi = del.mochidashi || del.持出 || 0;
     const kanryo = del.kanryo || 0;
     const tenso = del.tenso || 0;
@@ -9776,7 +9776,7 @@ function _renderOwnerMonthly(){
     const cols = (COL_LOGS||[]).filter(r=>r.driver&&r.driver.id===drv.id && r.date && r.date.startsWith(prefix));
     let delCnt=0, yakanCnt=0, ogataCnt=0, shuCnt=0, colCnt=0, daysSet=new Set();
     yps.forEach(r=>{
-      const f=r.form||{}, del=f.del||{};
+      const f = r.form||{}, del = f.del || f;   // ★ 2026/08/10 旧形式にも対応
       delCnt += (del.kanryo||0) + (del.tenso||0);
       yakanCnt += (del.yakan||0);
       ogataCnt += (del.ogata||0);
@@ -12177,7 +12177,7 @@ function _downloadOwnerDriverFullCsv(driverId){
   // 日付ごとに集計
   const byDate = {};
   (YP_LOGS||[]).filter(r=>r.driver&&r.driver.id===drv.id && r.date && r.date.startsWith(prefix)).forEach(r=>{
-    const f = r.form||{}, del = f.del||{};
+    const f = r.form||{}, del = f.del || f;   // ★ 2026/08/10 旧形式にも対応
     const shuCnt = ((f.col&&f.col.companies)||[]).reduce((s,c)=>s+(Number(c.count)||0),0);
     if(!byDate[r.date]) byDate[r.date] = {date:r.date, kanryo:0, tenso:0, yakan:0, ogata:0, mochimodoiri:0, shu:0, col:0};
     byDate[r.date].kanryo += del.kanryo||0;
@@ -12827,7 +12827,7 @@ function downloadOwnerCSV(year, month){
   rows.push(['日付','ドライバー名','ID','配達完了','配達転送','定時集荷','集荷事業'].join(','));
   drivers.forEach(drv=>{
     (YP_LOGS||[]).filter(r=>r.driver&&r.driver.id===drv.id && r.date && r.date.startsWith(prefix)).forEach(r=>{
-      const f=r.form||{}, del=f.del||{};
+      const f = r.form||{}, del = f.del || f;   // ★ 2026/08/10 旧形式にも対応
       const shuCnt = ((f.col&&f.col.companies)||[]).reduce((s,c)=>s+(c.count||0),0);
       rows.push([r.date, drv.name||'', drv.id||'', del.kanryo||0, del.tenso||0, shuCnt, 0].join(','));
     });
@@ -14277,7 +14277,7 @@ function _mvCollectMonth(year, month){
     const d = ensureDay(r.date);
     if(r.postOffice) d.posts.add(r.postOffice);
     const f = r.form || {};
-    const del = f.del || {};
+    const del = f.del || f;   // ★ 2026/08/10 旧形式(form直下)にも対応
     if(!d.del) d.del = {mochidashi:0,kanryo:0,tenso:0,yakan:0,ogata:0,mochimodoiri:0};
     d.del.mochidashi += del.mochidashi||0;
     d.del.kanryo += del.kanryo||0;
