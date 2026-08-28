@@ -1081,11 +1081,11 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
 <!-- 集荷入力 提出確認モーダル -->
 <div id="col-sub-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:8000;align-items:center;justify-content:center;">
   <div style="background:var(--card);border-radius:14px;padding:20px;max-width:300px;width:90%;text-align:center;">
-    <div style="font-size:14px;font-weight:700;color:var(--ink);margin-bottom:6px;">提出の確認</div>
-    <div style="font-size:12px;color:var(--mid);margin-bottom:16px;line-height:1.6;" id="col-sub-msg"></div>
+    <div style="font-size:14px;font-weight:700;color:var(--ink);margin-bottom:6px;" id="col-sub-title">提出の確認</div>
+    <div style="font-size:12px;color:var(--mid);margin-bottom:16px;line-height:1.6;text-align:left;" id="col-sub-msg"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-      <button onclick="closeColSubModal()" style="padding:10px;border-radius:8px;background:var(--inp);border:none;font-size:13px;color:var(--mid);cursor:pointer;">戻る</button>
-      <button onclick="doSubmitCol()" style="padding:10px;border-radius:8px;background:var(--sage);border:none;font-size:13px;color:#fff;cursor:pointer;">提出する</button>
+      <button id="col-sub-cancel" onclick="closeColSubModal()" style="padding:10px;border-radius:8px;background:var(--inp);border:none;font-size:13px;color:var(--mid);cursor:pointer;">戻る</button>
+      <button id="col-sub-ok" onclick="doSubmitCol()" style="padding:10px;border-radius:8px;background:var(--sage);border:none;font-size:13px;color:#fff;cursor:pointer;">提出する</button>
     </div>
   </div>
 </div>
@@ -18664,16 +18664,66 @@ function submitCol(){
       }
     }
   });
+  // ★ 2026/08/28: 未確定のまま提出できると、集荷したのか休みだったのか後から分からない。
+  //   顧客ごとに「数量確定」か「本日集荷なし」のどちらかを必ず押す運用にする。
+  //   未確定が残っている間は提出させず、どこが残っているかだけを示す。
+  const blocking = warnings.filter(w=>String(w).includes('未確定'));
   const msg=$('col-sub-msg');
-  if(warnings.length&&msg){
-    msg.innerHTML=warnings.map(w=>`⚠️ ${w}`).join('<br>')+`<br><br>このまま提出しますか？`;
-    const m=$('col-sub-modal');if(m) m.style.display='flex';
-  } else {
-    doSubmitCol();
+  if(blocking.length && msg){
+    msg.innerHTML =
+      `<div style="font-weight:700;color:var(--amber);margin-bottom:6px;">未確定の顧客が残っています</div>`
+      + blocking.map(w=>`・${w}`).join('<br>')
+      + `<div style="margin-top:10px;font-size:11.5px;color:var(--mid);line-height:1.6;">`
+      + `各顧客で <b>数量確定</b> か <b>本日集荷なし</b> のどちらかを押してください。<br>`
+      + `どちらも押されていないと、集荷したのか休みだったのか記録が残りません。</div>`;
+    const m=$('col-sub-modal'); if(m) m.style.display='flex';
+    _colSubBlocked = true;
+    _colSubToggleSubmit(false);
+    const t=document.getElementById('col-sub-title');
+    if(t){ t.textContent='提出できません'; t.style.color='var(--amber)'; }
+    return;
   }
+  if(warnings.length && msg){
+    // 未確定以外(数量0など)は、確認のうえ提出できる
+    msg.innerHTML=warnings.map(w=>`・${w}`).join('<br>')+`<br><br>このまま提出しますか？`;
+    const m=$('col-sub-modal'); if(m) m.style.display='flex';
+    _colSubBlocked = false;
+    _colSubToggleSubmit(true);
+    const t2=document.getElementById('col-sub-title');
+    if(t2){ t2.textContent='提出の確認'; t2.style.color='var(--ink)'; }
+    return;
+  }
+  doSubmitCol();
+}
+
+// 未確定(数量確定も本日集荷なしも押していない)顧客の件数
+function _colSubUnconfirmed(){
+  let n=0;
+  (colBlocks||[]).forEach(b=>{
+    if(b.type==='route') (b.customers||[]).forEach(c=>{ if(!c.confirmed) n++; });
+    else if(b.type==='indiv'){ if(!b.confirmed) n++; }
+  });
+  return n;
+}
+
+// 提出確認モーダルの「提出する」ボタンの出し分け
+let _colSubBlocked = false;
+function _colSubToggleSubmit(show){
+  const btn = document.getElementById('col-sub-ok');
+  if(btn) btn.style.display = show ? '' : 'none';
+  const back = document.getElementById('col-sub-cancel');
+  if(back) back.textContent = show ? '戻る' : '入力に戻る';
 }
 
 function doSubmitCol(){
+  // 未確定が残っている状態では提出させない(ボタンを隠しているが二重の歯止め)
+  if(typeof _colSubUnconfirmed==='function'){
+    const n=_colSubUnconfirmed();
+    if(n>0){
+      toast(`未確定の顧客が${n}件あります。数量確定か本日集荷なしを押してください`,'err');
+      return;
+    }
+  }
   closeColSubModal();
   // colRowsの形式に変換してfirebaseに保存
   const colRows=[];
