@@ -2944,10 +2944,15 @@ function buildPostOfficeBtns(){
   if(!wrap || !driver) return;
 
   // ドライバーの全担当郵便局（メイン＋追加）
-  const offices = [driver.office];
+  let offices = [driver.office];
   _normalizeSubOffices(driver.subOffices).forEach(o=>{
     if(!offices.includes(o.name)) offices.push(o.name);
   });
+  // ★ 2026/08/28: 本社は配達先の郵便局ではないため候補から外す。
+  //   本社所属のドライバーは「担当郵便局」に実際の局が入っている前提。
+  //   ただし他に候補が無い場合は、選べなくなるのを避けて残す。
+  const _real = offices.filter(o=>o && o!=='本社');
+  if(_real.length) offices = _real;
 
   wrap.innerHTML = '';
 
