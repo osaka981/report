@@ -2607,6 +2607,10 @@ function show(id){
     if(typeof loadPhotosForDate === 'function'){
       setTimeout(()=>loadPhotosForDate(($('col-date')?.value)||''), 60);
     }
+    // 保管期限(6か月)を過ぎた写真の掃除。1日1回だけ。
+    if(typeof purgeOldColPhotos === 'function'){
+      setTimeout(()=>purgeOldColPhotos(), 1500);
+    }
   }
 }
 
@@ -16835,7 +16839,11 @@ function itemsGridHtml(blockId, custIdx, items, color, customerName){
     const cust = (CUSTOMERS||[]).find(c => norm(c.name) === targetNorm);
     // ★ 2026/07/27: 月額(固定費)は日報で入力するものではないため除外する。
     //   経営管理システム側で毎月自動計上されるので、ここに出すと二重入力になる。
-    const customItems = (cust?.otherItems||[]).filter(o => o.name && (o.unit||'月額') !== '月額');
+    // ★ 2026/08/28: 月額に加えて日額も除外する。
+    //   日額(車建て)は「稼働した日 × 単価」なので、ドライバーが数量を打つ必要がない。
+    //   出すと毎日「1」を入れる手間が生まれ、入れ忘れ＝請求漏れになる。
+    const customItems = (cust?.otherItems||[])
+      .filter(o => o.name && !['月額','日額'].includes(o.unit||'月額'));
     
     if(customItems.length > 0){
       const foldCustomId = `foldcustom-${blockId}-${custIdx}`;
@@ -16851,7 +16859,7 @@ function itemsGridHtml(blockId, custIdx, items, color, customerName){
         const nc = v>0?(color==='g'?'col-inum col-inum-g':'col-inum'):'col-inum-z';
         const unit = o.unit || '月額';
         return `<div class="col-ic">
-          <div class="col-il">${esc_n(o.name)} <span style="font-size:9px;color:var(--mid);">[${esc_n(unit)}]</span></div>
+          <div class="col-il">${esc_n(o.name)}</div>
           <div class="col-irow">
             <button class="col-ibm" onclick="colAdj('${blockId}',${custIdx},'${k}',-1)">−</button>
             <input class="${nc}" type="number" value="${v}" min="0"
@@ -18639,14 +18647,13 @@ function updateColSubmitBtn(){
     if(b.type==='route'){
       const customers = b.customers||[];
       customers.forEach(cust=>{
-        const has = Object.values(cust.items||{}).some(v=>(parseInt(v)||0)>0);
-        // データあり or 休業日確定 → 有効
-        if(has || cust.rest) hasAnyData = true;
+        // ★ 2026/08/28: 数量0でも「確定を押した」なら有効な報告として扱う。
+        //   車建て(日額)は荷物0でも稼働があるため、0件を無効にすると提出できない。
+        if(cust.confirmed || cust.rest) hasAnyData = true;
         if(!cust.confirmed) unconfirmedCount++;
       });
     } else if(b.type==='indiv'){
-      const has = Object.values(b.items||{}).some(v=>(parseInt(v)||0)>0);
-      if(has || b.rest) hasAnyData = true;
+      if(b.confirmed || b.rest) hasAnyData = true;
       if(!b.confirmed) unconfirmedCount++;
     } else if(b.type==='charter'){
       const d = b.charterData||{};
@@ -18680,12 +18687,11 @@ function submitCol(){
       }
     }
     if(b.type==='indiv'){
-      if(!b.confirmed){
-        warnings.push(`${b.custName}：未確定`);
-      } else if(!b.rest && !Object.values(b.items||{}).some(v=>v>0)){
-        // 確定済みでも数量0かつ休業日でない場合のみ警告
-        warnings.push(`${b.custName}：数量が未入力`);
-      }
+      // ★ 2026/08/28: 数量0でも「確定を押した＝確認した」とみなし、警告しない。
+      //   車建て(日額)の顧客は荷物0でも稼働があるうえ、
+      //   アプリ側が契約形態を知らなくても正しく動くようにするため。
+      //   判定は「確定を押したかどうか」だけに絞る。
+      if(!b.confirmed) warnings.push(`${b.custName}：未確定`);
     }
     if(b.type==='charter'){
       const d = b.charterData||{};
@@ -20094,6 +20100,61 @@ function phpZoom(dateStr, cust, idx){
       <span style="color:#888;font-size:10.5px;">画面をタップで閉じる</span>
     </div>`;
   m.style.display='flex';
+}
+
+
+// ════════════════════════════════════════════════════════════
+//  集荷写真の保管期限 (2026/08/28)
+//   6か月を過ぎた写真は自動で削除する。
+//   容量を放置すると通信も保存も重くなるため、期限を切って回す。
+//   削除は日付ノードごと。索引からも同時に消す。
+// ════════════════════════════════════════════════════════════
+const PHOTO_KEEP_MONTHS = 6;
+
+function _photoCutoffDate(){
+  const d = new Date();
+  d.setMonth(d.getMonth() - PHOTO_KEEP_MONTHS);
+  return d.toISOString().slice(0,10);
+}
+
+// 期限切れの写真を消す。1日1回だけ走らせる(起動のたびに通信しない)。
+async function purgeOldColPhotos(){
+  try{
+    const today = new Date().toISOString().slice(0,10);
+    if(localStorage.getItem('nikki_photo_purged_on') === today) return;
+
+    await loadColPhotoIndex();
+    const cutoff = _photoCutoffDate();
+    const oldDates = [...new Set(
+      Object.values(COL_PHOTO_INDEX||{})
+        .map(v=>String(v && v.date || ''))
+        .filter(d=>d && d < cutoff)
+    )];
+    localStorage.setItem('nikki_photo_purged_on', today);
+    if(!oldDates.length) return;
+
+    if(fbDB && window._fbImports){
+      const { ref, set } = window._fbImports;
+      for(const d of oldDates){
+        await set(ref(fbDB, 'nikki/col_photos/' + d), null);   // 日付ノードごと削除
+      }
+    }
+    // 索引と手元の控えからも消す
+    const idx = {...(COL_PHOTO_INDEX||{})};
+    Object.keys(idx).forEach(k=>{ if(oldDates.includes(String(idx[k].date||''))) delete idx[k]; });
+    COL_PHOTO_INDEX = idx;
+    lsSet('nikki_col_photo_index', idx);
+    if(fbDB && window._fbImports){
+      const { ref, set } = window._fbImports;
+      await set(ref(fbDB, 'nikki/col_photo_index'), idx);
+    }
+    const local = {...(COL_PHOTOS||{})};
+    Object.keys(local).forEach(k=>{ if(oldDates.some(d=>k.startsWith(d+'__'))) delete local[k]; });
+    COL_PHOTOS = local;
+    lsSet(LS_KEYS.COL_PHOTOS, local);
+
+    console.log('[purgeOldColPhotos] 保管期限切れを削除:', oldDates.length, '日分 (基準', cutoff, ')');
+  }catch(e){ console.error('[purgeOldColPhotos]', e); }
 }
 
 </script>
