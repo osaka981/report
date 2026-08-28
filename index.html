@@ -16336,7 +16336,8 @@ function renderNotesList(){
 // ══════════════════════════════════════════════════
 const POST_DEADLINE = '17:30';   // 郵便局への納入締切
 
-function _visitTimeHtml(custId, custName, targetDateStr){
+// restBtnHtml: 時刻表示の直下に置くボタン(本日集荷なし)。無ければ従来どおり。
+function _visitTimeHtml(custId, custName, targetDateStr, restBtnHtml){
   const cu = _findCustomerById(custId) || _findCustomerByName(custName||'');
   const from = (cu && cu.visitFrom) || '';
   const to   = (cu && cu.visitTo)   || '';
@@ -16352,7 +16353,10 @@ function _visitTimeHtml(custId, custName, targetDateStr){
     ) || null;
   }catch(e){}
 
-  if(!from && !to && !chg && !note) return '';
+  // 時刻情報が無くてもボタンだけは出す
+  if(!from && !to && !chg && !note){
+    return restBtnHtml ? `<div style="padding:7px 14px 0;">${restBtnHtml}</div>` : '';
+  }
 
   let baseText = '';
   if(from && to)      baseText = `${from} 〜 ${to}`;
@@ -16364,7 +16368,7 @@ function _visitTimeHtml(custId, custName, targetDateStr){
 
   if(baseText){
     const struck = chg ? 'text-decoration:line-through;opacity:.55;' : '';
-    html += `<div style="font-size:11.5px;font-weight:700;color:var(--sage);${struck}">🕐 ${esc_n(baseText)}</div>`;
+    html += `<div style="font-size:11.5px;font-weight:700;color:var(--sage);${struck}">${esc_n(baseText)}</div>`;
   }
   if(chg){
     const ct = (chg.startTime && chg.endTime) ? `${chg.startTime} 〜 ${chg.endTime}`
@@ -16377,7 +16381,11 @@ function _visitTimeHtml(custId, custName, targetDateStr){
   if(note){
     html += `<div style="font-size:10px;color:var(--mid);margin-top:3px;">${esc_n(note)}</div>`;
   }
-  html += '</div></div>';
+  html += '</div>';
+  // ★ 2026/08/28: 「本日集荷なし」は時刻表示の直下に置く。
+  //   数量欄の下だと、入力せずに休みを登録したいときに毎回下までスクロールが要る。
+  if(restBtnHtml) html += restBtnHtml;
+  html += '</div>';
   return html;
 }
 
@@ -16824,8 +16832,8 @@ function itemsGridHtml(blockId, custIdx, items, color, customerName){
       }).join('');
       
       customItemsHtml = `
-        <div class="col-fold-trigger" style="margin-top:8px;background:rgba(193,114,76,.08);border-color:rgba(193,114,76,.3);" onclick="colToggleFold('${foldCustomId}','${foldCustomChevId}')">
-          <span class="col-fold-lbl" style="color:var(--clay);font-weight:700;">📋 カスタム品目 (${customItems.length}件)</span>
+        <div class="col-fold-trigger" style="margin-top:8px;background:rgba(193,114,76,.22);border-color:rgba(193,114,76,.5);border-radius:6px;" onclick="colToggleFold('${foldCustomId}','${foldCustomChevId}')">
+          <span class="col-fold-lbl" style="color:var(--clay);font-weight:700;">カスタム品目 (${customItems.length}件)</span>
           <span class="col-fold-chev" id="${foldCustomChevId}">${hasCustomVal?'▼ 閉じる':'▶ 展開'}</span>
         </div>
         <div id="${foldCustomId}" style="display:${hasCustomVal?'block':'none'};">
@@ -16977,14 +16985,14 @@ function renderRouteBlock(b){
         <span style="display:inline-block;width:22px;height:22px;background:var(--slate);color:#fff;border-radius:50%;text-align:center;line-height:22px;font-size:10px;font-weight:700;">${seq}</span>
         <span style="font-size:12px;font-weight:700;color:var(--ink);flex:1;">${esc_n(cust.customerName||`立ち寄り${seq}件目`)}${schedBadge}</span>
       </div>
-      ${_visitTimeHtml(custIdForSched, cust.customerName, ($('col-date')?.value)||'')}
+      ${_visitTimeHtml(custIdForSched, cust.customerName, ($('col-date')?.value)||'',
+          `<button onclick="colRouteCustRest(${b.id},${idx})" style="width:100%;margin-top:6px;padding:8px;background:transparent;color:var(--amber);border:1.5px solid var(--amber);border-radius:8px;font-size:11.5px;font-weight:700;cursor:pointer;">本日集荷なし</button>`)}
       ${schedDetail}
       <div class="col-iw" style="border:none;padding:0;background:transparent;">
         ${itemsGridHtml(b.id, idx, cust.items||{}, 'b', cust.customerName)}
       </div>
       <div style="display:flex;gap:6px;margin-top:8px;">
-        <button onclick="colRouteCustConfirm(${b.id},${idx})" style="flex:2;padding:9px;background:var(--ok);color:#faf8f5;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">✓ 数量確定</button>
-        <button onclick="colRouteCustRest(${b.id},${idx})" style="flex:1;padding:9px;background:var(--amber);color:#fff;border:1px solid var(--amber);border-radius:8px;font-size:11.5px;font-weight:700;cursor:pointer;">本日集荷なし</button>
+        <button onclick="colRouteCustConfirm(${b.id},${idx})" style="flex:1;padding:9px;background:var(--ok);color:#faf8f5;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">✓ 数量確定</button>
       </div>
       <button onclick="openScheduleModal(${custIdForSched},'${esc_n(cust.customerName||'').replace(/'/g,"\\'")}')" style="margin-top:6px;width:100%;padding:8px;background:transparent;border:1px dashed var(--brd);color:var(--mid);border-radius:8px;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -17121,14 +17129,14 @@ function renderIndivBlock(b){
       <span class="col-block-chev" id="blk-chev-${b.id}" style="${chevStyle}">▼</span>
     </div>
     <div id="blk-body-${b.id}" style="display:${bodyDisp};">
-      ${_visitTimeHtml(b.custId ?? b.customerId, b.custName || b.customerName, ($('col-date')?.value)||'')}
+      ${_visitTimeHtml(b.custId ?? b.customerId, b.custName || b.customerName, ($('col-date')?.value)||'',
+          `<button onclick="colIndivRest(${b.id})" style="width:100%;margin-top:6px;padding:8px;background:transparent;color:var(--amber);border:1.5px solid var(--amber);border-radius:8px;font-size:11.5px;font-weight:700;cursor:pointer;">本日集荷なし</button>`)}
       ${indivSchedDetail}
       <div class="col-iw" style="border-top:none;">
         ${itemsGridHtml(b.id,0,b.items||{},'g',b.custName)}
       </div>
       <div style="display:flex;gap:6px;padding:0 14px 6px;">
-        <button onclick="colIndivConfirm(${b.id})" style="flex:2;padding:9px;background:var(--sage);color:#faf8f5;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">✓ 数量確定</button>
-        <button onclick="colIndivRest(${b.id})" style="flex:1;padding:9px;background:var(--amber);color:#fff;border:1px solid var(--amber);border-radius:8px;font-size:11.5px;font-weight:700;cursor:pointer;">本日集荷なし</button>
+        <button onclick="colIndivConfirm(${b.id})" style="flex:1;padding:9px;background:var(--sage);color:#faf8f5;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">✓ 数量確定</button>
       </div>
       <div style="padding:0 14px 12px;">
         <button onclick="openScheduleModal(${indivCustId},'${esc_n(b.custName||'').replace(/'/g,"\\'")}')" style="width:100%;padding:8px;background:transparent;border:1px dashed var(--brd);color:var(--mid);border-radius:8px;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;">
