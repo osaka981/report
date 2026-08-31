@@ -2885,6 +2885,15 @@ function needsGpsCheck(d){
   return attType(d)==='part' || attType(d)==='jikan';
 }
 // 15分刻み丸め（7分以下切り捨て・8分以上切り上げ）
+// ★ 2026/08/31: 記録IDの生成。
+//   Date.now() だけだと同一ミリ秒で衝突し、同じIDの日報が複数できる。
+//   経営管理はIDで削除するため、1件消すと同IDの全件が消えた事故があった。
+let _idSeq = 0;
+function genRecId(){
+  _idSeq = (_idSeq + 1) % 1000;
+  return Date.now() * 1000 + _idSeq;   // ミリ秒×1000 + 連番 → 同一ミリ秒でも一意
+}
+
 function roundTo15(totalMin){
   const base=Math.floor(totalMin/15)*15;
   const rem=totalMin%15;
@@ -15235,7 +15244,19 @@ function updateYpTabBadges(){
     colBtn.innerHTML = `集荷${colFilled?colIndicator:''}`;
   }
 }
+// ★ 2026/08/31: 送信の多重発火を防ぐ。
+//   タップ判定の重複などで1回の操作から複数回呼ばれ、同じ日報が3件できた事故があった。
+//   送信開始から2秒間は再入を無視する。
+let _submitLock = 0;
+function _submitGuard(){
+  const now = Date.now();
+  if(now - _submitLock < 2000) return false;
+  _submitLock = now;
+  return true;
+}
+
 function submitYP(){
+  if(!_submitGuard()) return;
   const date=$('yp-date').value;
   const postOffice = getSelectedPostOffice();
   if(!postOffice){ toast('郵便局を選択してください','err'); return; }
@@ -15338,7 +15359,7 @@ function submitYP(){
   }
 
   const rec = {
-    id: Date.now(), type:'yuupack', driver:{...driver}, date,
+    id: genRecId(), type:'yuupack', driver:{...driver}, date,
     postOffice,
     form,
     submittedAt: new Date().toISOString(),
@@ -18754,6 +18775,7 @@ function _colSubToggleSubmit(show){
 }
 
 function doSubmitCol(){
+  if(!_submitGuard()) return;
   // 未確定が残っている状態では提出させない(ボタンを隠しているが二重の歯止め)
   if(typeof _colSubUnconfirmed==='function'){
     const n=_colSubUnconfirmed();
@@ -18838,7 +18860,7 @@ function doSubmitCol(){
       }
     }
   });
-  const rec={id:Date.now(),type:'collection',driver:{...driver},date:$('col-date')?.value||today(),
+  const rec={id:genRecId(),type:'collection',driver:{...driver},date:$('col-date')?.value||today(),
     rows:colRows,blocks:colBlocks,note:$('col-note')?.value||'',submittedAt:new Date().toISOString()};
   COL_LOGS.push(rec); fbSet('col_logs',COL_LOGS);
   clearColDraft();
@@ -19173,7 +19195,8 @@ function openCorrectModal(logId, logType){
     html += `<div style="font-size:10px;color:var(--amber);margin-top:8px;">※「訂正を確定する」後、内容を修正して再提出してください</div>`;
     diffArea.innerHTML = html;
   } else if(diffArea){
-    diffArea.innerHTML = `<div style="font-size:11px;color:var(--mid);">明細${rec.rows?.length||0}件の集荷日報を訂正します。</div>`;
+    // ★ 2026/08/28: 件数だけでは何を直すのか分からないため、提出内容を顧客ごとに出す。
+    diffArea.innerHTML = _correctColDetailHtml(rec);
   }
 
   $('correct-reason').value = '';
@@ -20155,6 +20178,67 @@ async function purgeOldColPhotos(){
 
     console.log('[purgeOldColPhotos] 保管期限切れを削除:', oldDates.length, '日分 (基準', cutoff, ')');
   }catch(e){ console.error('[purgeOldColPhotos]', e); }
+}
+
+
+// ── 訂正確認: 集荷日報の提出内容を表示 (2026/08/28) ──
+//  「明細◯件」だけでは何を直すのか判断できないため、
+//  顧客ごとに品目と数量を並べる。休業日・ルートも区別して出す。
+function _correctColDetailHtml(rec){
+  const rows = (rec && rec.rows) || [];
+  if(!rows.length){
+    return '<div style="font-size:11px;color:var(--mid);">明細がありません。</div>';
+  }
+  // 顧客ごとにまとめる(ルート行は見出しとして扱う)
+  const groups = [];
+  const idxOf = {};
+  rows.forEach(r=>{
+    if(r.masterKey === 'route'){
+      groups.push({name:(r.routeName||r.customerName||'ルート'), isRoute:true,
+                   sub:`立ち寄り${r.stopCount||0}件`, items:[]});
+      idxOf['__route__'+(r.routeName||'')] = groups.length-1;
+      return;
+    }
+    const key = (r.customerName||'(顧客不明)');
+    if(idxOf[key] === undefined){
+      groups.push({name:key, isRoute:false, sub:(r.routeName?`ルート: ${r.routeName}`:''), items:[]});
+      idxOf[key] = groups.length-1;
+    }
+    const g = groups[idxOf[key]];
+    if(r.isRest){ g.rest = true; return; }
+    const qty = parseInt(r.qty)||0;
+    if(qty > 0 || r.unit === '回') g.items.push({label:(r.label||r.masterKey||''), qty, unit:(r.unit||'個')});
+  });
+
+  let html = `<div style="font-size:11px;color:var(--mid);margin-bottom:6px;">
+    提出された内容（明細${rows.length}件）</div>`;
+
+  groups.forEach(g=>{
+    html += `<div style="background:var(--inp);border-radius:6px;padding:7px 9px;margin-bottom:5px;">
+      <div style="display:flex;align-items:baseline;gap:6px;">
+        <span style="font-size:12px;font-weight:700;color:var(--ink);">${esc_n(g.name)}</span>
+        ${g.isRoute?'<span style="font-size:9px;color:var(--slate);font-weight:700;">ルート</span>':''}
+        ${g.sub?`<span style="font-size:9.5px;color:var(--light);">${esc_n(g.sub)}</span>`:''}
+      </div>`;
+    if(g.rest){
+      html += `<div style="font-size:11px;font-weight:700;color:var(--amber);margin-top:3px;">本日集荷なし</div>`;
+    } else if(g.isRoute){
+      // ルート行は見出し。数量は各立ち寄り先に出る。
+    } else if(!g.items.length){
+      html += `<div style="font-size:11px;color:var(--light);margin-top:3px;">数量なし（0件で確定）</div>`;
+    } else {
+      html += `<div style="margin-top:4px;">` + g.items.map(it=>`
+        <div style="display:flex;justify-content:space-between;padding:1px 0;font-size:11px;">
+          <span style="color:var(--mid);">${esc_n(it.label)}</span>
+          <strong style="color:var(--ink);">${it.qty}${esc_n(it.unit)}</strong>
+        </div>`).join('') + `</div>`;
+    }
+    html += `</div>`;
+  });
+
+  html += `<div style="font-size:10px;color:var(--amber);margin-top:8px;">
+    ※「訂正を確定する」後、内容を修正して再提出してください</div>`;
+  return html;
 }
 
 </script>
