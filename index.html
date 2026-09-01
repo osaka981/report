@@ -1009,7 +1009,7 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
     <!-- 日付 -->
     <div class="card mb8">
       <div class="row-hd"><div class="row-ico" style="background:rgba(44,40,37,.07)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ink)" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><span class="row-lbl">日付</span></div>
-      <input type="date" id="col-date" class="fi" onchange="loadPhotosForDate(this.value)">
+      <input type="date" id="col-date" class="fi" onchange="loadPhotosForDate(this.value);renderJetCard()">
     </div>
 
     <!-- ══ 休業調査カード(Phase 1: 2026/05/01) ══ -->
@@ -1027,6 +1027,7 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
     <!-- 集荷入力エリア -->
     <div class="card mb8">
       <div class="row-hd"><div class="row-ico" style="background:rgba(44,40,37,.07)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ink)" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div><span class="row-lbl">集荷入力</span></div>
+      <div id="col-jet-card" style="display:none;"></div>
       <div id="col-blocks-wrap"></div>
 
       <!-- ルートを追加 -->
@@ -2152,6 +2153,17 @@ function setupRealtimeSync() {
     if (!snap.exists()) return;
     COL_LOGS = snap.val() || [];
     fbSet('col_logs', COL_LOGS);
+  });
+  // ★ 2026/09/01: バーコード計数アプリの便別実績（読むだけ。書かない）
+  onValue(ref(fbDB, 'nikki/jet_scan'), snap => {
+    JET_SCAN = snap.exists() ? (snap.val()||{}) : {};
+    try{ localStorage.setItem('nikki_jet_scan', JSON.stringify(JET_SCAN)); }catch(e){}
+    renderJetCard();
+  });
+  onValue(ref(fbDB, 'nikki/jet_settings'), snap => {
+    JET_SET = snap.exists() ? (snap.val()||{}) : {};
+    try{ localStorage.setItem('nikki_jet_settings', JSON.stringify(JET_SET)); }catch(e){}
+    renderJetCard();
   });
   // マスタデータもリアルタイム更新(安全弁: データ破損時はlocalStorageを守る)
   onValue(ref(fbDB, 'nikki/drivers'), snap => {
@@ -16581,6 +16593,15 @@ function _useIndivAnyway(){
 }
 
 function _doAddIndivBlock(custId, custName, region){
+  // ★ 2026/09/01: バーコード計数で報告する顧客は、手入力で追加させない(二重計上防止)
+  try{
+    const jc=_jetCustomer();
+    if(jc && (String(jc.id)===String(custId) || (custName && jc.name===custName))){
+      toast(jc.name+' のゆうパケットはバーコード計数で報告します。ここでの入力は不要です','err');
+      renderJetCard();
+      return;
+    }
+  }catch(e){}
   // ★ 休業日チェック(SCHEDULE_OVERRIDES)
   if(custId || custName){
     const targetDateStr = ($('col-date')?.value) || (()=>{const d=new Date();const y=d.getFullYear();const m=String(d.getMonth()+1).padStart(2,'0');const dd=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${dd}`;})();
@@ -16809,7 +16830,63 @@ function addCharterBlock(){
 }
 
 // ── ブロック全体を再描画 ──
+// ══════════════════════════════════════════
+// バーコード計数（nikki/jet_scan）の表示：ゆうパケット集荷はここで報告済み扱い
+// ══════════════════════════════════════════
+let JET_SCAN = (()=>{ try{ return JSON.parse(localStorage.getItem('nikki_jet_scan')||'{}'); }catch(e){ return {}; } })();
+let JET_SET  = (()=>{ try{ return JSON.parse(localStorage.getItem('nikki_jet_settings')||'{}'); }catch(e){ return {}; } })();
+function _jetCustomer(){
+  const id = JET_SET && JET_SET.customerId;
+  let c = id ? (CUSTOMERS||[]).find(x=>String(x.id)===String(id)) : null;
+  if(!c) c = (CUSTOMERS||[]).find(x=>/ジェットグループ/.test(x.name||'')) || null;
+  return c;
+}
+function _jetIdNorm(v){ return String(v||'').replace(/[－ー–—]/g,'-').replace(/-/g,'').trim(); }
+function _jetShiftsFor(dateStr){
+  if(!driver) return [];
+  const byKey = (JET_SCAN||{})[dateStr] || {};
+  const me = _jetIdNorm(driver.id||driver.empNo||driver.driverNo);
+  const myName = String(driver.name||'').trim();
+  return Object.values(byKey).filter(j=>{
+    if(!j) return false;
+    const jid=_jetIdNorm(j.driverId);
+    if(me && jid) return jid===me;
+    return myName && String(j.driverName||'').trim()===myName;
+  }).sort((a,b)=>(a.startedAt||0)-(b.startedAt||0));
+}
+function renderJetCard(){
+  const el=$('col-jet-card'); if(!el) return;
+  const cust=_jetCustomer();
+  const dateStr=$('col-date')?.value||today();
+  const list=_jetShiftsFor(dateStr);
+  if(!cust || !list.length){ el.style.display='none'; el.innerHTML=''; return; }
+  const hm=t=>{ if(!t) return ''; const d=new Date(t); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); };
+  let t3=0,t5=0,open=0;
+  const rows=list.map(j=>{
+    t3+=j.c3||0; t5+=j.c5||0; if(!j.closed) open++;
+    return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--brd);font-size:12px;">
+      <span style="font-weight:700;min-width:44px;">${j.bin||''}</span>
+      <span style="color:var(--mid);flex:1;">${j.closed?'締め '+hm(j.closedAt):'<span style="color:#b26a00;font-weight:700;">計数中</span>'}</span>
+      <span style="font-family:'Courier Prime',monospace;">通常 <b>${j.c3||0}</b>　5cm <b>${j.c5||0}</b>　計 <b>${(j.c3||0)+(j.c5||0)}</b></span>
+    </div>`;
+  }).join('');
+  el.style.display='block';
+  el.innerHTML=`<div style="background:rgba(90,138,90,.08);border:1.5px solid rgba(90,138,90,.35);border-radius:10px;padding:10px 14px;margin-bottom:8px;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;">
+      <div style="font-size:12.5px;font-weight:700;color:var(--ink);">${cust.name}　ゆうパケット</div>
+      <div style="font-size:10px;color:var(--mid);">バーコード計数で報告済み</div>
+    </div>
+    <div style="font-size:10px;color:var(--mid);margin:2px 0 4px;">この顧客のゆうパケットは計数アプリの実績がそのまま集荷実績になります。ここで入力する必要はありません。</div>
+    ${rows}
+    <div style="display:flex;justify-content:flex-end;gap:12px;padding-top:6px;border-top:1px solid var(--brd);font-size:12px;">
+      <span>本日 通常 <b>${t3}</b>　5cm <b>${t5}</b>　計 <b>${t3+t5}</b></span>
+    </div>
+    ${open?'<div style="font-size:10px;color:#b26a00;margin-top:4px;">締めていない便があります。計数アプリで締めると確定します。</div>':''}
+  </div>`;
+}
+
 function renderColBlocks(){
+  renderJetCard();
   const wrap=$('col-blocks-wrap');
   if(!wrap) return;
   // 写真はブロック描画時に必要なので、未読込ならここで読む(通信はしない)
