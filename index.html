@@ -414,7 +414,8 @@ textarea.fi{resize:none;}
 // Firebase SDK (CDN)
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, set, get, onValue, push, remove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
-window._fbImports = { initializeApp, getDatabase, ref, set, get, onValue, push, remove };
+import { getAuth, signInAnonymously, onIdTokenChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+window._fbImports = { initializeApp, getDatabase, ref, set, get, onValue, push, remove, getAuth, signInAnonymously, onIdTokenChanged };
 window._fbReady = true;
 document.dispatchEvent(new Event('fb-sdk-ready'));
 </script>
@@ -1931,6 +1932,18 @@ async function initFirebase() {
     const { initializeApp, getDatabase } = window._fbImports || {};
     if (!initializeApp) { fbOnline = false; return; }
     const app = initializeApp(config);
+    // ★ 2026/09/03: 匿名認証。ルールを「認証済みのみ」に締めるための準備。
+    try {
+      const { getAuth, signInAnonymously, onIdTokenChanged } = window._fbImports;
+      const auth = getAuth(app);
+      window._fbToken = null;
+      onIdTokenChanged(auth, async u => { if (u) { try { window._fbToken = await u.getIdToken(); } catch(e){} } });
+      await Promise.race([
+        signInAnonymously(auth).then(async c => { window._fbToken = await c.user.getIdToken(); }),
+        new Promise(r => setTimeout(r, 6000))
+      ]);
+      setInterval(async () => { try { const u = auth.currentUser; if (u) window._fbToken = await u.getIdToken(); } catch(e){} }, 30*60*1000);
+    } catch(e) { console.warn('匿名認証に失敗（続行します）:', e); }
     fbDB = getDatabase(app);
     fbOnline = true;
     console.log('Firebase接続OK');
