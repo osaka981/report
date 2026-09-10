@@ -2049,6 +2049,8 @@ async function syncFromFirebase() {
 
 // Firebase書き込み
 async function fbSet(key, value) {
+  // ★ 2026/09/10: 計数アプリ由来の仮レコードは保存しない（表示・集計のためだけに混ぜている）
+  if (key === 'col_logs' && Array.isArray(value)) value = value.filter(r => !r || !r._fromJet);
   ls_set('nikki_' + key, value); // localStorageは常に更新
   if (!fbDB) { _pendQueueAdd(key, value); _pendBadgeUpdate(); return; }
   const { ref, set } = window._fbImports;
@@ -2176,17 +2178,20 @@ function setupRealtimeSync() {
     if (!snap.exists()) return;
     COL_LOGS = snap.val() || [];
     fbSet('col_logs', COL_LOGS);
+    _mergeJetIntoColLogs();
   });
   // ★ 2026/09/01: バーコード計数アプリの便別実績（読むだけ。書かない）
   onValue(ref(fbDB, 'nikki/jet_scan'), snap => {
     JET_SCAN = snap.exists() ? (snap.val()||{}) : {};
     try{ localStorage.setItem('nikki_jet_scan', JSON.stringify(JET_SCAN)); }catch(e){}
+    _mergeJetIntoColLogs();
     renderJetCard();
     try{ if($('co-view-jet') && $('co-view-jet').style.display!=='none') _renderOwnerJet(); }catch(e){}
   });
   onValue(ref(fbDB, 'nikki/jet_settings'), snap => {
     JET_SET = snap.exists() ? (snap.val()||{}) : {};
     try{ localStorage.setItem('nikki_jet_settings', JSON.stringify(JET_SET)); }catch(e){}
+    _mergeJetIntoColLogs();
     renderJetCard();
   });
   // マスタデータもリアルタイム更新(安全弁: データ破損時はlocalStorageを守る)
@@ -12335,6 +12340,38 @@ function _getWorkTypeInfo(d){
   return {label:'集荷専従', color:'var(--amber)', bg:'rgba(154,122,58,.12)'};
 }
 
+// ★ 2026/09/10: 計数アプリの実績を集荷日報と同じ形にして集計へ混ぜる（保存はしない）
+const JET_ITEM={3:'ゆうパケット_通常',5:'ゆうパケット_7cm以上'};
+function _jetToColRows(){
+  const cust=_jetCustomer(); if(!cust) return [];
+  const out=[];
+  Object.keys(JET_SCAN||{}).forEach(date=>{
+    Object.values(JET_SCAN[date]||{}).forEach(j=>{
+      if(!j||!j.closed||!j.key) return;
+      const c=_jetCarrierOf(j);
+      const items={};
+      if(j.c3) items[JET_ITEM[3]]=j.c3;
+      if(j.c5) items[JET_ITEM[5]]=j.c5;
+      if(!Object.keys(items).length) return;
+      const blk={type:'indiv',custId:cust.id,custName:cust.name,region:cust.region||'',items:items};
+      const rows=Object.entries(items).map(([k,v])=>({customerId:cust.id,customerName:cust.name,
+        region:cust.region||'',masterKey:k,label:k.replace(/_/g,' '),qty:v,unit:'個'}));
+      out.push({ id:'jet_'+j.key, type:'collection', date:date,
+        driver:{ id:c.id, name:c.name, empNo:c.id, driverNo:c.id },
+        rows:rows, blocks:[blk],
+        note:'バーコード計数 '+(j.bin||'')+((j.carrierName&&j.driverName&&j.carrierName!==j.driverName)?'／計数 '+j.driverName:''),
+        submittedAt:new Date(j.closedAt||Date.now()).toISOString(),
+        _fromJet:true, _jetKey:j.key });
+    });
+  });
+  return out;
+}
+function _mergeJetIntoColLogs(){
+  try{
+    COL_LOGS=(COL_LOGS||[]).filter(r=>!r||!r._fromJet).concat(_jetToColRows());
+  }catch(e){ console.warn('[計数の合流] 失敗:',e); }
+}
+
 // ★ 2026/09/07: 委託会社オーナー向け「運搬実績」
 async function _renderOwnerJet(){
   const box=$('co-jet-body'); if(!box) return;
@@ -16677,6 +16714,7 @@ function _doAddIndivBlock(custId, custName, region){
     if(jc && (String(jc.id)===String(custId) || (custName && jc.name===custName))){
       toast(jc.name+' のゆうパケットはバーコード計数で報告します。ここでの入力は不要です','err');
       renderJetCard();
+      if(confirm(jc.name+' のゆうパケットはバーコード計数で報告します。\n計数アプリを開きますか？')) openJetApp();
       return;
     }
   }catch(e){}
@@ -16937,6 +16975,8 @@ function _jetShiftsFor(dateStr, forDriver){
     return myName && c.name===myName;
   }).sort((a,b)=>(a.startedAt||0)-(b.startedAt||0));
 }
+const JET_APP_URL='https://osaka981.github.io/j-scan/';
+function openJetApp(){ try{ window.open(JET_APP_URL,'_blank','noopener'); }catch(e){ location.href=JET_APP_URL; } }
 function renderJetCard(){
   const el=$('col-jet-card'); if(!el) return;
   const cust=_jetCustomer();
@@ -16966,6 +17006,11 @@ function renderJetCard(){
     <div style="display:flex;justify-content:flex-end;gap:12px;padding-top:6px;border-top:1px solid var(--brd);font-size:12px;">
       <span>本日 通常 <b>${t3}</b>　5cm <b>${t5}</b>　計 <b>${t3+t5}</b></span>
     </div>
+    <div style="font-size:10px;color:var(--mid);margin-top:4px;">この数量は計数アプリの記録です。ここでは変更できません。便を追加すると自動で増えます。</div>
+    <button onclick="openJetApp()" style="width:100%;margin-top:8px;padding:10px;border:1px solid rgba(90,138,90,.5);
+      background:rgba(90,138,90,.14);color:var(--ink);border-radius:8px;font-size:12.5px;font-weight:700;font-family:inherit;cursor:pointer;">
+      バーコード計数アプリを開く
+    </button>
 
   </div>`;
 }
