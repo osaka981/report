@@ -1412,6 +1412,7 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
       <button class="settings-btn" onclick="coSwitchTab('monthly')" id="co-tab-monthly-btn" style="white-space:nowrap;padding:7px 12px;">月次集計</button>
       <button class="settings-btn" onclick="coSwitchTab('mc')" id="co-tab-mc-btn" style="white-space:nowrap;padding:7px 12px;">月次確認</button>
       <button class="settings-btn" onclick="coSwitchTab('drivers')" id="co-tab-drivers-btn" style="white-space:nowrap;padding:7px 12px;">ドライバー</button>
+      <button class="settings-btn" onclick="coSwitchTab('jet')" id="co-tab-jet-btn" style="white-space:nowrap;padding:7px 12px;">運搬実績</button>
       <button class="settings-btn" onclick="coSwitchTab('schedule')" id="co-tab-schedule-btn" style="white-space:nowrap;padding:7px 12px;">休業表</button>
       <button class="settings-btn" onclick="coSwitchTab('csv')" id="co-tab-csv-btn" style="white-space:nowrap;padding:7px 12px;">CSV</button>
       <button class="settings-btn" onclick="coSwitchTab('noti')" id="co-tab-noti-btn" style="white-space:nowrap;padding:7px 12px;position:relative;">お知らせ
@@ -1466,6 +1467,15 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
     </div>
 
     <!-- ドライバータブ -->
+    <div id="co-view-jet" class="co-view" style="display:none;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+        <input type="month" id="co-jet-mon" onchange="_renderOwnerJet()"
+          style="padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;">
+        <span style="font-size:10px;color:var(--mid);">大阪北郵便局へ運んだ便のみ。計数のみの便は含みません。</span>
+      </div>
+      <div id="co-jet-body"></div>
+    </div>
+
     <div id="co-view-drivers" class="co-view" style="display:none;">
       <div class="card mb10">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
@@ -2172,6 +2182,7 @@ function setupRealtimeSync() {
     JET_SCAN = snap.exists() ? (snap.val()||{}) : {};
     try{ localStorage.setItem('nikki_jet_scan', JSON.stringify(JET_SCAN)); }catch(e){}
     renderJetCard();
+    try{ if($('co-view-jet') && $('co-view-jet').style.display!=='none') _renderOwnerJet(); }catch(e){}
   });
   onValue(ref(fbDB, 'nikki/jet_settings'), snap => {
     JET_SET = snap.exists() ? (snap.val()||{}) : {};
@@ -2647,8 +2658,9 @@ window.onload=()=>{
 };
 
 function refreshRegions(){
+  const rs=$('col-region'); if(!rs) return;          // ★ 2026/09/07: 要素が無い画面では何もしない（起動時エラー対策）
   const regs=[...new Set(CUSTOMERS.map(c=>c.region))].sort();
-  const rs=$('col-region'); rs.innerHTML='<option value="">地域を選択してください</option>';
+  rs.innerHTML='<option value="">地域を選択してください</option>';
   regs.forEach(r=>{const o=document.createElement('option');o.value=r;o.textContent=r;rs.appendChild(o);});
 }
 
@@ -8842,7 +8854,7 @@ function _osqApplyPicker(){
 
 function coSwitchTab(tab){
   _ownerMvState.tab = tab;
-  ['monthly','mc','drivers','schedule','csv','noti','settings'].forEach(t=>{
+  ['monthly','mc','drivers','jet','schedule','csv','noti','settings'].forEach(t=>{
     const view = $('co-view-'+t);
     const btn  = $('co-tab-'+t+'-btn');
     if(view) view.style.display = (t===tab)?'':'none';
@@ -8854,6 +8866,7 @@ function coSwitchTab(tab){
   if(tab === 'monthly') _renderOwnerMonthly();
   else if(tab === 'mc') renderCoMcView();
   else if(tab === 'drivers') _renderOwnerDrivers();
+  else if(tab === 'jet') _renderOwnerJet();
   else if(tab === 'schedule') _renderOwnerSchedule();
   else if(tab === 'csv') _renderOwnerCSV();
   else if(tab === 'noti'){
@@ -12322,6 +12335,58 @@ function _getWorkTypeInfo(d){
   return {label:'集荷専従', color:'var(--amber)', bg:'rgba(154,122,58,.12)'};
 }
 
+// ★ 2026/09/07: 委託会社オーナー向け「運搬実績」
+async function _renderOwnerJet(){
+  const box=$('co-jet-body'); if(!box) return;
+  const monEl=$('co-jet-mon');
+  if(monEl && !monEl.value){ const d=new Date(); monEl.value=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+  const mon=monEl?monEl.value:'';
+  const drivers=_getCompanyDrivers();
+  if(!drivers.length){ box.innerHTML='<div style="padding:16px 8px;text-align:center;color:var(--light);font-size:11px;">所属ドライバーが登録されていません</div>'; return; }
+  const ids=new Set(drivers.map(d=>_jetIdNorm(d.id||d.empNo||d.driverNo)).filter(Boolean));
+  const names=new Set(drivers.map(d=>String(d.name||'').trim()).filter(Boolean));
+  const rows=[];
+  Object.keys(JET_SCAN||{}).filter(d=>!mon||d.startsWith(mon)).sort().forEach(date=>{
+    Object.values(JET_SCAN[date]||{}).forEach(j=>{
+      if(!j||!j.closed) return;
+      const c=_jetCarrierOf(j);
+      if(!((c.id&&ids.has(c.id))||(c.name&&names.has(c.name)))) return;
+      rows.push({date,j,carrier:c});
+    });
+  });
+  if(!rows.length){ box.innerHTML='<div style="padding:16px 8px;text-align:center;color:var(--light);font-size:11px;">この月の運搬実績はありません</div>'; return; }
+  rows.sort((a,b)=>(a.date+String(a.j.startedAt||0)).localeCompare(b.date+String(b.j.startedAt||0)));
+  const per=new Map();
+  rows.forEach(r=>{
+    const k=r.carrier.name||r.carrier.id;
+    const v=per.get(k)||{n:0,c3:0,c5:0}; v.n++; v.c3+=r.j.c3||0; v.c5+=r.j.c5||0; per.set(k,v);
+  });
+  const T3=rows.reduce((n,r)=>n+(r.j.c3||0),0), T5=rows.reduce((n,r)=>n+(r.j.c5||0),0);
+  const hm=t=>{ if(!t) return ''; const d=new Date(t); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); };
+  box.innerHTML=
+    `<div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px;">
+       <div style="font-size:11px;color:var(--mid);">${mon} 合計</div>
+       <div style="font-size:22px;font-weight:800;">${(T3+T5).toLocaleString()}<span style="font-size:12px;font-weight:600;"> 個</span></div>
+       <div style="font-size:12px;">通常 ${T3.toLocaleString()}　5cm ${T5.toLocaleString()}　${rows.length}便</div>
+     </div>
+     <div style="font-size:11px;font-weight:700;color:var(--mid);margin:0 2px 6px;">ドライバー別</div>
+     ${Array.from(per.entries()).map(([k,v])=>
+       `<div style="display:flex;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:6px;font-size:12px;">
+          <b style="flex:1;">${k}</b><span>${v.n}便</span><span>通常 ${v.c3}</span><span>5cm ${v.c5}</span><b>計 ${v.c3+v.c5}</b>
+        </div>`).join('')}
+     <div style="font-size:11px;font-weight:700;color:var(--mid);margin:12px 2px 6px;">便ごと</div>
+     ${rows.map(r=>
+       `<div style="background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:6px;font-size:12px;">
+          <div style="display:flex;gap:8px;align-items:baseline;">
+            <b style="min-width:78px;">${r.date}</b><span style="flex:1;">${r.carrier.name}　${r.j.bin||''}</span>
+            <b>${((r.j.c3||0)+(r.j.c5||0)).toLocaleString()}個</b>
+          </div>
+          <div style="font-size:10px;color:var(--mid);margin-top:2px;">
+            通常 ${r.j.c3||0}　5cm ${r.j.c5||0}　締め ${hm(r.j.closedAt)}${
+              (r.j.carrierName&&r.j.driverName&&r.j.carrierName!==r.j.driverName)?`　計数 ${r.j.driverName}`:''}
+          </div>
+        </div>`).join('')}`;
+}
 function _renderOwnerDrivers(){
   const drivers = _getCompanyDrivers();
   const list = $('co-driver-list');
@@ -16855,16 +16920,21 @@ function _jetCustomer(){
   return c;
 }
 function _jetIdNorm(v){ return String(v||'').replace(/[－ー–—]/g,'-').replace(/-/g,'').trim(); }
-function _jetShiftsFor(dateStr){
-  if(!driver) return [];
+// ★ 2026/09/07: 表示するのは「局へ運んだ便」のみ。計数しただけの便は出さない。
+function _jetCarrierOf(j){
+  return { id:_jetIdNorm(j.carrierId||j.driverId), name:String(j.carrierName||j.driverName||'').trim() };
+}
+function _jetShiftsFor(dateStr, forDriver){
+  const d = forDriver || driver;
+  if(!d) return [];
   const byKey = (JET_SCAN||{})[dateStr] || {};
-  const me = _jetIdNorm(driver.id||driver.empNo||driver.driverNo);
-  const myName = String(driver.name||'').trim();
+  const me = _jetIdNorm(d.id||d.empNo||d.driverNo);
+  const myName = String(d.name||'').trim();
   return Object.values(byKey).filter(j=>{
-    if(!j) return false;
-    const jid=_jetIdNorm(j.driverId);
-    if(me && jid) return jid===me;
-    return myName && String(j.driverName||'').trim()===myName;
+    if(!j || !j.closed) return false;
+    const c=_jetCarrierOf(j);
+    if(me && c.id) return c.id===me;
+    return myName && c.name===myName;
   }).sort((a,b)=>(a.startedAt||0)-(b.startedAt||0));
 }
 function renderJetCard(){
@@ -16874,12 +16944,14 @@ function renderJetCard(){
   const list=_jetShiftsFor(dateStr);
   if(!cust || !list.length){ el.style.display='none'; el.innerHTML=''; return; }
   const hm=t=>{ if(!t) return ''; const d=new Date(t); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); };
-  let t3=0,t5=0,open=0;
+  let t3=0,t5=0;
   const rows=list.map(j=>{
-    t3+=j.c3||0; t5+=j.c5||0; if(!j.closed) open++;
+    t3+=j.c3||0; t5+=j.c5||0;
     return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--brd);font-size:12px;">
       <span style="font-weight:700;min-width:44px;">${j.bin||''}</span>
-      <span style="color:var(--mid);flex:1;">${j.closed?'締め '+hm(j.closedAt):'<span style="color:#b26a00;font-weight:700;">計数中</span>'}</span>
+      <span style="color:var(--mid);flex:1;">締め ${hm(j.closedAt)}${
+        (j.carrierName && j.driverName && j.carrierName!==j.driverName)
+          ? `<span style="font-size:10px;color:var(--mid);"> ／ 計数 ${j.driverName}</span>` : ''}</span>
       <span style="font-family:'Courier Prime',monospace;">通常 <b>${j.c3||0}</b>　5cm <b>${j.c5||0}</b>　計 <b>${(j.c3||0)+(j.c5||0)}</b></span>
     </div>`;
   }).join('');
@@ -16887,14 +16959,14 @@ function renderJetCard(){
   el.innerHTML=`<div style="background:rgba(90,138,90,.08);border:1.5px solid rgba(90,138,90,.35);border-radius:10px;padding:10px 14px;margin-bottom:8px;">
     <div style="display:flex;justify-content:space-between;align-items:baseline;">
       <div style="font-size:12.5px;font-weight:700;color:var(--ink);">${cust.name}　ゆうパケット</div>
-      <div style="font-size:10px;color:var(--mid);">バーコード計数で報告済み</div>
+      <div style="font-size:10px;color:var(--mid);">運搬した便（バーコード計数で報告済み）</div>
     </div>
-    <div style="font-size:10px;color:var(--mid);margin:2px 0 4px;">この顧客のゆうパケットは計数アプリの実績がそのまま集荷実績になります。ここで入力する必要はありません。</div>
+    <div style="font-size:10px;color:var(--mid);margin:2px 0 4px;">あなたが大阪北郵便局へ運んだ便です。この実績がそのまま集荷実績になります。ここで入力する必要はありません。</div>
     ${rows}
     <div style="display:flex;justify-content:flex-end;gap:12px;padding-top:6px;border-top:1px solid var(--brd);font-size:12px;">
       <span>本日 通常 <b>${t3}</b>　5cm <b>${t5}</b>　計 <b>${t3+t5}</b></span>
     </div>
-    ${open?'<div style="font-size:10px;color:#b26a00;margin-top:4px;">締めていない便があります。計数アプリで締めると確定します。</div>':''}
+
   </div>`;
 }
 
