@@ -2040,6 +2040,7 @@ async function syncFromFirebase() {
   REGIONS   = ls_get(LS.REGIONS, REGIONS);
   YP_LOGS   = ls_get(LS.YP_LOGS, []);
   COL_LOGS  = ls_get(LS.COL_LOGS, []);
+  try{ _mergeJetIntoColLogs(); }catch(e){}
   ATT_LOGS  = ls_get(LS.ATT_LOGS, []);
   console.log('Firebase同期完了');
   // ★ 2026/07/06: 起動を待たない方式にしたため、裏で読込完了後に
@@ -6776,6 +6777,7 @@ function _normalizeBlocks(b){
 }
 
 function _renderMgrStats(){
+  try { _mergeJetIntoColLogs(); } catch(e){}
   try {
     closeMgrStats();
     const {year, month, tab, drillLevel, colDrillLevel} = _mgrStatsState;
@@ -19468,6 +19470,7 @@ function applyCorrection(){
     renderRows();
     $('col-date').value = rec.date;
     COL_LOGS = ls_get(LS.COL_LOGS,[]).filter(r=>String(r.id)!==String(rec.id));
+    try{ _mergeJetIntoColLogs(); }catch(e){}
     ls_set(LS.COL_LOGS, COL_LOGS);
     show('scr-col');
     toast('内容を修正して再提出してください','info');
@@ -19736,6 +19739,7 @@ function renderCsvStat(){
 }
 function doExport(t){
   YP_LOGS=ls_get(LS.YP_LOGS,[]); COL_LOGS=ls_get(LS.COL_LOGS,[]);
+  try{ _mergeJetIntoColLogs(); }catch(e){}
   const dt=(()=>{const _d=new Date();const _y=_d.getFullYear();const _m=String(_d.getMonth()+1).padStart(2,'0');const _dd=String(_d.getDate()).padStart(2,'0');return `${_y}-${_m}-${_dd}`;})();
   if(t==='yp'||t==='both') exportCSV(makeYPCSV(), `宅配日報_${dt}.csv`);
   if(t==='col'||t==='both') setTimeout(()=>exportCSV(makeColCSV(),`集荷日報_${dt}.csv`),t==='both'?600:0);
