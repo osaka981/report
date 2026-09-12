@@ -13509,6 +13509,32 @@ function submitNameInput(){
   _completeLogin(d);
 }
 
+// ★ 2026/09/12: 入力途中の作業が残っているかを判定する。
+//   出勤中の再ログインで常に業務画面へ飛ばすと、確認や設定をしたいだけのときに
+//   いきなり入力画面から始まってしまうため、「途中のデータがあるときだけ」復元する。
+//   判定材料は、集荷入力の一時保存（数量や顧客が入っているもの）と送信待ちキュー。
+function _hasWorkInProgress(){
+  // 集荷入力の一時保存
+  try{
+    const d = JSON.parse(localStorage.getItem(COL_DRAFT_KEY) || 'null');
+    const blocks = (d && Array.isArray(d.blocks)) ? d.blocks : [];
+    const hasQty = o => Object.values(o || {}).some(v => Number(v) > 0);
+    const has = blocks.some(b=>{
+      if(!b || !b.type) return false;
+      if(b.type === 'indiv')   return !!(b.custId || b.custName) || hasQty(b.items);
+      if(b.type === 'route')   return (b.customers||[]).some(c=>hasQty(c.items));
+      if(b.type === 'charter') return !!(b.charterData && (b.charterData.custName || b.charterData.content));
+      return false;
+    });
+    if(has) return true;
+  }catch(e){}
+  // 送信待ちキュー（オフラインで送れていない分）
+  try{
+    if(Object.keys(_pendQueueGet()||{}).length > 0) return true;
+  }catch(e){}
+  return false;
+}
+
 function _completeLogin(d){
   // 管理者コード使用者は氏名入力画面を先に表示
   if(d._isSharedCode && !d._inputName){
@@ -13528,8 +13554,11 @@ function _completeLogin(d){
   const todayStr0 = (()=>{const y=now0.getFullYear();const m=String(now0.getMonth()+1).padStart(2,'0');const dd=String(now0.getDate()).padStart(2,'0');return `${y}-${m}-${dd}`;})();
   ATT_LOGS = ls_get(LS.ATT_LOGS,[]);
   const existingAtt = ATT_LOGS.find(a=>a.driverId===d.id && a.date===todayStr0 && !a.clockOut);
-  if(existingAtt){
-    // 出勤中の再ログイン → 即業務画面
+  // ★ 2026/09/12: 出勤中でも、入力途中のデータが無ければトップ(モード選択)から始める。
+  //   以前は出勤中なら必ず業務画面へ飛ばしていたため、確認や設定をしたいだけのときも
+  //   入力画面から始まり、ログアウトも見えない状態になっていた。
+  //   途中のデータがある場合だけ、続きから入れるよう業務画面を復元する。
+  if(existingAtt && _hasWorkInProgress()){
     _enterWorkMode(d);
     setTimeout(()=>_checkBirthday(d), 400);
     return;
