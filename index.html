@@ -2358,6 +2358,11 @@ function setupRealtimeSync() {
         region: fc.region||'',
         start: fc.start||'',
         colPrices: fc.colPrices||{},
+        // ★ 2026/09/12: 細分化品目の出し分けに必要
+        useItems: fc.useItems||[],
+        // ★ 2026/09/12: カスタム品目。ここで捨てていたため itemsGridHtml の
+        //   カスタム品目欄（ASLAJ等）が常に非表示になっていた。
+        otherItems: fc.otherItems||[],
       })).filter(c=>c.name);
       ls_set(LS.CUSTOMERS, CUSTOMERS);
       // REGIONS も更新
@@ -2603,18 +2608,36 @@ let OFFICES = ls_get(LS.OFFICES,(()=>{
 const OSAKA_KU=['北区','都島区','福島区','此花区','中央区','西区','港区','大正区','天王寺区','浪速区','西淀川区','淀川区','東淀川区','東成区','生野区','旭区','城東区','鶴見区','阿倍野区','住之江区','住吉区','東住吉区','平野区','西成区'];
 const KYOTO_AREAS=['京都市上京区','京都市中京区','京都市下京区','京都市東山区','京都市左京区','京都市右京区','京都市北区','京都市西京区','京都市伏見区','京都市南区','京都市山科区','宇治市','長岡京市','向日市','八幡市','京田辺市'];
 
+// ★ 2026/09/12: 経営管理の ITEMS と対応。ck → masterKey。
+//   optional の品目（ゆうパック170・ゆうパケット1〜7cm）は顧客の useItems で出し分ける。
 const ITEM_MAP=[
   ['y60','ゆうパック_60'],['y80','ゆうパック_80'],['y100','ゆうパック_100'],
   ['y120','ゆうパック_120'],['y140','ゆうパック_140'],['y160','ゆうパック_160'],
+  ['y170','ゆうパック_170'],
   ['pk1','ゆうパケット_通常'],['pk2','ゆうパケット_7cm以上'],
+  ['pk1c','ゆうパケット_1cm'],['pk2c','ゆうパケット_2cm'],['pk3c','ゆうパケット_3cm'],
+  ['pk4c','ゆうパケット_4cm'],['pk5c','ゆうパケット_5cm'],['pk6c','ゆうパケット_6cm'],
+  ['pk7c','ゆうパケット_7cm'],
   ['cp','クリックポスト'],['ke','ケース'],['te','定形外(ゆうメール)'],['ch','チャーター'],
 ];
-const UNIT={
-  'ゆうパック_60':{u:'個'},'ゆうパック_80':{u:'個'},'ゆうパック_100':{u:'個'},
-  'ゆうパック_120':{u:'個'},'ゆうパック_140':{u:'個'},'ゆうパック_160':{u:'個'},
-  'ゆうパケット_通常':{u:'個'},'ゆうパケット_7cm以上':{u:'個'},
-  'クリックポスト':{u:'個'},'ケース':{u:'個'},'定形外(ゆうメール)':{u:'個'},'チャーター':{u:'件'},
+// 顧客ごとに使うかどうかを選ぶ品目（経営管理の ITEMS.optional と一致させる）
+const OPTIONAL_ITEMS=[
+  'ゆうパック_170',
+  'ゆうパケット_1cm','ゆうパケット_2cm','ゆうパケット_3cm','ゆうパケット_4cm',
+  'ゆうパケット_5cm','ゆうパケット_6cm','ゆうパケット_7cm',
+];
+// 細分化品目の表示ラベル
+const OPTIONAL_LABEL={
+  'ゆうパック_170':'YP 170',
+  'ゆうパケット_1cm':'1cm','ゆうパケット_2cm':'2cm','ゆうパケット_3cm':'3cm',
+  'ゆうパケット_4cm':'4cm','ゆうパケット_5cm':'5cm','ゆうパケット_6cm':'6cm',
+  'ゆうパケット_7cm':'7cm',
 };
+const UNIT=(()=>{
+  const m={};
+  ITEM_MAP.forEach(([,k])=>{ m[k]={u: k==='チャーター'?'件':'個'}; });
+  return m;
+})();
 
 // ══ ユーティリティ ══
 const $=id=>document.getElementById(id);
@@ -17060,13 +17083,39 @@ function itemsGridHtml(blockId, custIdx, items, color, customerName){
   const fold140ChevId=`foldchev-${blockId}-${custIdx}`;
   const has140=(items['ゆうパック_140']||0)+(items['ゆうパック_160']||0)>0;
   
+  // ★ 2026/09/12: 顧客の特定を先に行い、細分化品目(useItems)とカスタム品目の両方で使う
+  const _norm = (s) => String(s||'').replace(/[\s・,、.]+/g, '').toLowerCase();
+  const _cust = customerName
+    ? (CUSTOMERS||[]).find(c => _norm(c.name) === _norm(customerName))
+    : null;
+
+  // ★ 2026/09/12: 細分化品目（経営管理の顧客設定 useItems で選ばれたものだけ出す）。
+  //   既に数量が入っている品目は、設定が外れても入力値が消えないよう必ず出す。
+  let optItemsHtml = '';
+  {
+    const on = Array.isArray(_cust && _cust.useItems) ? _cust.useItems : [];
+    const useOpt = OPTIONAL_ITEMS.filter(k => on.includes(k) || (items[k]||0) > 0);
+    if(useOpt.length){
+      const foldOptId = `foldopt-${blockId}-${custIdx}`;
+      const foldOptChevId = `foldoptchev-${blockId}-${custIdx}`;
+      const hasOptVal = useOpt.some(k => (items[k]||0) > 0);
+      optItemsHtml = `
+        <div class="col-fold-trigger" style="margin-top:8px;" onclick="colToggleFold('${foldOptId}','${foldOptChevId}')">
+          <span class="col-fold-lbl">細分化品目 (${useOpt.length}件)</span>
+          <span class="col-fold-chev" id="${foldOptChevId}">${hasOptVal?'▼ 閉じる':'▶ 展開'}</span>
+        </div>
+        <div id="${foldOptId}" style="display:${hasOptVal?'block':'none'};">
+          <div class="col-g2" style="margin-top:6px;">
+            ${useOpt.map(k => cell(k, OPTIONAL_LABEL[k]||k, items)).join('')}
+          </div>
+        </div>`;
+    }
+  }
+
   // カスタム品目(顧客固有)取得
   let customItemsHtml = '';
   if(customerName){
-    // CUSTOMERSから該当顧客のotherItemsを取得
-    const norm = (s) => String(s||'').replace(/[\s・,、.]+/g, '').toLowerCase();
-    const targetNorm = norm(customerName);
-    const cust = (CUSTOMERS||[]).find(c => norm(c.name) === targetNorm);
+    const cust = _cust;
     // ★ 2026/07/27: 月額(固定費)は日報で入力するものではないため除外する。
     //   経営管理システム側で毎月自動計上されるので、ここに出すと二重入力になる。
     // ★ 2026/08/28: 月額に加えて日額も除外する。
@@ -17133,8 +17182,9 @@ function itemsGridHtml(blockId, custIdx, items, color, customerName){
     <div class="col-igl" style="margin-top:8px;">ゆうパケット</div>
     <div class="col-g2">
       ${cell('ゆうパケット_通常','通常',items)}
-      ${cell('ゆうパケット_7cm以上','7cm〜',items)}
+      ${cell('ゆうパケット_7cm以上','5cm〜',items)}
     </div>
+    ${optItemsHtml}
     <div class="col-igl" style="margin-top:8px;">その他</div>
     <div class="col-g2">
       ${cell('クリックポスト','クリポス',items)}
