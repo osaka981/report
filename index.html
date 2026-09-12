@@ -2345,6 +2345,15 @@ function setupRealtimeSync() {
       _refreshNotificationBadges();
     }
   });
+  // ★ 2026/09/12(第4段階): 経営管理で追加された品目定義を取り込む
+  onValue(ref(fbDB, 'nikki/item_defs'), snap => {
+    if(!snap.exists()) return;
+    const v = snap.val();
+    if(!Array.isArray(v)) return;
+    try{ localStorage.setItem('nikki_item_defs', JSON.stringify(v)); }catch(e){}
+    applyUserItemDefs(v);
+    try{ if(typeof renderColBlocks==='function') renderColBlocks(); }catch(e){}
+  });
   onValue(ref(fbDB, 'nikki/customers'), snap => {
     if (!snap.exists()) return;
     // Firebase顧客データを経営管理システムのフォーマットに対応
@@ -2633,11 +2642,30 @@ const OPTIONAL_LABEL={
   'ゆうパケット_4cm':'4cm','ゆうパケット_5cm':'5cm','ゆうパケット_6cm':'6cm',
   'ゆうパケット_7cm':'7cm',
 };
+// ★ 2026/09/12(第4段階): 経営管理の品目マスタで追加された品目を取り込む。
+//   追加品目は必ず「顧客ごとに使うかを選ぶ品目」なので OPTIONAL_ITEMS に足す。
+function applyUserItemDefs(defs){
+  if(!Array.isArray(defs)) return;
+  defs.forEach(d=>{
+    if(!d || !d.key) return;
+    if(!OPTIONAL_ITEMS.includes(d.key)) OPTIONAL_ITEMS.push(d.key);
+    OPTIONAL_LABEL[d.key] = d.label || d.key;
+    if(!ITEM_MAP.some(([,k])=>k===d.key)) ITEM_MAP.push([d.ck||d.key, d.key]);
+    UNIT[d.key] = { u: d.unit==='件' ? '件' : '個' };
+  });
+}
+function loadUserItemDefsFromLS(){
+  try{
+    const v = JSON.parse(localStorage.getItem('nikki_item_defs') || '[]');
+    applyUserItemDefs(v);
+  }catch(e){}
+}
 const UNIT=(()=>{
   const m={};
   ITEM_MAP.forEach(([,k])=>{ m[k]={u: k==='チャーター'?'件':'個'}; });
   return m;
 })();
+loadUserItemDefsFromLS();   // ★ 2026/09/12: 端末に保存済みの追加品目を先に反映
 
 // ══ ユーティリティ ══
 const $=id=>document.getElementById(id);
