@@ -3698,10 +3698,11 @@ function _parseLoginId(raw){
     return {type:'owner', companyCode, id:clean};
   }
 
-  // 5桁(先頭1): 委託会社オーナー(委託会社番号そのもの)※旧形式の互換
-  if(clean.length===5 && clean.startsWith('1')){
-    return {type:'owner', companyCode:clean, id:clean};
-  }
+  /* ★ 2026/09/14: 「5桁・先頭1 → オーナー」の旧形式の互換を廃止した。
+     オーナーIDは 910001 のように「9＋委託会社番号5桁」の6桁だけとする。
+     理由: 自社の社員番号が5桁になった場合、1始まりの人がオーナーとして
+     判定され、本人がログインできなくなるため（この判定が個人直属より先に
+     書かれている）。委託会社には 910001 形式だけを案内する。 */
 
   // 8桁: 委託会社所属個人 or 管理者コード(-999)
   if(clean.length===8){
@@ -3767,9 +3768,11 @@ async function doLogin(){
   if(parsed.type === 'owner'){
     // 委託会社オーナーログイン(委託会社番号 10001 等の5桁)
     const co = (COMPANIES||[]).find(c=>{
+      /* ★ 2026/09/14: 会社コードそのもの(10001)で引ける経路を外した。
+         判定側だけ直しても、ここが残っていると別経路でオーナーに入れてしまう。
+         照合するのは発行済みのオーナーID(910001)と、そこから外した5桁だけ。 */
       return c.ownerLoginId===parsed.id ||
              (parsed.companyCode && String(c.companyCode)===String(parsed.companyCode)) ||
-             String(c.companyCode)===String(parsed.id) ||
              String(c.id)===String(parsed.id);
     });
     if(!co){
