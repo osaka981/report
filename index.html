@@ -13026,6 +13026,16 @@ async function _coSubmitAddDriver(){
     employmentType: '個人事業主',
     active: true,
     createdAt: new Date().toISOString(),
+    /* ★ 2026/09/14: 経営管理と突き合わせるための項目。
+       uid は社員番号が変わっても動かない鍵。経営管理で番号を付け替えても、
+       過去の日報・計数がこの人から外れないようにするためのもの。
+       createdVia は「委託会社が登録した」印で、経営管理の通知に使う。 */
+    uid: 'o' + Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+    empNo: id,
+    empNoHistory: [],
+    createdVia: 'owner',
+    createdCompanyName: (_ownerCompany.name || ''),
+    confirmedAt: null,
     initialPinHash: hash,
     initialPinIssuedAt: new Date().toISOString(),
     pinHash: null,
