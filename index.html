@@ -1995,7 +1995,8 @@ async function initFirebase() {
     })();
     // 起動時: 未送信キューがあれば再送信
     _pendBadgeUpdate();
-    _guardStorage();          // ★ 2026/09/14: 保存領域の確保と使用量の確認
+    // ★ 2026/09/14: 画面が出てから測る（起動直後だと toast が出せないことがある）
+    setTimeout(()=>{ try{ _guardStorage(); }catch(e){} }, 3000);
     if(_pendCount() > 0){ setTimeout(()=>_pendFlush(false), 1200); }
   } catch(e) {
     console.error('Firebase初期化エラー:', e);
@@ -3797,7 +3798,11 @@ async function doLogin(){
     _loginPin = '';
     [0,1,2,3,4,5].forEach(i=>{ const el=$('lpd'+i); if(el) el.classList.remove('on'); });
     if($('pin-login-name')) $('pin-login-name').textContent = co.name + ' オーナー';
-    if($('pin-login-err')) $('pin-login-err').textContent = '';
+    /* ★ 2026/09/14: 消す対象のIDが間違っていた（実際の要素は login-pin-err）。
+       if で囲んでいるため何も起きず、前のIDで出した「PINが違います(残り◯回)」が
+       次の人の画面に残っていた。身に覚えのない残り回数が出ると、本人は
+       ロックを恐れて入力をためらう。 */
+    if($('login-pin-err')) $('login-pin-err').textContent = '';
     if($('pin-login-hint')){
       if(!co.ownerPinHash){
         $('pin-login-hint').textContent = '初期PINを入力してください(代表から配布)';
@@ -3892,7 +3897,8 @@ function _showPinScreen(d){
     if(el) el.classList.remove('on');
   });
   if($('pin-login-name')) $('pin-login-name').textContent = d.name || '';
-  if($('pin-login-err')) $('pin-login-err').textContent = '';
+  // ★ 2026/09/14: 同上。前の人のエラー表示を必ず消す。
+  if($('login-pin-err')) $('login-pin-err').textContent = '';
   if(!d.pinHash){
     if($('pin-login-hint')) $('pin-login-hint').textContent = '初期PINを入力してください(管理者から配布)';
   } else {
@@ -13928,6 +13934,9 @@ function cancelPinLogin(){
   _pendingLoginDriver = null;
   _loginPin = '';
   [0,1,2,3,4,5].forEach(i=>{ const el=$('lpd'+i); if(el) el.classList.remove('on'); });
+  // ★ 2026/09/14: 戻るときにもエラー表示を消す（次に開く人へ持ち越さない）
+  if($('login-pin-err')) $('login-pin-err').textContent = '';
+  if($('login-err')){ $('login-err').textContent = ''; $('login-err').style.display = 'none'; }
   show('scr-login');
 }
 
