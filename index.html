@@ -1995,6 +1995,7 @@ async function initFirebase() {
     })();
     // 起動時: 未送信キューがあれば再送信
     _pendBadgeUpdate();
+    _guardStorage();          // ★ 2026/09/14: 保存領域の確保と使用量の確認
     if(_pendCount() > 0){ setTimeout(()=>_pendFlush(false), 1200); }
   } catch(e) {
     console.error('Firebase初期化エラー:', e);
@@ -2105,8 +2106,62 @@ function _pendQueueGet(){
   try { return JSON.parse(localStorage.getItem(PEND_KEY) || '{}') || {}; }
   catch { return {}; }
 }
+/* ★ 2026/09/14: ここが失敗しても無言だった。
+   端末の空き容量が尽きると、オフラインで出した日報が未送信キューに入らず、
+   そのまま消える。本人は提出したつもりのまま気づけない。
+   ① 再取得できるキャッシュだけ捨ててもう一度試す（未送信ぶんは絶対に消さない）
+   ② それでも駄目なら画面に出す */
+let _pendSaveWarned = false;
+function _freeDisposableCache(){
+  // Firebaseから読み直せるものだけ。日報の下書きや未送信ぶんには触れない。
+  ['nikki_jet_scan','nikki_jet_settings'].forEach(k=>{ try{ localStorage.removeItem(k); }catch(e){} });
+}
 function _pendQueueSave(q){
-  try { localStorage.setItem(PEND_KEY, JSON.stringify(q)); } catch {}
+  try { localStorage.setItem(PEND_KEY, JSON.stringify(q)); return true; } catch(e) {
+    _freeDisposableCache();
+    try { localStorage.setItem(PEND_KEY, JSON.stringify(q)); return true; } catch(e2) {
+      console.error('[pending] 端末への保存に失敗', e2);
+      if(!_pendSaveWarned){
+        _pendSaveWarned = true;
+        try{ toast('端末の空き容量が足りません。未送信ぶんを保存できていないので、電波の良い場所で送信してください', 'info'); }catch(_){}
+      }
+      return false;
+    }
+  }
+}
+/* ★ 2026/09/14: 端末側の保存領域を守る。
+   ・persist() が通ると、空き容量が減ったときの自動削除の対象から外れる
+   ・localStorage は約5MBが上限。手前で気づけるように使用量を見る */
+function _lsBytes(){
+  let n=0;
+  try{
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      n += (k.length + (localStorage.getItem(k)||'').length) * 2;
+    }
+  }catch(e){}
+  return n;
+}
+async function _guardStorage(){
+  try{
+    if(navigator.storage && navigator.storage.persist){
+      const already = navigator.storage.persisted ? await navigator.storage.persisted() : false;
+      if(!already){
+        const ok = await navigator.storage.persist();
+        console.log('[storage] persist():', ok);
+      }
+    }
+  }catch(e){}
+  try{
+    const b=_lsBytes();
+    console.log('[storage] localStorage使用量 約'+Math.round(b/1024)+'KB');
+    if(b > 4*1024*1024){
+      _freeDisposableCache();
+      if(_lsBytes() > 4*1024*1024){
+        toast('端末の保存容量が上限に近づいています。未送信ぶんを送信してください', 'info');
+      }
+    }
+  }catch(e){}
 }
 function _pendQueueAdd(key, value){
   const q = _pendQueueGet();
