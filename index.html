@@ -416,6 +416,10 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
 import { getDatabase, ref, set, get, onValue, push, remove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 import { getAuth, signInAnonymously, onIdTokenChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 window._fbImports = { initializeApp, getDatabase, ref, set, get, onValue, push, remove, getAuth, signInAnonymously, onIdTokenChanged };
+/* ★ 2026/09/14: これは「SDKの読み込みが終わった」という意味のフラグ。
+   計数アプリの window._fbReady は「認証が整うまでの約束(Promise)」で別物なので、
+   共通化するときに取り違えないよう名前を分ける。旧名も残す。 */
+window._fbSdkReady = true;
 window._fbReady = true;
 document.dispatchEvent(new Event('fb-sdk-ready'));
 </script>
@@ -1946,12 +1950,32 @@ async function initFirebase() {
     try {
       const { getAuth, signInAnonymously, onIdTokenChanged } = window._fbImports;
       const auth = getAuth(app);
+      window._fbAuth = auth;
       window._fbToken = null;
-      onIdTokenChanged(auth, async u => { if (u) { try { window._fbToken = await u.getIdToken(); } catch(e){} } });
-      await Promise.race([
-        signInAnonymously(auth).then(async c => { window._fbToken = await c.user.getIdToken(); }),
-        new Promise(r => setTimeout(r, 6000))
-      ]);
+      /* ★ 2026/09/14: 認証が整ったかどうかを他から待てるようにする。
+         これまでは6秒で打ち切って先へ進み、間に合わないと未認証のまま
+         購読を張っていた。ルールが「認証済みのみ」なので、その購読は
+         permission_denied で即座に止まる。Firebaseは張り直さないため、
+         画面はオンライン表示のまま、同期だけが静かに死んでいた。 */
+      let _authRes=null;
+      window._fbAuthReady = new Promise(r=>{ _authRes=r; });
+      const _authDone = ok => { if(_authRes){ const f=_authRes; _authRes=null; f(ok); } };
+      let _anonTries = 0;
+      onIdTokenChanged(auth, async u => {
+        if (!u) {
+          // サインアウト直後などユーザーが居ない状態。匿名で入り直す。
+          window._fbToken = null;
+          if (_anonTries++ < 3) { try { await signInAnonymously(auth); } catch(e) { _authDone(false); } }
+          else _authDone(false);
+          return;
+        }
+        _anonTries = 0;
+        try { window._fbToken = await u.getIdToken(); } catch(e) { window._fbToken = null; }
+        _authDone(!!window._fbToken);
+      });
+      signInAnonymously(auth).catch(e => { console.warn('匿名認証に失敗:', e); _authDone(false); });
+      // 起動を止めない。認証の完了は購読側で待つ（最大15秒）。
+      setTimeout(()=>_authDone(false), 15000);
       setInterval(async () => { try { const u = auth.currentUser; if (u) window._fbToken = await u.getIdToken(); } catch(e){} }, 30*60*1000);
     } catch(e) { console.warn('匿名認証に失敗（続行します）:', e); }
     fbDB = getDatabase(app);
@@ -1962,8 +1986,13 @@ async function initFirebase() {
     // ★ 2026/07/06: 起動高速化。Firebase読み込みを「待たない」。
     //   localStorageのデータで即座に画面表示し、クラウド読込は裏で実行する。
     //   電波が悪くても立ち上がりが速い。データはリアルタイム同期で追いつく。
-    setupRealtimeSync();      // リアルタイム更新を購読(裏でデータが最新化される)
-    syncFromFirebase();       // await しない → 裏で実行(完了を待たずに先へ進む)
+    /* ★ 2026/09/14: 購読と初回読込は認証が整ってから始める。
+       画面は localStorage のデータで既に出ているので、待っても体感は変わらない。 */
+    (async () => {
+      try { await (window._fbAuthReady || Promise.resolve(true)); } catch(e) {}
+      setupRealtimeSync();    // リアルタイム更新を購読(裏でデータが最新化される)
+      syncFromFirebase();     // await しない → 裏で実行(完了を待たずに先へ進む)
+    })();
     // 起動時: 未送信キューがあれば再送信
     _pendBadgeUpdate();
     if(_pendCount() > 0){ setTimeout(()=>_pendFlush(false), 1200); }
@@ -2153,6 +2182,9 @@ window.addEventListener('online', ()=>{
   console.log('[online] 復帰検知 → 未送信キューを再送信');
   _toast('オンライン復帰');
   setTimeout(()=>_pendFlush(false), 800);
+  /* ★ 2026/09/14: オフラインの間に止まった購読を張り直す。
+     Firebase は接続が戻っても、拒否で止まった購読は復活させない。 */
+  setTimeout(()=>{ try{ if(fbDB) setupRealtimeSync(); }catch(e){} }, 1500);
 });
 window.addEventListener('offline', ()=>{
   console.log('[offline] オフライン検知');
@@ -2166,37 +2198,62 @@ setInterval(()=>{
 }, 60000);
 
 // リアルタイム同期購読（他のスマホの変更を受信）
+/* ★ 2026/09/14: onValue は読み取りを拒否されると購読ごと止まり、Firebase は
+   自動で張り直さない。これまでエラーの受け口を渡していなかったため、
+   同期が止まっても画面には何も出ず、気づけなかった。
+   エラーを拾って間隔を空けて張り直し、それでも駄目なら知らせる。 */
+const _subState = {};
+function subscribeNode(path, cb, label){
+  const { ref, onValue } = window._fbImports || {};
+  if (!fbDB || !ref || !onValue) return;
+  const st = _subState[path] || (_subState[path] = { tries:0, off:null });
+  try { if (st.off) st.off(); } catch(e){}
+  st.off = onValue(ref(fbDB, path), snap => {
+    st.tries = 0;
+    try { cb(snap); } catch(e) { console.error('['+path+'] 反映に失敗', e); }
+  }, err => {
+    st.tries++;
+    console.warn('['+path+'] 受信が止まりました('+st.tries+'回目)', err && err.message);
+    if (st.tries <= 6) {
+      const wait = Math.min(30000, 2000*Math.pow(2, st.tries-1));
+      setTimeout(()=>subscribeNode(path, cb, label), wait);
+    } else {
+      try { toast((label||'データ')+'の同期が止まっています。画面を開き直してください', 'info'); } catch(e){}
+    }
+  });
+}
+
 function setupRealtimeSync() {
   if (!fbDB) return;
   const { ref, onValue } = window._fbImports;
   // 日報ログをリアルタイムで受信
-  onValue(ref(fbDB, 'nikki/yp_logs'), snap => {
+  subscribeNode('nikki/yp_logs', snap => {
     if (!snap.exists()) return;
     YP_LOGS = snap.val() || [];
     fbSet('yp_logs', YP_LOGS);
   });
-  onValue(ref(fbDB, 'nikki/col_logs'), snap => {
+  subscribeNode('nikki/col_logs', snap => {
     if (!snap.exists()) return;
     COL_LOGS = snap.val() || [];
     fbSet('col_logs', COL_LOGS);
     _mergeJetIntoColLogs();
   });
   // ★ 2026/09/01: バーコード計数アプリの便別実績（読むだけ。書かない）
-  onValue(ref(fbDB, 'nikki/jet_scan'), snap => {
+  subscribeNode('nikki/jet_scan', snap => {
     JET_SCAN = snap.exists() ? (snap.val()||{}) : {};
     try{ localStorage.setItem('nikki_jet_scan', JSON.stringify(JET_SCAN)); }catch(e){}
     _mergeJetIntoColLogs();
     renderJetCard();
     try{ if($('co-view-jet') && $('co-view-jet').style.display!=='none') _renderOwnerJet(); }catch(e){}
   });
-  onValue(ref(fbDB, 'nikki/jet_settings'), snap => {
+  subscribeNode('nikki/jet_settings', snap => {
     JET_SET = snap.exists() ? (snap.val()||{}) : {};
     try{ localStorage.setItem('nikki_jet_settings', JSON.stringify(JET_SET)); }catch(e){}
     _mergeJetIntoColLogs();
     renderJetCard();
   });
   // マスタデータもリアルタイム更新(安全弁: データ破損時はlocalStorageを守る)
-  onValue(ref(fbDB, 'nikki/drivers'), snap => {
+  subscribeNode('nikki/drivers', snap => {
     if (!snap.exists()) return;
     const v = snap.val();
     // Firebaseからのデータが配列でない、または空、または必須フィールド(id)が欠損している場合はスキップ
@@ -2244,7 +2301,7 @@ function setupRealtimeSync() {
   //   従来は 'companies'(プレフィックスなし)を読んでいたため、経営管理の
   //   nikki/companies と別ノードになり、削除が反映されず復活していた。
   //   空(全削除)も正しく反映する。
-  onValue(ref(fbDB, 'nikki/companies'), snap => {
+  subscribeNode('nikki/companies', snap => {
     const v = snap.exists() ? snap.val() : [];
     const arr = Array.isArray(v) ? v : (v ? Object.values(v) : []);
     COMPANIES = arr;
@@ -2255,20 +2312,20 @@ function setupRealtimeSync() {
   // ★ 2026/06/29: オーナーPIN専用ノード。委託会社マスタとは別に永続化。
   //   マスタを書き戻さずPINだけ保存することで、委託会社の復活バグを起こさず
   //   オーナーPINが初回ログイン後リロードで消える問題を解消する。
-  onValue(ref(fbDB, 'nikki/owner_pins'), snap => {
+  subscribeNode('nikki/owner_pins', snap => {
     window._ownerPins = snap.exists() ? (snap.val()||{}) : {};
     try{ localStorage.setItem('nikki_owner_pins', JSON.stringify(window._ownerPins)); }catch(e){}
     _applyOwnerPins();
     if(typeof renderOwnerCompanies==='function') try{ renderOwnerCompanies(); }catch(e){}
   });
-  onValue(ref(fbDB, 'nikki/col_routes'), snap => {
+  subscribeNode('nikki/col_routes', snap => {
     if(snap.exists()){
       COL_ROUTES = snap.val()||[];
       ls_set(LS.COL_ROUTES, COL_ROUTES);
     }
   });
   // 顧客の休業・時間変更予定(Phase B)
-  onValue(ref(fbDB, 'nikki/schedule_overrides'), snap => {
+  subscribeNode('nikki/schedule_overrides', snap => {
     if(snap.exists()){
       const v = snap.val();
       const arr = Array.isArray(v) ? v : (v ? Object.values(v) : []);
@@ -2279,7 +2336,7 @@ function setupRealtimeSync() {
     }
   });
   // 休業調査(Phase 1: 2026/05/01)
-  onValue(ref(fbDB, 'nikki/schedule_surveys'), snap => {
+  subscribeNode('nikki/schedule_surveys', snap => {
     if(snap.exists()){
       const v = snap.val();
       const arr = Array.isArray(v) ? v : (v ? Object.values(v) : []);
@@ -2290,7 +2347,7 @@ function setupRealtimeSync() {
       if(typeof renderSurveyListScreen === 'function' && document.getElementById('scr-survey-list')?.classList.contains('on')) renderSurveyListScreen();
     }
   });
-  onValue(ref(fbDB, 'nikki/survey_responses'), snap => {
+  subscribeNode('nikki/survey_responses', snap => {
     if(snap.exists()){
       const v = snap.val();
       const arr = Array.isArray(v) ? v : (v ? Object.values(v) : []);
@@ -2300,7 +2357,7 @@ function setupRealtimeSync() {
       if(typeof renderSurveyAnswerScreen === 'function' && document.getElementById('scr-survey-answer')?.classList.contains('on')) renderSurveyAnswerScreen();
     }
   });
-  onValue(ref(fbDB, 'nikki/schedule_logs'), snap => {
+  subscribeNode('nikki/schedule_logs', snap => {
     if(snap.exists()){
       const v = snap.val();
       const arr = Array.isArray(v) ? v : (v ? Object.values(v) : []);
@@ -2309,7 +2366,7 @@ function setupRealtimeSync() {
     }
   });
   // 顧客申し送りメモ(Phase 1: 2026/05/01)
-  onValue(ref(fbDB, 'nikki/customer_notes'), snap => {
+  subscribeNode('nikki/customer_notes', snap => {
     if(snap.exists()){
       const v = snap.val();
       const arr = Array.isArray(v) ? v : (v ? Object.values(v) : []);
@@ -2320,7 +2377,7 @@ function setupRealtimeSync() {
     }
   });
   // 月次確認(Phase A: 2026/05/02)
-  onValue(ref(fbDB, 'nikki/monthly_confirmations'), snap => {
+  subscribeNode('nikki/monthly_confirmations', snap => {
     if(snap.exists()){
       const v = snap.val();
       const arr = Array.isArray(v) ? v : (v ? Object.values(v) : []);
@@ -2333,7 +2390,7 @@ function setupRealtimeSync() {
     }
   });
   // アプリ内通知(Phase C)
-  onValue(ref(fbDB, 'nikki/notifications'), snap => {
+  subscribeNode('nikki/notifications', snap => {
     if(snap.exists()){
       const v = snap.val();
       const arr = Array.isArray(v) ? v : (v ? Object.values(v) : []);
@@ -2346,7 +2403,7 @@ function setupRealtimeSync() {
     }
   });
   // ★ 2026/09/12(第4段階): 経営管理で追加された品目定義を取り込む
-  onValue(ref(fbDB, 'nikki/item_defs'), snap => {
+  subscribeNode('nikki/item_defs', snap => {
     if(!snap.exists()) return;
     const v = snap.val();
     if(!Array.isArray(v)) return;
@@ -2354,7 +2411,7 @@ function setupRealtimeSync() {
     applyUserItemDefs(v);
     try{ if(typeof renderColBlocks==='function') renderColBlocks(); }catch(e){}
   });
-  onValue(ref(fbDB, 'nikki/customers'), snap => {
+  subscribeNode('nikki/customers', snap => {
     if (!snap.exists()) return;
     // Firebase顧客データを経営管理システムのフォーマットに対応
     const fbCusts = snap.val() || CUSTOMERS;
