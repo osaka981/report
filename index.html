@@ -2002,6 +2002,12 @@ async function initFirebase() {
         }
         _anonTries = 0;
         try { window._fbToken = await u.getIdToken(); } catch(e) { window._fbToken = null; }
+        /* ★ 2026/09/15: 前回と違うユーザーになっていたら購読を張り直す。
+           匿名 → 端末アカウント、端末アカウント → 匿名(解除)の両方で起きる。 */
+        if (window._fbLastUid && window._fbLastUid !== u.uid) {
+          setTimeout(()=>{ try{ resubscribeAll('ユーザーが切り替わりました'); }catch(e){} }, 600);
+        }
+        window._fbLastUid = u.uid;
         _authDone(!!window._fbToken);
       });
       signInAnonymously(auth).catch(e => { console.warn('匿名認証に失敗:', e); _authDone(false); });
@@ -2342,6 +2348,22 @@ setInterval(()=>{
    同期が止まっても画面には何も出ず、気づけなかった。
    エラーを拾って間隔を空けて張り直し、それでも駄目なら知らせる。 */
 const _subState = {};
+/* ★ 2026/09/15: 認証しているユーザーが入れ替わったら、購読を張り直す。
+   端末アカウントでログインすると匿名から @work.local へユーザーが変わる。
+   Firebaseは既存の購読をそのまま引き継がず、切り替えの瞬間に
+   permission_denied を返すことがある。ルール上は読める相手でも、
+   一度止まった購読は自動で復活しないため、明示的に張り直す必要がある。
+   （ルールのプレイグラウンドでは同じUIDで許可されることを確認済み） */
+function resubscribeAll(why){
+  console.log('[購読] 張り直します:', why||'');
+  Object.keys(_subState).forEach(k=>{
+    const st=_subState[k];
+    try{ if(st && st.off) st.off(); }catch(e){}
+    if(st){ st.off=null; st.tries=0; }
+  });
+  try{ setupRealtimeSync(); }catch(e){ console.warn('[購読] 張り直しに失敗', e); }
+  try{ syncFromFirebase(); }catch(e){}
+}
 function subscribeNode(path, cb, label){
   const { ref, onValue } = window._fbImports || {};
   if (!fbDB || !ref || !onValue) return;
@@ -3907,6 +3929,8 @@ async function acctLogin(){
     });
     if($('acct-pw')) $('acct-pw').value='';
     acctPaint();
+    // ★ 2026/09/15: ユーザーが変わったので購読を張り直す（データが来なくなるのを防ぐ）
+    setTimeout(()=>{ try{ resubscribeAll('端末アカウントでログイン'); }catch(e){} }, 800);
     toast('この端末を ' + (rec.companyName||'会社') + ' として設定しました', 'ok');
     // 個人アカウントなら社員番号を埋めておく
     if(rec.kind==='person' && rec.staffUid){
@@ -3930,6 +3954,8 @@ async function acctLogout(){
   acctSet(null);
   try{ if(I.signOut && window._fbAuth) await I.signOut(window._fbAuth); }catch(e){}
   acctPaint();
+  // ★ 2026/09/15: 匿名に戻るので、こちらでも張り直す
+  setTimeout(()=>{ try{ resubscribeAll('端末アカウントを解除'); }catch(e){} }, 1200);
   toast('端末のアカウントを解除しました','info');
 }
 let _loginPin = '';
@@ -4079,7 +4105,28 @@ async function doLogin(){
   $('login-err').style.display = 'block';
 }
 
+/* ★ 2026/09/15: 端末アカウントの会社と、ログインしようとしている人の会社が
+   食い違っていたら止める。UPの端末で自社のドライバーが日報を出せてしまうと、
+   第2段階でルールが会社ごとに絞ったときに、その端末からは読めないデータが
+   できてしまう（出したのに自分で確認できない状態になる）。 */
+function acctAllows(d){
+  const a = (typeof acctGet==='function') ? acctGet() : null;
+  if(!a || !a.companyId) return true;          // 端末アカウント未設定なら従来どおり
+  const dc = String((d && d.companyId) || '');
+  if(dc === String(a.companyId)) return true;
+  const who = (d && d.name) || 'この方';
+  const err = $('login-err');
+  if(err){
+    err.innerHTML = who + ' は ' + (a.companyName||'この会社') + ' の所属ではありません。<br>'
+      + 'この端末は ' + (a.companyName||'') + ' 用に設定されています。<br>'
+      + '別の会社の方が使う場合は、端末のアカウントを解除してください。';
+    err.style.display = 'block';
+  }
+  return false;
+}
+
 function _showPinScreen(d){
+  if(!acctAllows(d)) return;      // ★ 2026/09/15: 会社が違う人は進ませない
   _loginPin = '';
   [0,1,2,3,4,5].forEach(i=>{
     const el = $('lpd'+i);
@@ -15894,6 +15941,11 @@ function submitYP(){
     id: genRecId(), type:'yuupack', driver:{...driver}, date,
     postOffice,
     form,
+    /* ★ 2026/09/15: どの委託会社のデータかをレコード自身に持たせる。
+       Firebaseのルールは会社ID(companyId)だけを見て、委託会社が
+       他社のデータを読めないようにする。この値が無いと絞り込めない。
+       自社のドライバーは空になる（自社＝制限の対象外）。 */
+    companyId: String(driver.companyId || ''),
     submittedAt: new Date().toISOString(),
   };
   YP_LOGS.push(rec); fbSet('yp_logs', YP_LOGS);
@@ -19500,7 +19552,10 @@ function doSubmitCol(){
     }
   });
   const rec={id:genRecId(),type:'collection',driver:{...driver},date:$('col-date')?.value||today(),
-    rows:colRows,blocks:colBlocks,note:$('col-note')?.value||'',submittedAt:new Date().toISOString()};
+    rows:colRows,blocks:colBlocks,note:$('col-note')?.value||'',
+    // ★ 2026/09/15: 宅配と同じ理由で会社IDを持たせる
+    companyId: String(driver.companyId || ''),
+    submittedAt:new Date().toISOString()};
   COL_LOGS.push(rec); fbSet('col_logs',COL_LOGS);
   clearColDraft();
   lastResult=rec; showDone();
