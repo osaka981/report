@@ -1997,6 +1997,14 @@ async function initFirebase() {
     _pendBadgeUpdate();
     // ★ 2026/09/14: 画面が出てから測る（起動直後だと toast が出せないことがある）
     setTimeout(()=>{ try{ _guardStorage(); }catch(e){} }, 3000);
+    /* ★ 2026/09/15: 未送信が残っていないか定期的に確認して、
+       残っていれば自動で送信を試す。溜めたまま日をまたがせない。 */
+    setInterval(()=>{
+      try{
+        _pendBadgeUpdate();
+        if(_pendCount()>0 && navigator.onLine) _pendFlush(false);
+      }catch(e){}
+    }, 5*60*1000);
     if(_pendCount() > 0){ setTimeout(()=>_pendFlush(false), 1200); }
   } catch(e) {
     console.error('Firebase初期化エラー:', e);
@@ -2175,6 +2183,44 @@ function _pendQueueRemove(key){
 }
 function _pendCount(){ return Object.keys(_pendQueueGet()).length; }
 
+/* ★ 2026/09/15: 未送信がいつから溜まっているかを見る。
+   実際に、提出したつもりの日報が2〜3日キューに残り、
+   数日後にまとめて届いていた（本人は提出済みだと思っている）。
+   件数だけの小さなバッジでは気づけないので、古いものがあれば
+   画面の上に居座る帯を出す。 */
+function _pendOldest(){
+  const q=_pendQueueGet();
+  let oldest=0;
+  Object.values(q).forEach(v=>{ const t=v&&v.ts; if(t && (!oldest || t<oldest)) oldest=t; });
+  return oldest;
+}
+function _pendAgeHours(){
+  const t=_pendOldest();
+  return t ? (Date.now()-t)/3600000 : 0;
+}
+function _pendBanner(){
+  const n=_pendCount();
+  let el=document.getElementById('pend-banner');
+  if(!n){ if(el) el.remove(); return; }
+  const h=_pendAgeHours();
+  if(h < 1){ if(el) el.remove(); return; }   // 数分の遅れは普通なので出さない
+  if(!el){
+    el=document.createElement('div');
+    el.id='pend-banner';
+    el.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9600;padding:10px 14px;'
+      +'font-family:\'Noto Sans JP\',sans-serif;font-size:12.5px;font-weight:700;line-height:1.5;'
+      +'color:#fff;text-align:center;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.25);';
+    el.onclick=()=>_pendFlush(true);
+    document.body.appendChild(el);
+  }
+  const days=Math.floor(h/24);
+  const sev = h>=24;
+  el.style.background = sev ? '#b3261e' : '#9a7a3a';
+  el.textContent = sev
+    ? '⚠ 未送信の日報が '+n+'件 あります（最も古いもので'+(days||1)+'日前）。まだ届いていません。タップして送信'
+    : '未送信の日報が '+n+'件 あります（'+Math.floor(h)+'時間前から）。タップして送信';
+}
+
 // 未送信キューを再送信(成功した分だけキューから消す)
 let _pendFlushing = false;
 async function _pendFlush(showResult){
@@ -2212,10 +2258,15 @@ function _pendBadgeUpdate(label){
   if(label){ el.style.display='flex'; el.querySelector('.pb-txt').textContent = label; return; }
   if(n > 0){
     el.style.display = 'flex';
-    el.querySelector('.pb-txt').textContent = `未送信 ${n}件`;
+    const h=_pendAgeHours();
+    el.querySelector('.pb-txt').textContent = h>=24
+      ? `未送信 ${n}件（${Math.floor(h/24)}日前から）`
+      : `未送信 ${n}件`;
+    el.style.background = h>=24 ? '#b3261e' : '#9a7a3a';
   } else {
     el.style.display = 'none';
   }
+  try{ _pendBanner(); }catch(e){}
 }
 
 // 簡易トースト
@@ -19331,6 +19382,28 @@ function showDone(){
   const r=lastResult;
   $('done-title').style.color=r.type==='yuupack'?'var(--slate)':'var(--sage)';
   $('done-time').textContent=new Date(r.submittedAt).toLocaleString('ja-JP');
+  /* ★ 2026/09/15: 未送信キューに入っただけの場合、これまで通常の完了画面と
+     区別が付かなかった。本人は提出できたと思い、実際は届いていない。
+     キューに残っているときは、その旨をこの画面に出す。 */
+  try{
+    const _pn=_pendCount();
+    let _w=document.getElementById('done-pend-warn');
+    if(_pn>0){
+      if(!_w){
+        _w=document.createElement('div');
+        _w.id='done-pend-warn';
+        _w.style.cssText='margin:10px 0;padding:10px 12px;border-radius:8px;'
+          +'background:rgba(179,38,30,.12);border:1px solid rgba(179,38,30,.4);'
+          +'color:#b3261e;font-size:12px;font-weight:700;line-height:1.6;cursor:pointer;';
+        _w.onclick=()=>_pendFlush(true);
+        const _t=document.getElementById('done-time');
+        if(_t&&_t.parentNode) _t.parentNode.insertBefore(_w,_t.nextSibling);
+      }
+      _w.innerHTML='⚠ この日報はまだ会社に届いていません（未送信 '+_pn+'件）。<br>'
+        +'電波のある場所でこの表示をタップして送信してください。';
+      _w.style.display='';
+    }else if(_w){ _w.style.display='none'; }
+  }catch(e){}
   // 通常の日報提出時は退勤フラグをリセット+ボタンを元に戻す
   _resetDoneButtons();
   let rows;
