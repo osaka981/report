@@ -571,30 +571,32 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
     </div>
 
     <!-- ★ 2026/09/15: 端末アカウント（IDとパスワード）。
-         社員番号でのログインはこれまで通り。その手前に「この端末はどの会社か」を
-         決めるだけの仕組みを足した。委託会社ごとに配った1組のIDとパスワードで
-         端末を紐づけ、誰が日報を出すかは今まで通り社員番号で選ぶ。
-         一度ログインすれば端末に残るので、以後はオフラインでも起動できる。 -->
-    <div class="card mb12" id="acct-card">
-      <div class="flbc" style="align-items:center;">
-        <div>
-          <div style="font-size:12.5px;font-weight:700;">この端末のアカウント</div>
-          <div style="color:var(--light);font-size:10.5px;margin-top:2px;" id="acct-state">未設定</div>
+         ドライバーが毎日見る画面なので、既定では小さな文字1行だけにして
+         たたんでおく。設定するのは端末につき一度きりの作業で、
+         日々の操作には関係しないため。 -->
+    <div style="text-align:center;margin-top:14px;">
+      <span id="acct-line" onclick="acctToggle()"
+            style="font-size:10.5px;color:var(--light);cursor:pointer;
+                   border-bottom:1px dotted var(--light);padding-bottom:1px;">端末の設定</span>
+    </div>
+    <div id="acct-form" style="display:none;margin-top:10px;">
+      <div class="card">
+        <div style="font-size:12.5px;font-weight:700;margin-bottom:2px;">この端末のアカウント</div>
+        <div style="color:var(--light);font-size:10.5px;margin-bottom:8px;" id="acct-state">未設定</div>
+        <div id="acct-inputs">
+          <div class="lbl">ID</div>
+          <input type="email" id="acct-id" class="fi" autocomplete="username"
+                 style="font-size:13px;font-family:var(--mono);" placeholder="xxxxxxxx@work.local">
+          <div class="lbl mt8">パスワード</div>
+          <input type="password" id="acct-pw" class="fi" autocomplete="current-password" style="font-size:14px;">
+          <div id="acct-err" style="display:none;background:rgba(139,74,58,.07);border:1px solid rgba(139,74,58,.22);border-radius:6px;padding:6px 10px;color:var(--rust);font-size:11px;margin-top:6px;"></div>
+          <button class="btn-main mt8" id="acct-go" style="background:var(--slate);color:#faf8f5;" onclick="acctLogin()">ログイン</button>
+          <div style="color:var(--light);font-size:10.5px;margin-top:6px;line-height:1.6;">
+            大阪急配から配布されたIDとパスワードを入力してください。<br>
+            最初の1回だけ電波のある場所で行ってください。以後は不要です。
+          </div>
         </div>
-        <button class="btn-main btn-ghost" id="acct-btn" style="font-size:11px;padding:7px 14px;width:auto;margin:0;" onclick="acctToggle()">設定する</button>
-      </div>
-      <div id="acct-form" style="display:none;margin-top:10px;">
-        <div class="lbl">ID</div>
-        <input type="email" id="acct-id" class="fi" autocomplete="username"
-               style="font-size:13px;font-family:var(--mono);" placeholder="xxxxxxxx@work.local">
-        <div class="lbl mt8">パスワード</div>
-        <input type="password" id="acct-pw" class="fi" autocomplete="current-password" style="font-size:14px;">
-        <div id="acct-err" style="display:none;background:rgba(139,74,58,.07);border:1px solid rgba(139,74,58,.22);border-radius:6px;padding:6px 10px;color:var(--rust);font-size:11px;margin-top:6px;"></div>
-        <button class="btn-main mt8" id="acct-go" style="background:var(--slate);color:#faf8f5;" onclick="acctLogin()">ログイン</button>
-        <div style="color:var(--light);font-size:10.5px;margin-top:6px;line-height:1.6;">
-          大阪急配から配布されたIDとパスワードを入力してください。<br>
-          最初の1回だけ電波のある場所で行ってください。以後は不要です。
-        </div>
+        <button class="btn-main btn-ghost mt8" id="acct-btn" style="font-size:11px;" onclick="acctToggle()">閉じる</button>
       </div>
     </div>
 
@@ -3865,25 +3867,37 @@ function acctSet(v){
 }
 function acctPaint(){
   const a=acctGet();
-  const st=$('acct-state'), btn=$('acct-btn');
-  if(st) st.textContent = a
+  const label = a
     ? (a.companyName||'(会社未設定)') + (a.kind==='person' && a.staffName ? ' / '+a.staffName : ' / 端末で共用')
     : '未設定';
-  if(st) st.style.color = a ? 'var(--sage)' : 'var(--light)';
-  if(btn) btn.textContent = a ? '解除' : '設定する';
-  const f=$('acct-form');
-  if(a && f) f.style.display='none';
+  const st=$('acct-state');
+  if(st){ st.textContent=label; st.style.color = a ? 'var(--sage)' : 'var(--light)'; }
+  /* ★ 2026/09/15: たたんだ状態の1行。設定済みなら会社名だけ小さく出す。
+     未設定なら「端末の設定」とだけ出して目立たせない。 */
+  const line=$('acct-line');
+  if(line){
+    line.textContent = a ? ('この端末: '+label) : '端末の設定';
+    line.style.color = a ? 'var(--sage)' : 'var(--light)';
+  }
+  // 設定済みのときは入力欄を隠し、解除ボタンにする
+  const inp=$('acct-inputs'), btn=$('acct-btn');
+  if(inp) inp.style.display = a ? 'none' : '';
+  if(btn) btn.textContent = a ? 'この端末のアカウントを解除' : '閉じる';
+  if(btn) btn.style.color = a ? 'var(--rust)' : '';
 }
 function acctToggle(){
   const a=acctGet();
-  if(a){
+  const f=$('acct-form');
+  // 設定済みで、すでに開いている状態からの操作は「解除」
+  if(a && f && f.style.display!=='none'){
     if(!confirm('この端末のアカウントを解除します。\n\n解除すると、次に使うときは電波のある場所でIDとパスワードの入力が必要です。\nよろしいですか?')) return;
     acctLogout();
+    if(f) f.style.display='none';
     return;
   }
-  const f=$('acct-form');
   if(f) f.style.display = (f.style.display==='none') ? '' : 'none';
-  if(f && f.style.display!=='none') setTimeout(()=>$('acct-id')?.focus(), 80);
+  acctPaint();
+  if(f && f.style.display!=='none' && !a) setTimeout(()=>$('acct-id')?.focus(), 80);
 }
 function _acctErr(msg){
   const e=$('acct-err');
