@@ -12753,26 +12753,27 @@ function _getWorkTypeInfo(d){
 // ★ 2026/09/10: 計数アプリの実績を集荷日報と同じ形にして集計へ混ぜる（保存はしない）
 const JET_ITEM={3:'ゆうパケット_通常',5:'ゆうパケット_7cm以上'};
 function _jetToColRows(){
-  const cust=_jetCustomer(); if(!cust) return [];
   const out=[];
-  Object.keys(JET_SCAN||{}).forEach(date=>{
-    Object.values(JET_SCAN[date]||{}).forEach(j=>{
-      if(!j||!j.closed||!j.key) return;
-      const c=_jetCarrierOf(j);
-      const items={};
-      if(j.c3) items[JET_ITEM[3]]=j.c3;
-      if(j.c5) items[JET_ITEM[5]]=j.c5;
-      if(!Object.keys(items).length) return;
-      const blk={type:'indiv',custId:cust.id,custName:cust.name,region:cust.region||'',items:items};
-      const rows=Object.entries(items).map(([k,v])=>({customerId:cust.id,customerName:cust.name,
-        region:cust.region||'',masterKey:k,label:k.replace(/_/g,' '),qty:v,unit:'個'}));
-      out.push({ id:'jet_'+j.key, type:'collection', date:date,
-        driver:{ id:c.id, name:c.name, empNo:c.id, driverNo:c.id },
-        rows:rows, blocks:[blk],
-        note:'バーコード計数 '+(j.bin||'')+((j.carrierName&&j.driverName&&j.carrierName!==j.driverName)?'／計数 '+j.driverName:''),
-        submittedAt:new Date(j.closedAt||Date.now()).toISOString(),
-        _fromJet:true, _jetKey:j.key });
-    });
+  // ★ 2026/09/15: 顧客別の階層に対応。顧客は便ごとに引く（複数顧客に対応）
+  _jetWalkAll((j, date, custIdFromPath)=>{
+    if(!j.closed) return;
+    const cust=_jetCustomerOf(j, custIdFromPath);
+    if(!cust) return;
+    const c=_jetCarrierOf(j);
+    const items={};
+    if(j.c3) items[JET_ITEM[3]]=j.c3;
+    if(j.c5) items[JET_ITEM[5]]=j.c5;
+    if(!Object.keys(items).length) return;
+    const blk={type:'indiv',custId:cust.id,custName:cust.name,region:cust.region||'',items:items};
+    const rows=Object.entries(items).map(([k,v])=>({customerId:cust.id,customerName:cust.name,
+      region:cust.region||'',masterKey:k,label:k.replace(/_/g,' '),qty:v,unit:'個'}));
+    out.push({ id:'jet_'+j.key, type:'collection', date:date,
+      driver:{ id:c.id, name:c.name, empNo:c.id, driverNo:c.id },
+      rows:rows, blocks:[blk],
+      companyId: String(j.carrierCompanyId || j.companyId || ''),
+      note:'バーコード計数 '+(j.bin||'')+((j.carrierName&&j.driverName&&j.carrierName!==j.driverName)?'／計数 '+j.driverName:''),
+      submittedAt:new Date(j.closedAt||Date.now()).toISOString(),
+      _fromJet:true, _jetKey:j.key });
   });
   return out;
 }
@@ -12793,13 +12794,13 @@ async function _renderOwnerJet(){
   const ids=new Set(drivers.map(d=>_jetIdNorm(d.id||d.empNo||d.driverNo)).filter(Boolean));
   const names=new Set(drivers.map(d=>String(d.name||'').trim()).filter(Boolean));
   const rows=[];
-  Object.keys(JET_SCAN||{}).filter(d=>!mon||d.startsWith(mon)).sort().forEach(date=>{
-    Object.values(JET_SCAN[date]||{}).forEach(j=>{
-      if(!j||!j.closed) return;
-      const c=_jetCarrierOf(j);
-      if(!((c.id&&ids.has(c.id))||(c.name&&names.has(c.name)))) return;
-      rows.push({date,j,carrier:c});
-    });
+  // ★ 2026/09/15: 顧客別の階層に対応（直下が日付である前提だと1件も拾えない）
+  _jetWalkAll((j, date)=>{
+    if(mon && !String(date).startsWith(mon)) return;
+    if(!j.closed) return;
+    const c=_jetCarrierOf(j);
+    if(!((c.id&&ids.has(c.id))||(c.name&&names.has(c.name)))) return;
+    rows.push({date,j,carrier:c});
   });
   if(!rows.length){ box.innerHTML='<div style="padding:16px 8px;text-align:center;color:var(--light);font-size:11px;">この月の運搬実績はありません</div>'; return; }
   rows.sort((a,b)=>(a.date+String(a.j.startedAt||0)).localeCompare(b.date+String(b.j.startedAt||0)));
@@ -17415,6 +17416,42 @@ function _jetCustomer(){
   return c;
 }
 function _jetIdNorm(v){ return String(v||'').replace(/[－ー–—]/g,'-').replace(/-/g,'').trim(); }
+
+/* ★ 2026/09/15: 計数データの走査。
+   これまで jet_scan の直下が日付である前提だった。顧客別の階層
+   （jet_scan/<顧客ID>/日付/便）に移行してからは、直下が顧客IDなので
+   1件も拾えず、全社統計にジェットの集荷数量が出ていなかった。
+   旧形式（直下が日付）も残っているため、両方に対応する。
+   cb(便, 日付, 顧客ID) を呼ぶ。顧客IDは旧形式では空。 */
+function _jetIsDate(k){ return /^\d{4}-\d{2}-\d{2}$/.test(String(k||'')); }
+function _jetWalkAll(cb){
+  const root = JET_SCAN || {};
+  Object.keys(root).forEach(k1=>{
+    const v1 = root[k1];
+    if(!v1 || typeof v1 !== 'object') return;
+    if(_jetIsDate(k1)){
+      // 旧形式: jet_scan/<日付>/<便>
+      Object.values(v1).forEach(j=>{ if(j && j.key) cb(j, k1, ''); });
+    }else{
+      // 顧客別: jet_scan/<顧客ID>/<日付>/<便>
+      Object.keys(v1).forEach(k2=>{
+        const v2 = v1[k2];
+        if(!v2 || typeof v2 !== 'object' || !_jetIsDate(k2)) return;
+        Object.values(v2).forEach(j=>{ if(j && j.key) cb(j, k2, String(k1)); });
+      });
+    }
+  });
+}
+// 便から顧客を引く（便に記録された顧客を優先し、無ければ従来の推定に落とす）
+function _jetCustomerOf(j, custIdFromPath){
+  const id = (j && j.custId) || custIdFromPath || '';
+  if(id){
+    const c = (CUSTOMERS||[]).find(x=>String(x.id)===String(id));
+    if(c) return c;
+    if(j && j.custName) return { id:id, name:j.custName, region:'' };
+  }
+  return _jetCustomer();
+}
 // ★ 2026/09/07: 表示するのは「局へ運んだ便」のみ。計数しただけの便は出さない。
 function _jetCarrierOf(j){
   return { id:_jetIdNorm(j.carrierId||j.driverId), name:String(j.carrierName||j.driverName||'').trim() };
@@ -17422,15 +17459,18 @@ function _jetCarrierOf(j){
 function _jetShiftsFor(dateStr, forDriver){
   const d = forDriver || driver;
   if(!d) return [];
-  const byKey = (JET_SCAN||{})[dateStr] || {};
   const me = _jetIdNorm(d.id||d.empNo||d.driverNo);
   const myName = String(d.name||'').trim();
-  return Object.values(byKey).filter(j=>{
-    if(!j || !j.closed) return false;
+  // ★ 2026/09/15: 顧客別の階層に対応
+  const list=[];
+  _jetWalkAll((j, date)=>{
+    if(String(date)!==String(dateStr)) return;
+    if(!j.closed) return;
     const c=_jetCarrierOf(j);
-    if(me && c.id) return c.id===me;
-    return myName && c.name===myName;
-  }).sort((a,b)=>(a.startedAt||0)-(b.startedAt||0));
+    const hit = (me && c.id) ? (c.id===me) : (myName && c.name===myName);
+    if(hit) list.push(j);
+  });
+  return list.sort((a,b)=>(a.startedAt||0)-(b.startedAt||0));
 }
 const JET_APP_URL='https://osaka981.github.io/j-scan/';
 function openJetApp(){ try{ window.open(JET_APP_URL,'_blank','noopener'); }catch(e){ location.href=JET_APP_URL; } }
