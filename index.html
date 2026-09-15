@@ -414,8 +414,11 @@ textarea.fi{resize:none;}
 // Firebase SDK (CDN)
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, set, get, onValue, push, remove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
-import { getAuth, signInAnonymously, onIdTokenChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-window._fbImports = { initializeApp, getDatabase, ref, set, get, onValue, push, remove, getAuth, signInAnonymously, onIdTokenChanged };
+import { getAuth, signInAnonymously, onIdTokenChanged,
+         signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+window._fbImports = { initializeApp, getDatabase, ref, set, get, onValue, push, remove, getAuth, signInAnonymously, onIdTokenChanged,
+         /* ★ 2026/09/15: 端末アカウント（IDとパスワード）のログイン用 */
+         signInWithEmailAndPassword, signOut };
 /* ★ 2026/09/14: これは「SDKの読み込みが終わった」という意味のフラグ。
    計数アプリの window._fbReady は「認証が整うまでの約束(Promise)」で別物なので、
    共通化するときに取り違えないよう名前を分ける。旧名も残す。 */
@@ -565,6 +568,34 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
       <input type="tel" id="emp-id" class="fi" style="font-size:18px;font-weight:700;text-align:center;letter-spacing:.25em;font-family:var(--mono);" placeholder="" oninput="$('login-err').style.display='none'">
       <div id="login-err" style="display:none;background:rgba(139,74,58,.07);border:1px solid rgba(139,74,58,.22);border-radius:6px;padding:6px 10px;color:var(--rust);font-size:11px;margin-top:6px;"></div>
       <button class="btn-main mt8" style="background:var(--clay);color:#faf8f5;" onclick="doLogin()">ログイン</button>
+    </div>
+
+    <!-- ★ 2026/09/15: 端末アカウント（IDとパスワード）。
+         社員番号でのログインはこれまで通り。その手前に「この端末はどの会社か」を
+         決めるだけの仕組みを足した。委託会社ごとに配った1組のIDとパスワードで
+         端末を紐づけ、誰が日報を出すかは今まで通り社員番号で選ぶ。
+         一度ログインすれば端末に残るので、以後はオフラインでも起動できる。 -->
+    <div class="card mb12" id="acct-card">
+      <div class="flbc" style="align-items:center;">
+        <div>
+          <div style="font-size:12.5px;font-weight:700;">この端末のアカウント</div>
+          <div style="color:var(--light);font-size:10.5px;margin-top:2px;" id="acct-state">未設定</div>
+        </div>
+        <button class="btn-main btn-ghost" id="acct-btn" style="font-size:11px;padding:7px 14px;width:auto;margin:0;" onclick="acctToggle()">設定する</button>
+      </div>
+      <div id="acct-form" style="display:none;margin-top:10px;">
+        <div class="lbl">ID</div>
+        <input type="email" id="acct-id" class="fi" autocomplete="username"
+               style="font-size:13px;font-family:var(--mono);" placeholder="xxxxxxxx@work.local">
+        <div class="lbl mt8">パスワード</div>
+        <input type="password" id="acct-pw" class="fi" autocomplete="current-password" style="font-size:14px;">
+        <div id="acct-err" style="display:none;background:rgba(139,74,58,.07);border:1px solid rgba(139,74,58,.22);border-radius:6px;padding:6px 10px;color:var(--rust);font-size:11px;margin-top:6px;"></div>
+        <button class="btn-main mt8" id="acct-go" style="background:var(--slate);color:#faf8f5;" onclick="acctLogin()">ログイン</button>
+        <div style="color:var(--light);font-size:10.5px;margin-top:6px;line-height:1.6;">
+          大阪急配から配布されたIDとパスワードを入力してください。<br>
+          最初の1回だけ電波のある場所で行ってください。以後は不要です。
+        </div>
+      </div>
     </div>
 
   </div>
@@ -1994,6 +2025,7 @@ async function initFirebase() {
       syncFromFirebase();     // await しない → 裏で実行(完了を待たずに先へ進む)
     })();
     // 起動時: 未送信キューがあれば再送信
+    try{ acctPaint(); }catch(e){}   // ★ 2026/09/15: 端末アカウントの状態を表示
     _pendBadgeUpdate();
     // ★ 2026/09/14: 画面が出てから測る（起動直後だと toast が出せないことがある）
     setTimeout(()=>{ try{ _guardStorage(); }catch(e){} }, 3000);
@@ -3794,6 +3826,112 @@ function _lockPin(){
 
 // Step 1: 社員番号入力 → ID判定 → PIN画面へ
 let _pendingLoginDriver = null;
+
+/* ══ ★ 2026/09/15: 端末アカウント ══
+   Firebase Auth のメール／パスワードでログインし、権限表(nikki/_acl/user)から
+   その端末がどの会社のものかを確定する。
+   ログイン状態は端末に保存されるので、2回目以降はオフラインでも復元される。
+   日報を誰が出すかは、これまで通り社員番号とPINで決める（1台を交代で使う
+   場合にオフラインでも人を替えられるようにするため）。 */
+const ACCT_LS = 'nikki_device_acct';
+function acctGet(){
+  try{ const v=JSON.parse(localStorage.getItem(ACCT_LS)||'null'); return (v&&v.uid)?v:null; }
+  catch(e){ return null; }
+}
+function acctSet(v){
+  try{ v ? localStorage.setItem(ACCT_LS, JSON.stringify(v)) : localStorage.removeItem(ACCT_LS); }catch(e){}
+}
+function acctPaint(){
+  const a=acctGet();
+  const st=$('acct-state'), btn=$('acct-btn');
+  if(st) st.textContent = a
+    ? (a.companyName||'(会社未設定)') + (a.kind==='person' && a.staffName ? ' / '+a.staffName : ' / 端末で共用')
+    : '未設定';
+  if(st) st.style.color = a ? 'var(--sage)' : 'var(--light)';
+  if(btn) btn.textContent = a ? '解除' : '設定する';
+  const f=$('acct-form');
+  if(a && f) f.style.display='none';
+}
+function acctToggle(){
+  const a=acctGet();
+  if(a){
+    if(!confirm('この端末のアカウントを解除します。\n\n解除すると、次に使うときは電波のある場所でIDとパスワードの入力が必要です。\nよろしいですか?')) return;
+    acctLogout();
+    return;
+  }
+  const f=$('acct-form');
+  if(f) f.style.display = (f.style.display==='none') ? '' : 'none';
+  if(f && f.style.display!=='none') setTimeout(()=>$('acct-id')?.focus(), 80);
+}
+function _acctErr(msg){
+  const e=$('acct-err');
+  if(e){ e.textContent=msg; e.style.display='block'; }
+}
+async function acctLogin(){
+  const I = window._fbImports || {};
+  const email = ($('acct-id')?.value||'').trim();
+  const pw    = ($('acct-pw')?.value||'');
+  if(!email || !pw){ _acctErr('IDとパスワードを入力してください'); return; }
+  if(!I.signInWithEmailAndPassword || !window._fbAuth){
+    _acctErr('通信の準備ができていません。少し待ってからもう一度お試しください'); return;
+  }
+  const btn=$('acct-go');
+  if(btn){ btn.disabled=true; btn.textContent='確認中'; }
+  try{
+    const cred = await I.signInWithEmailAndPassword(window._fbAuth, email, pw);
+    const uid  = cred.user.uid;
+    // 権限表からこの端末の所属を読む
+    let rec=null;
+    try{
+      const snap = await I.get(I.ref(fbDB, 'nikki/_acl/user/'+uid));
+      if(snap.exists()) rec = snap.val();
+    }catch(e){}
+    if(!rec){
+      _acctErr('このIDは登録されていません。大阪急配にお問い合わせください');
+      try{ await I.signOut(window._fbAuth); }catch(e){}
+      return;
+    }
+    if(rec.active === false){
+      _acctErr('このIDは停止されています。大阪急配にお問い合わせください');
+      try{ await I.signOut(window._fbAuth); }catch(e){}
+      return;
+    }
+    acctSet({
+      uid, email,
+      kind: rec.kind||'company',
+      companyId: rec.companyId||'',
+      companyName: rec.companyName||'',
+      staffUid: rec.staffUid||'',
+      staffName: rec.staffName||'',
+      at: Date.now()
+    });
+    if($('acct-pw')) $('acct-pw').value='';
+    acctPaint();
+    toast('この端末を ' + (rec.companyName||'会社') + ' として設定しました', 'ok');
+    // 個人アカウントなら社員番号を埋めておく
+    if(rec.kind==='person' && rec.staffUid){
+      const d=(DRIVERS||[]).find(x=>x && String(x.uid||x.id)===String(rec.staffUid));
+      if(d && $('emp-id')) $('emp-id').value = String(d.empNo||d.id||'').replace('-','');
+    }
+  }catch(e){
+    const code=(e && e.code)||'';
+    _acctErr(
+      code.includes('wrong-password')||code.includes('invalid-credential') ? 'IDまたはパスワードが違います' :
+      code.includes('user-not-found') ? 'このIDは存在しません' :
+      code.includes('too-many-requests') ? '試行が多すぎます。しばらく待ってからお試しください' :
+      code.includes('network') ? '通信できません。電波のある場所でお試しください' :
+      'ログインできませんでした（'+(e&&e.message||'')+'）');
+  }finally{
+    if(btn){ btn.disabled=false; btn.textContent='ログイン'; }
+  }
+}
+async function acctLogout(){
+  const I = window._fbImports || {};
+  acctSet(null);
+  try{ if(I.signOut && window._fbAuth) await I.signOut(window._fbAuth); }catch(e){}
+  acctPaint();
+  toast('端末のアカウントを解除しました','info');
+}
 let _loginPin = '';
 
 async function doLogin(){
