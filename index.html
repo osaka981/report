@@ -554,7 +554,7 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
     <div class="tb-eye">軽貨物運送　日報システム</div>
     <div class="tb-title" style="color:var(--clay);">ドライバー日報</div>
     <div class="tb-sub" id="login-greeting">本日もよろしくお願いします</div>
-    <div class="tb-sub" id="app-ver-label" style="font-family:var(--mono);font-size:9px;opacity:.7;">ver 2026-09-23.6</div>
+    <div class="tb-sub" id="app-ver-label" style="font-family:var(--mono);font-size:9px;opacity:.7;">ver 2026-09-23.7</div>
   </div>
   <div class="p16">
     <div class="card mb12">
@@ -1257,6 +1257,13 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
       <button class="mv-mn-btn" onclick="mvShiftMonth(-1)">&lsaquo;</button>
       <div class="mv-mn-label" id="mv-mon-label">2026年4月</div>
       <button class="mv-mn-btn" onclick="mvShiftMonth(1)">&rsaquo;</button>
+    </div>
+
+    <!-- ★ 2026-09-23.7: 事業の絞り込み（既定は両方） -->
+    <div class="mv-toggle" style="margin-bottom:8px;">
+      <button id="mv-f-all" class="mv-toggle-btn on" onclick="mvSetBizFilter('all')">すべて</button>
+      <button id="mv-f-del" class="mv-toggle-btn" onclick="mvSetBizFilter('del')">宅配</button>
+      <button id="mv-f-col" class="mv-toggle-btn" onclick="mvSetBizFilter('col')">集荷</button>
     </div>
 
     <!-- 月合計 -->
@@ -3186,7 +3193,7 @@ function selectDriverId(id){
 
 
 // ★ 版の文字列（差し替えのたびに必ず上げる。ログイン画面の表示と一致させる）
-const APP_VER = '2026-09-23.6';
+const APP_VER = '2026-09-23.7';
 console.log('[日報アプリ] APP_VER', APP_VER);
 
 // ══ 勤怠ユーティリティ ══
@@ -14368,7 +14375,16 @@ let _mvState = {
   mode: 'cal',         // 'cal' or 'list'
   year: 0, month: 0,   // 表示中の年月(0始まり月)
   selectedDate: null,  // カレンダーで選択された日付(YYYY-MM-DD)
+  bizFilter: 'all',    // ★ 2026-09-23.7: 'all' | 'del'(宅配) | 'col'(集荷)
 };
+// ★ 2026-09-23.7: 事業の絞り込み
+function mvSetBizFilter(f){
+  _mvState.bizFilter = f;
+  ['all','del','col'].forEach(k=>{
+    const b=$('mv-f-'+k); if(b) b.classList.toggle('on', k===f);
+  });
+  renderMonthlyView();
+}
 
 // ══════════════════════════════════════════════════
 // 休業調査(Phase 1: 2026/05/01)
@@ -15013,8 +15029,9 @@ function _mvCollectMonth(year, month){
   const prefix = `${y}-${m}`;
 
   // YP_LOGS/COL_LOGSからフィルタ
-  const yps = (YP_LOGS||[]).filter(r=>r.driver&&r.driver.id===driver.id&&r.date&&r.date.startsWith(prefix));
-  const cols = (COL_LOGS||[]).filter(r=>r.driver&&r.driver.id===driver.id&&r.date&&r.date.startsWith(prefix));
+  const _f = _mvState.bizFilter || 'all';   // ★ 2026-09-23.7
+  const yps = (_f==='col') ? [] : (YP_LOGS||[]).filter(r=>r.driver&&r.driver.id===driver.id&&r.date&&r.date.startsWith(prefix));
+  const cols = (_f==='del') ? [] : (COL_LOGS||[]).filter(r=>r.driver&&r.driver.id===driver.id&&r.date&&r.date.startsWith(prefix));
 
   const byDate = {};
   const ensureDay = (date)=>{
@@ -15730,6 +15747,18 @@ function _buildDayDetailHTML(iso, dayData, withCloseBtn){
 
   // ★ 2026/06/23: 本人による日報削除ボタン(カレンダー詳細時のみ)
   //   誤入力した日報を本人が削除できる。承認済みの月は mvDeleteDay 側で拒否する。
+  // ★ 2026-09-23.7: その日の日報をここから修正できるようにする
+  if(withCloseBtn){
+    const _myYp=(YP_LOGS||[]).filter(r=>r.driver&&r.driver.id===driver.id&&r.date===iso);
+    const _myCol=(COL_LOGS||[]).filter(r=>r.driver&&r.driver.id===driver.id&&r.date===iso);
+    const _btns=[
+      ..._myYp.map(r=>`<button onclick="openCorrectModal('${r.id}','${r.type||'yuupack'}')" style="flex:1;padding:8px;border-radius:8px;background:rgba(96,112,128,.10);border:1px solid rgba(96,112,128,.35);color:var(--slate);font-size:11.5px;font-weight:700;cursor:pointer;">宅配日報を修正</button>`),
+      ..._myCol.map(r=>`<button onclick="openCorrectModal('${r.id}','${r.type||'collection'}')" style="flex:1;padding:8px;border-radius:8px;background:rgba(122,138,110,.10);border:1px solid rgba(122,138,110,.35);color:var(--sage);font-size:11.5px;font-weight:700;cursor:pointer;">集荷日報を修正</button>`),
+    ];
+    if(_btns.length){
+      html += `<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;">${_btns.join('')}</div>`;
+    }
+  }
   if(withCloseBtn){
     html += `<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--brd);">
       <button onclick="mvDeleteDay('${iso}')" style="width:100%;padding:9px;border-radius:8px;background:rgba(196,68,68,.08);border:1px solid rgba(196,68,68,.3);color:#c44;font-size:12px;font-weight:700;cursor:pointer;">この日の日報を削除</button>
