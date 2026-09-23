@@ -554,7 +554,7 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
     <div class="tb-eye">軽貨物運送　日報システム</div>
     <div class="tb-title" style="color:var(--clay);">ドライバー日報</div>
     <div class="tb-sub" id="login-greeting">本日もよろしくお願いします</div>
-    <div class="tb-sub" id="app-ver-label" style="font-family:var(--mono);font-size:9px;opacity:.7;">ver 2026-09-23.4</div>
+    <div class="tb-sub" id="app-ver-label" style="font-family:var(--mono);font-size:9px;opacity:.7;">ver 2026-09-23.6</div>
   </div>
   <div class="p16">
     <div class="card mb12">
@@ -927,6 +927,7 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
     <div class="tb-eye">軽貨物運送　日報システム</div>
     <div class="tb-title" style="color:var(--slate)">ゆうパック日報</div>
     <div class="tb-sub" id="yp-sub"></div>
+    <div class="tb-sub" id="yp-clock-in" style="font-family:var(--mono);display:none;"></div>
   </div>
   <div class="p16">
     <div class="card mb8"><div class="row-hd"><div class="row-ico" style="background:rgba(44,40,37,.07)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ink)" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><span class="row-lbl">日付</span></div><input type="date" id="yp-date" class="fi"></div>
@@ -1032,6 +1033,7 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
     <div class="tb-eye">軽貨物運送　日報システム</div>
     <div class="tb-title" style="color:var(--sage)">集荷日報</div>
     <div class="tb-sub" id="col-sub"></div>
+    <div class="tb-sub" id="col-clock-in" style="font-family:var(--mono);display:none;"></div>
   </div>
   <div class="p16">
 
@@ -3184,7 +3186,7 @@ function selectDriverId(id){
 
 
 // ★ 版の文字列（差し替えのたびに必ず上げる。ログイン画面の表示と一致させる）
-const APP_VER = '2026-09-23.4';
+const APP_VER = '2026-09-23.6';
 console.log('[日報アプリ] APP_VER', APP_VER);
 
 // ══ 勤怠ユーティリティ ══
@@ -3243,15 +3245,22 @@ function setAttBiz(biz){
 }
 const BIZ_JP={del:'宅配', col:'集荷'};
 function _updClockInLabel(){
-  const el=$('sel-clock-in'); if(!el) return;
   const att=(ATT_LOGS||[]).find(a=>a.id===todayAttId);
   // ★ 2026-09-23.4: 出勤時刻は時間単価の業務がある人にだけ表示する
-  if(!att || !att.clockIn || hourlyBizOf(driver).length===0){ el.style.display='none'; return; }
-  const ci=new Date(att.clockIn);
+  //   ★ 2026-09-23.6: トップだけでなく、宅配日報・集荷日報の画面にも出す
   const hb=hourlyBizOf(driver);
-  const bizTxt = att.biz ? `（${BIZ_JP[att.biz]}）` : (hb.length>1 ? '（業務を選ぶと決まります）' : '');
-  el.textContent = `出勤: ${ci.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}${bizTxt}`;
-  el.style.display='block';
+  const show = !!(att && att.clockIn && hb.length>0);
+  let txt='';
+  if(show){
+    const ci=new Date(att.clockIn);
+    const bizTxt = att.biz ? `（${BIZ_JP[att.biz]}）` : (hb.length>1 ? '（業務を選ぶと決まります）' : '');
+    txt = `出勤: ${ci.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}${bizTxt}`;
+  }
+  ['sel-clock-in','col-clock-in','yp-clock-in'].forEach(id=>{
+    const el=$(id); if(!el) return;
+    el.textContent = txt;
+    el.style.display = show ? 'block' : 'none';
+  });
 }
 // 15分刻み丸め（7分以下切り捨て・8分以上切り上げ）
 // ★ 2026/08/31: 記録IDの生成。
@@ -3357,6 +3366,17 @@ function buildPostOfficeBtns(){
   //   ただし他に候補が無い場合は、選べなくなるのを避けて残す。
   const _real = offices.filter(o=>o && o!=='本社');
   if(_real.length) offices = _real;
+  // ★ 2026-09-23.5: 集荷専用の拠点（堺営業所など）は宅配日報の郵便局候補に出さない。
+  //   拠点マスタで宅配の扱いがある拠点だけを残す（マスタに無い郵便局は従来どおり出す）。
+  const _isDelOffice = (name)=>{
+    const o=(OFFICES||[]).find(x=>x && x.name===name);
+    if(!o) return true;
+    if(typeof o.typesDel === 'boolean') return o.typesDel;
+    if(typeof o.typesCol === 'boolean') return !o.typesCol;
+    return true;
+  };
+  const _delOnly = offices.filter(_isDelOffice);
+  if(_delOnly.length) offices = _delOnly;
 
   wrap.innerHTML = '';
 
@@ -15893,7 +15913,9 @@ function confirmClockOut(){
   // 帰社修正時刻（集荷時間単価のみ）
   if(isColJikan(driver)){
     const adjVal=$('co-adj-time').value;
-    if(adjVal){
+    // ★ 2026-09-23.6: 退勤時刻と同じなら「修正なし」として扱う（欄に現在時刻が入っているため）
+    const nowHM=`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+    if(adjVal && adjVal!==nowHM){
       const [h,m]=adjVal.split(':').map(Number);
       const adjDate=new Date(now);
       adjDate.setHours(h,m,0,0);
@@ -15917,14 +15939,14 @@ function confirmClockOut(){
   // 完了画面へ
   $('done-title').textContent='退勤完了';
   $('done-time').textContent=now.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})+' 退勤記録';
-  const wm=att.workMin;
   const doneSum=$('done-sum');
+  // ★ 2026-09-23.6: 出勤時刻・退勤時刻を表示。稼働時間は出さない。帰社修正時刻は修正があったときだけ。
   if(doneSum) doneSum.innerHTML=`
-    <div class="sum-row" style="border-top:none;">
+    ${att.clockIn?`<div class="sum-row" style="border-top:none;"><span>出勤時刻</span><span class="fw7">${new Date(att.clockIn).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}</span></div>`:''}
+    <div class="sum-row">
       <span>退勤時刻</span><span class="fw7">${now.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}</span>
     </div>
     ${att.biz?`<div class="sum-row"><span>業務</span><span class="fw7">${BIZ_JP[att.biz]||att.biz}</span></div>`:''}
-    ${wm!=null?`<div class="sum-row"><span>稼働時間</span><span class="fw7" style="color:var(--clay)">${fmtMin(wm)}</span></div>`:''}
     ${att.adjustedOut?`<div class="sum-row"><span>帰社修正時刻</span><span class="fw7" style="color:var(--amber)">${new Date(att.adjustedOut).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}</span></div>`:''}
   `;
   // 退勤完了後はログアウトボタンを目立たせるが、修正・トップに戻るボタンは表示維持
@@ -16129,7 +16151,6 @@ function submitYP(){
   };
   YP_LOGS.push(rec); fbSet('yp_logs', YP_LOGS);
   lastResult = rec;
-  if(_askFinishWork('ゆうパック宅配業務')) return;   // ★ 2026-09-23.4: はいなら退勤画面へ
   showDone();
 }
 
@@ -19779,7 +19800,6 @@ function doSubmitCol(){
   COL_LOGS.push(rec); fbSet('col_logs',COL_LOGS);
   clearColDraft();
   lastResult=rec;
-  if(_askFinishWork('集荷業務')) return;   // ★ 2026-09-23.4: はいなら退勤画面へ
   showDone();
 }
 
@@ -19791,19 +19811,6 @@ function buildRegionTabs(){
   if(custRegions.length){ REGIONS=[...new Set([...REGIONS,...custRegions])].sort(); }
 }
 
-
-// ★ 2026-09-23.4: 日報の提出後に「業務を終了しますか？」を聞く。
-//   はい → 退勤画面（位置の確認・帰社時刻の修正ができる）／いいえ → 提出完了画面
-function _askFinishWork(label){
-  try{
-    const att=(ATT_LOGS||[]).find(a=>a.id===todayAttId);
-    if(!att || !att.clockIn || att.clockOut) return false;
-    if(!confirm(`日報を提出しました。\n${label}を終了しますか？\n退勤として記録します。`)) return false;
-    if(typeof toast==='function') toast('日報を提出しました','ok');
-    startClockOut();
-    return true;
-  }catch(e){ console.warn('[業務終了]', e); return false; }
-}
 
 // ══ 完了 ══
 function showDone(){
