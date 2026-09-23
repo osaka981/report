@@ -554,7 +554,7 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
     <div class="tb-eye">軽貨物運送　日報システム</div>
     <div class="tb-title" style="color:var(--clay);">ドライバー日報</div>
     <div class="tb-sub" id="login-greeting">本日もよろしくお願いします</div>
-    <div class="tb-sub" id="app-ver-label" style="font-family:var(--mono);font-size:9px;opacity:.7;">ver 2026-09-23.2</div>
+    <div class="tb-sub" id="app-ver-label" style="font-family:var(--mono);font-size:9px;opacity:.7;">ver 2026-09-23.3</div>
   </div>
   <div class="p16">
     <div class="card mb12">
@@ -3184,7 +3184,7 @@ function selectDriverId(id){
 
 
 // ★ 版の文字列（差し替えのたびに必ず上げる。ログイン画面の表示と一致させる）
-const APP_VER = '2026-09-23.2';
+const APP_VER = '2026-09-23.3';
 console.log('[日報アプリ] APP_VER', APP_VER);
 
 // ══ 勤怠ユーティリティ ══
@@ -15031,6 +15031,56 @@ function _mvCollectMonth(year, month){
 // ★ 2026/06/23: 本人による日報削除
 //   カレンダー詳細の「この日の日報を削除」から呼ばれる。
 //   承認済みの月は削除不可。未承認なら、その日・本人のYP_LOGS/COL_LOGSを削除する。
+// ★ 2026-09-23.3: 顧客ごとの削除（この日の日報からその顧客の分だけ消す）
+function _mvKeyOf(b){
+  const id = b.custId ?? b.customerId;
+  if(id!=null && id!=='') return 'c'+String(id);
+  return 'n'+String(b.custName || b.customerName || '');
+}
+function _mvRowMatch(row, key){
+  if(!row) return false;
+  const id = row.customerId ?? row.custId;
+  if(key.startsWith('c')) return String(id)===key.slice(1);
+  return String(row.customerName || row.custName || '')===key.slice(1);
+}
+async function mvDeleteCustomer(iso, key, label){
+  if(!driver){ alert('ログイン情報が確認できません'); return; }
+  const dt = new Date(iso + 'T00:00:00');
+  const conf = _getMonthlyConfirmation(dt.getFullYear(), dt.getMonth());
+  if(conf && conf.status === 'approved'){
+    alert('この月は承認済み(締め確定)のため削除できません。\n修正が必要な場合は管理者にご連絡ください。');
+    return;
+  }
+  if(!confirm(`${_fmtDateJp(iso)} の「${label}」の集荷分を削除します。\n他の顧客の分は残ります。よろしいですか?`)) return;
+  let hit = 0;
+  const next = [];
+  (COL_LOGS||[]).forEach(r=>{
+    if(!(r.driver && r.driver.id===driver.id && r.date===iso)){ next.push(r); return; }
+    const blocks = _normalizeBlocks(r.blocks);
+    const keptBlocks = [];
+    blocks.forEach(b=>{
+      if(b.type==='route'){
+        const cs=(b.customers||[]).filter(c=>{
+          if(_mvKeyOf(c)===key){ hit++; return false; }
+          return true;
+        });
+        if(cs.length) keptBlocks.push({...b, customers:cs});
+        return;
+      }
+      if(_mvKeyOf(b)===key){ hit++; return; }
+      keptBlocks.push(b);
+    });
+    const keptRows = (r.rows||[]).filter(row=>!_mvRowMatch(row, key));
+    if(!keptBlocks.length && !keptRows.length) return;   // 空になった日報は削除
+    next.push({...r, blocks:keptBlocks, rows:keptRows});
+  });
+  if(!hit){ alert('削除できる記録が見つかりませんでした'); return; }
+  COL_LOGS = next;
+  await fbSet('col_logs', COL_LOGS);
+  renderMonthlyView();
+  if(typeof toast === 'function') toast('削除しました', 'ok'); else alert('削除しました');
+}
+
 async function mvDeleteDay(iso){
   if(!driver){ alert('ログイン情報が確認できません'); return; }
   // 対象日の年月から承認状態を判定
@@ -15578,7 +15628,7 @@ function _buildDayDetailHTML(iso, dayData, withCloseBtn){
           return;
         }
         if(tot === 0) return;
-        html += `<div class="mv-dd-row mv-dd-total"><span>単独: ${_blkName(b)}</span><span>${tot}個</span></div>`;
+        html += `<div class="mv-dd-row mv-dd-total"><span>単独: ${_blkName(b)}</span><span>${tot}個${withCloseBtn?` <button onclick="mvDeleteCustomer('${iso}','${_mvKeyOf(b)}','${String(_blkName(b)).replace(/'/g,"\\'")}')" style="margin-left:6px;border:1px solid rgba(196,68,68,.35);background:rgba(196,68,68,.08);color:#c44;border-radius:6px;font-size:10px;padding:1px 6px;cursor:pointer;">削除</button>`:''}</span></div>`;
         Object.entries(items).forEach(([k,v])=>{
           if(v>0) html += `<div class="mv-dd-row mv-dd-row-sub"><span>${k}</span><span>${v}</span></div>`;
         });
@@ -15600,7 +15650,7 @@ function _buildDayDetailHTML(iso, dayData, withCloseBtn){
           }
           if(tot === 0) return;
           // 顧客名(計N個)
-          html += `<div class="mv-dd-row mv-dd-row-sub" style="padding-left:14px;font-weight:700;"><span>${_blkName(c)}</span><span>${tot}個</span></div>`;
+          html += `<div class="mv-dd-row mv-dd-row-sub" style="padding-left:14px;font-weight:700;"><span>${_blkName(c)}</span><span>${tot}個${withCloseBtn?` <button onclick="mvDeleteCustomer('${iso}','${_mvKeyOf(c)}','${String(_blkName(c)).replace(/'/g,"\\'")}')" style="margin-left:6px;border:1px solid rgba(196,68,68,.35);background:rgba(196,68,68,.08);color:#c44;border-radius:6px;font-size:10px;padding:1px 6px;cursor:pointer;">削除</button>`:''}</span></div>`;
           // 品目内訳(さらに字下げ)
           Object.entries(items).forEach(([k,v])=>{
             if(v>0) html += `<div class="mv-dd-row mv-dd-row-sub" style="padding-left:28px;font-size:10px;color:var(--light);"><span>${k}</span><span>${v}</span></div>`;
@@ -15623,7 +15673,7 @@ function _buildDayDetailHTML(iso, dayData, withCloseBtn){
   if(withCloseBtn){
     html += `<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--brd);">
       <button onclick="mvDeleteDay('${iso}')" style="width:100%;padding:9px;border-radius:8px;background:rgba(196,68,68,.08);border:1px solid rgba(196,68,68,.3);color:#c44;font-size:12px;font-weight:700;cursor:pointer;">この日の日報を削除</button>
-      <div style="font-size:10px;color:var(--light);margin-top:5px;text-align:center;">誤って入力した場合に削除できます(承認済みの月は削除できません)</div>
+      <div style="font-size:10px;color:var(--light);margin-top:5px;text-align:center;">顧客ごとに消す場合は、上の顧客名の横の「削除」を押してください。<br>数量を直す場合は「当月の日報履歴」の「訂正」から入力し直してください（承認済みの月は変更できません）</div>
     </div>`;
   }
 
