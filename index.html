@@ -554,7 +554,7 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
     <div class="tb-eye">軽貨物運送　日報システム</div>
     <div class="tb-title" style="color:var(--clay);">ドライバー日報</div>
     <div class="tb-sub" id="login-greeting">本日もよろしくお願いします</div>
-    <div class="tb-sub" id="app-ver-label" style="font-family:var(--mono);font-size:9px;opacity:.7;">ver 2026-09-23.8</div>
+    <div class="tb-sub" id="app-ver-label" style="font-family:var(--mono);font-size:9px;opacity:.7;">ver 2026-09-23.9</div>
   </div>
   <div class="p16">
     <div class="card mb12">
@@ -3193,7 +3193,7 @@ function selectDriverId(id){
 
 
 // ★ 版の文字列（差し替えのたびに必ず上げる。ログイン画面の表示と一致させる）
-const APP_VER = '2026-09-23.8';
+const APP_VER = '2026-09-23.9';
 console.log('[日報アプリ] APP_VER', APP_VER);
 
 // ══ 勤怠ユーティリティ ══
@@ -15178,6 +15178,17 @@ async function mvDeleteDay(iso){
   COL_LOGS = (COL_LOGS||[]).filter(r=>!(r.driver&&r.driver.id===driver.id&&r.date===iso));
   await fbSet('yp_logs', YP_LOGS);
   await fbSet('col_logs', COL_LOGS);
+  // ★ 2026-09-23.9: その日の日報が全部無くなったら、出勤・退勤の記録も消すか確認する
+  try{
+    ATT_LOGS = ls_get(LS.ATT_LOGS,[])||[];
+    const mine = ATT_LOGS.filter(a=>a && String(a.driverId)===String(driver.id) && a.date===iso);
+    if(mine.length && confirm(`${_fmtDateJp(iso)} の出勤・退勤の記録も削除しますか？\n（勤務時間の計算から外れます）`)){
+      ATT_LOGS = ATT_LOGS.filter(a=>!(a && String(a.driverId)===String(driver.id) && a.date===iso));
+      ls_set(LS.ATT_LOGS, ATT_LOGS);
+      await fbSet('att_logs', ATT_LOGS);
+      if(mine.some(a=>a.id===todayAttId)) todayAttId=null;
+    }
+  }catch(e){ console.warn('[打刻の削除]', e); }
   // 詳細パネルを閉じて再描画
   _mvState.selectedDate = null;
   if($('mv-day-detail')) $('mv-day-detail').style.display = 'none';
