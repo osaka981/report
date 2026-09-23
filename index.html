@@ -554,7 +554,7 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
     <div class="tb-eye">軽貨物運送　日報システム</div>
     <div class="tb-title" style="color:var(--clay);">ドライバー日報</div>
     <div class="tb-sub" id="login-greeting">本日もよろしくお願いします</div>
-    <div class="tb-sub" id="app-ver-label" style="font-family:var(--mono);font-size:9px;opacity:.7;">ver 2026-09-23.1</div>
+    <div class="tb-sub" id="app-ver-label" style="font-family:var(--mono);font-size:9px;opacity:.7;">ver 2026-09-23.2</div>
   </div>
   <div class="p16">
     <div class="card mb12">
@@ -3184,7 +3184,7 @@ function selectDriverId(id){
 
 
 // ★ 版の文字列（差し替えのたびに必ず上げる。ログイン画面の表示と一致させる）
-const APP_VER = '2026-09-23.1';
+const APP_VER = '2026-09-23.2';
 console.log('[日報アプリ] APP_VER', APP_VER);
 
 // ══ 勤怠ユーティリティ ══
@@ -3200,11 +3200,18 @@ function attType(d){
 //   基本情報の給与形態だけでなく、業務ごとの設定で判定する。
 function hourlyBizOf(d){
   if(!d) return [];
-  if(Array.isArray(d.hourlyBiz)) return d.hourlyBiz.filter(b=>b==='del'||b==='col');
+  if(Array.isArray(d.hourlyBiz) && d.hourlyBiz.length) return d.hourlyBiz.filter(b=>b==='del'||b==='col');
   const pm=d.payMode||{};
   const out=['del','col'].filter(b=>pm[b] && pm[b].type==='時間単価');
   if(out.length) return out;
-  return (attType(d)==='jikan'||attType(d)==='part') ? ['del','col'] : [];
+  // 経営管理から hourlyBiz が届いていない古いデータ用の推定
+  if(attType(d)==='jikan'||attType(d)==='part'){
+    if(d.officeType==='collection') return ['col'];
+    const ids=(d.deptIds||[]).map(String);
+    if(ids.length===1) return [ids.includes('3')?'col':'del'];
+    return ['del','col'];
+  }
+  return [];
 }
 // 打刻に付ける業務（時間単価の業務が1つならそれに決まる。2つなら業務を選んだ時点で決まる）
 function fixedBizOf(d){
