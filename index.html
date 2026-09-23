@@ -554,7 +554,7 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
     <div class="tb-eye">軽貨物運送　日報システム</div>
     <div class="tb-title" style="color:var(--clay);">ドライバー日報</div>
     <div class="tb-sub" id="login-greeting">本日もよろしくお願いします</div>
-    <div class="tb-sub" id="app-ver-label" style="font-family:var(--mono);font-size:9px;opacity:.7;">ver 2026-09-23.3</div>
+    <div class="tb-sub" id="app-ver-label" style="font-family:var(--mono);font-size:9px;opacity:.7;">ver 2026-09-23.4</div>
   </div>
   <div class="p16">
     <div class="card mb12">
@@ -900,12 +900,12 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
     <div id="sel-biz-area">
       <button class="biz-btn" id="btn-yp" onclick="selectBiz('yp')">
         <div style="margin-bottom:6px;"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="var(--slate)" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div>
-        <div class="biz-t" style="color:var(--slate)">ゆうパック宅配事業</div>
+        <div class="biz-t" style="color:var(--slate)">ゆうパック宅配業務</div>
         <div class="biz-s">配達数・集荷・夜間・持ち戻りなど</div>
       </button>
       <button class="biz-btn" id="btn-col" onclick="selectBiz('col')">
         <div style="margin-bottom:6px;"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="var(--sage)" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>
-        <div class="biz-t" style="color:var(--sage)">集荷事業</div>
+        <div class="biz-t" style="color:var(--sage)">集荷業務</div>
         <div class="biz-s">顧客別・品目別（12種）の集荷数量</div>
       </button>
     </div>
@@ -3184,7 +3184,7 @@ function selectDriverId(id){
 
 
 // ★ 版の文字列（差し替えのたびに必ず上げる。ログイン画面の表示と一致させる）
-const APP_VER = '2026-09-23.3';
+const APP_VER = '2026-09-23.4';
 console.log('[日報アプリ] APP_VER', APP_VER);
 
 // ══ 勤怠ユーティリティ ══
@@ -3245,7 +3245,8 @@ const BIZ_JP={del:'宅配', col:'集荷'};
 function _updClockInLabel(){
   const el=$('sel-clock-in'); if(!el) return;
   const att=(ATT_LOGS||[]).find(a=>a.id===todayAttId);
-  if(!att || !att.clockIn){ el.style.display='none'; return; }
+  // ★ 2026-09-23.4: 出勤時刻は時間単価の業務がある人にだけ表示する
+  if(!att || !att.clockIn || hourlyBizOf(driver).length===0){ el.style.display='none'; return; }
   const ci=new Date(att.clockIn);
   const hb=hourlyBizOf(driver);
   const bizTxt = att.biz ? `（${BIZ_JP[att.biz]}）` : (hb.length>1 ? '（業務を選ぶと決まります）' : '');
@@ -3635,11 +3636,45 @@ function getSelectedPostOffice(){
   return selectedPostOffice;
 }
 
+// ★ 2026-09-23.4: 業務開始＝出勤の記録（業務付き）
+function startWork(biz){
+  const now=new Date();
+  const todayStr=(()=>{const y=now.getFullYear();const m=String(now.getMonth()+1).padStart(2,'0');const dd=String(now.getDate()).padStart(2,'0');return `${y}-${m}-${dd}`;})();
+  ATT_LOGS=ls_get(LS.ATT_LOGS,[]);
+  const att={id:Date.now(), driverId:driver.id, driverName:driver.name, date:todayStr,
+    clockIn:now.toISOString(), clockInGps:null, clockOut:null, clockOutGps:null,
+    adjustedOut:null, workMin:null, kyuyo:driver.kyuyo||'個数制（歩合）',
+    biz, hourlyBiz:hourlyBizOf(driver)};
+  todayAttId=att.id;
+  ATT_LOGS.push(att);
+  ls_set(LS.ATT_LOGS, ATT_LOGS);
+  fbSet('att_logs', ATT_LOGS);
+  if(navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(pos=>{
+      ATT_LOGS=ls_get(LS.ATT_LOGS,[]);
+      const i=ATT_LOGS.findIndex(a=>a.id===att.id);
+      if(i>=0){
+        ATT_LOGS[i].clockInGps={lat:pos.coords.latitude, lng:pos.coords.longitude, acc:pos.coords.accuracy};
+        ls_set(LS.ATT_LOGS, ATT_LOGS);
+        fbSet('att_logs', ATT_LOGS);
+      }
+    },()=>{}, {timeout:8000, maximumAge:0});
+  }
+  _updClockInLabel();
+  if(typeof toast==='function') toast(`${BIZ_JP[biz]}業務を開始しました（出勤 ${now.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}）`,'ok');
+}
 function selectBiz(t){
-  // ★ 2026-09-23.1: 開いた業務を打刻に付ける（時間単価の業務が2つある人はここで決まる）
+  const _biz = (t==='yp') ? 'del' : 'col';
+  const _label = (t==='yp') ? 'ゆうパック宅配業務' : '集荷業務';
   try{
-    const biz = (t==='yp') ? 'del' : 'col';
-    if(hourlyBizOf(driver).includes(biz)) setAttBiz(biz);
+    const att=(ATT_LOGS||[]).find(a=>a.id===todayAttId);
+    if(!att || !att.clockIn){
+      // ★ 2026-09-23.4: 業務開始の確認 → 出勤を記録
+      if(!confirm(`${_label}を開始しますか？\n出勤として記録します。`)) return;
+      startWork(_biz);
+    } else if(!att.clockOut){
+      setAttBiz(_biz);
+    }
   }catch(e){ console.warn('[打刻の業務]', e); }
   if(t==='yp'){
     $('yp-sub').textContent=`${driver.name} ／ ${driver.office}`;
@@ -14161,6 +14196,11 @@ function _completeLoginContinue(d){
     // ★ 2026-09-23.1: 時間単価の業務が1つの人は、その業務を打刻に付ける
     if(!existing.biz && fixedBizOf(d)){ existing.biz=fixedBizOf(d); ls_set(LS.ATT_LOGS, ATT_LOGS); fbSet('att_logs', ATT_LOGS); }
     _updClockInLabel();
+  } else if(true){
+    // ★ 2026-09-23.4: ログインだけでは出勤にしない。
+    //   業務ボタン（宅配業務・集荷業務）を押して「業務開始」を選んだ時点で出勤を記録する。
+    todayAttId = null;
+    _updClockInLabel();
   } else {
     // 新規出勤記録
     const att = {id:Date.now(), driverId:d.id, driverName:d.name, date:todayStr,
@@ -15767,6 +15807,15 @@ let clockOutGps=null;
 function startClockOut(){
   if(!driver){show('scr-login');return;}
   const att=ATT_LOGS.find(a=>a.id===todayAttId);
+  // ★ 2026-09-23.4: 業務開始（出勤）を押していない場合
+  if(!att || !att.clockIn){
+    alert('まだ業務を開始していません。\n宅配業務または集荷業務のボタンから開始してください。');
+    return;
+  }
+  if(att.clockOut){
+    alert('この日はすでに退勤を記録しています。');
+    return;
+  }
   const co=$('co-sub');
   co.textContent=`${driver.name} ／ ${driver.office}`;
   const needGps=needsGpsCheck(driver);
@@ -16079,7 +16128,9 @@ function submitYP(){
     submittedAt: new Date().toISOString(),
   };
   YP_LOGS.push(rec); fbSet('yp_logs', YP_LOGS);
-  lastResult = rec; showDone();
+  lastResult = rec;
+  if(_askFinishWork('ゆうパック宅配業務')) return;   // ★ 2026-09-23.4: はいなら退勤画面へ
+  showDone();
 }
 
 // ══ 集荷 ══
@@ -19727,7 +19778,9 @@ function doSubmitCol(){
     submittedAt:new Date().toISOString()};
   COL_LOGS.push(rec); fbSet('col_logs',COL_LOGS);
   clearColDraft();
-  lastResult=rec; showDone();
+  lastResult=rec;
+  if(_askFinishWork('集荷業務')) return;   // ★ 2026-09-23.4: はいなら退勤画面へ
+  showDone();
 }
 
 // ── 旧関数の互換（selectRegion等は未使用になるが残す） ──
@@ -19738,6 +19791,19 @@ function buildRegionTabs(){
   if(custRegions.length){ REGIONS=[...new Set([...REGIONS,...custRegions])].sort(); }
 }
 
+
+// ★ 2026-09-23.4: 日報の提出後に「業務を終了しますか？」を聞く。
+//   はい → 退勤画面（位置の確認・帰社時刻の修正ができる）／いいえ → 提出完了画面
+function _askFinishWork(label){
+  try{
+    const att=(ATT_LOGS||[]).find(a=>a.id===todayAttId);
+    if(!att || !att.clockIn || att.clockOut) return false;
+    if(!confirm(`日報を提出しました。\n${label}を終了しますか？\n退勤として記録します。`)) return false;
+    if(typeof toast==='function') toast('日報を提出しました','ok');
+    startClockOut();
+    return true;
+  }catch(e){ console.warn('[業務終了]', e); return false; }
+}
 
 // ══ 完了 ══
 function showDone(){
