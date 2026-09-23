@@ -554,7 +554,7 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
     <div class="tb-eye">軽貨物運送　日報システム</div>
     <div class="tb-title" style="color:var(--clay);">ドライバー日報</div>
     <div class="tb-sub" id="login-greeting">本日もよろしくお願いします</div>
-    <div class="tb-sub" id="app-ver-label" style="font-family:var(--mono);font-size:9px;opacity:.7;">ver 2026-09-23.7</div>
+    <div class="tb-sub" id="app-ver-label" style="font-family:var(--mono);font-size:9px;opacity:.7;">ver 2026-09-23.8</div>
   </div>
   <div class="p16">
     <div class="card mb12">
@@ -3193,7 +3193,7 @@ function selectDriverId(id){
 
 
 // ★ 版の文字列（差し替えのたびに必ず上げる。ログイン画面の表示と一致させる）
-const APP_VER = '2026-09-23.7';
+const APP_VER = '2026-09-23.8';
 console.log('[日報アプリ] APP_VER', APP_VER);
 
 // ══ 勤怠ユーティリティ ══
@@ -15643,9 +15643,29 @@ function _renderMvDayDetail(iso, dayData){
 // 日詳細のHTMLを構築(カレンダーとリストで共通)
 function _buildDayDetailHTML(iso, dayData, withCloseBtn){
   const posts = [...(dayData.posts||[])].filter(Boolean);
+  // ★ 2026-09-23.8: 郵便局が記録されていない日報（経営管理で入力・修正したものなど）は
+  //   ドライバーの所属から補って表示する。
+  if(!posts.length && dayData.del && driver && driver.office) posts.push(driver.office);
   const postLine = posts.length ? `<div style="font-size:10px;color:var(--mid);margin-bottom:4px;">対応郵便局: ${posts.join('・')}</div>` : '';
+  // ★ 2026-09-23.8: 時間単価の人は、その日の出勤・退勤を出す
+  let attLine = '';
+  try{
+    if(hourlyBizOf(driver).length){
+      const _a=(ATT_LOGS||[]).filter(x=>x && String(x.driverId)===String(driver.id) && x.date===iso);
+      if(_a.length){
+        const _ci=_a.map(x=>x.clockIn).filter(Boolean).sort()[0];
+        const _co=_a.map(x=>x.adjustedOut||x.clockOut).filter(Boolean).sort().slice(-1)[0];
+        const _hm=v=>v?new Date(v).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}):'--:--';
+        const _bz=_a.map(x=>x.biz).filter(Boolean)[0];
+        attLine = `<div class="mv-dd-sec"><div class="mv-dd-sec-title">勤務時間${_bz?`（${BIZ_JP[_bz]||_bz}）`:''}</div>`
+          + `<div class="mv-dd-row mv-dd-total"><span>出勤</span><span>${_hm(_ci)}</span></div>`
+          + `<div class="mv-dd-row mv-dd-total"><span>退勤</span><span>${_hm(_co)}</span></div>`
+          + `</div>`;
+      }
+    }
+  }catch(e){ console.warn('[勤務時間表示]', e); }
   const closeBtn = withCloseBtn ? `<button class="mv-dd-close" onclick="mvSelectDate('${iso}')">×</button>` : '';
-  let html = `<div class="mv-dd-head"><span>${_fmtDateJp(iso)}</span>${closeBtn}</div>${postLine}`;
+  let html = `<div class="mv-dd-head"><span>${_fmtDateJp(iso)}</span>${closeBtn}</div>${postLine}${attLine}`;
 
   // 配達業務
   if(dayData.del){
@@ -15677,7 +15697,12 @@ function _buildDayDetailHTML(iso, dayData, withCloseBtn){
 
   // 集荷事業
   if(dayData.colBlocks){
-    const hasCol = (dayData.colBlocks.indiv?.length||0) + (dayData.colBlocks.route?.length||0) + (dayData.colBlocks.charter?.length||0) > 0;
+    // ★ 2026-09-23.8: 数量も休業表示も無いときは、見出しだけ残らないようにする
+    const _qty = o => Object.values(o||{}).reduce((s,v)=>s+(Number(v)||0),0);
+    const hasCol =
+      (dayData.colBlocks.indiv||[]).some(b=>b.rest || _qty(b.items)>0)
+      || (dayData.colBlocks.route||[]).some(rt=>(rt.customers||[]).some(c=>c.rest || _qty(c.items)>0))
+      || (dayData.colBlocks.charter||[]).length>0;
     if(hasCol){
       html += `<div class="mv-dd-sec"><div class="mv-dd-sec-title col">集荷事業</div>`;
       // ★ 2026/08/02: 個別集荷ブロックは作られ方によってフィールド名が2種類ある。
