@@ -554,6 +554,7 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
     <div class="tb-eye">軽貨物運送　日報システム</div>
     <div class="tb-title" style="color:var(--clay);">ドライバー日報</div>
     <div class="tb-sub" id="login-greeting">本日もよろしくお願いします</div>
+    <div class="tb-sub" id="app-ver-label" style="font-family:var(--mono);font-size:9px;opacity:.7;">ver 2026-09-23.1</div>
   </div>
   <div class="p16">
     <div class="card mb12">
@@ -3182,6 +3183,10 @@ function selectDriverId(id){
 }
 
 
+// ★ 版の文字列（差し替えのたびに必ず上げる。ログイン画面の表示と一致させる）
+const APP_VER = '2026-09-23.1';
+console.log('[日報アプリ] APP_VER', APP_VER);
+
 // ══ 勤怠ユーティリティ ══
 // 給与形態から勤怠タイプを判定
 function attType(d){
@@ -3190,13 +3195,55 @@ function attType(d){
   if(k==='時間単価')return'jikan';      // 個人事業主（時間単価）
   return'other';                         // 歩合・委託・スポット
 }
+// ★ 2026-09-23.1: 時間単価の業務（経営管理から hourlyBiz で受け取る）
+//   経営管理で宅配・集荷それぞれに給与形態を設定できるようになったため、
+//   基本情報の給与形態だけでなく、業務ごとの設定で判定する。
+function hourlyBizOf(d){
+  if(!d) return [];
+  if(Array.isArray(d.hourlyBiz)) return d.hourlyBiz.filter(b=>b==='del'||b==='col');
+  const pm=d.payMode||{};
+  const out=['del','col'].filter(b=>pm[b] && pm[b].type==='時間単価');
+  if(out.length) return out;
+  return (attType(d)==='jikan'||attType(d)==='part') ? ['del','col'] : [];
+}
+// 打刻に付ける業務（時間単価の業務が1つならそれに決まる。2つなら業務を選んだ時点で決まる）
+function fixedBizOf(d){
+  const hb=hourlyBizOf(d);
+  return hb.length===1 ? hb[0] : null;
+}
 // 集荷の時間単価かどうか（帰社修正UI表示判定）
 function isColJikan(d){
+  const hb=hourlyBizOf(d);
+  if(hb.includes('col')) return true;
   return attType(d)==='jikan' && (d.officeType==='collection');
 }
 // GPS退勤警告が必要か
 function needsGpsCheck(d){
-  return attType(d)==='part' || attType(d)==='jikan';
+  return attType(d)==='part' || attType(d)==='jikan' || hourlyBizOf(d).length>0;
+}
+// 打刻に業務を記録する（未設定のときだけ）
+function setAttBiz(biz){
+  if(!biz || !todayAttId) return;
+  ATT_LOGS=ls_get(LS.ATT_LOGS,[]);
+  const i=ATT_LOGS.findIndex(a=>a.id===todayAttId);
+  if(i<0) return;
+  if(ATT_LOGS[i].biz===biz) return;
+  if(ATT_LOGS[i].biz && ATT_LOGS[i].biz!==biz && ATT_LOGS[i].clockOut) return;  // 退勤済みは変えない
+  ATT_LOGS[i].biz=biz;
+  ls_set(LS.ATT_LOGS, ATT_LOGS);
+  fbSet('att_logs', ATT_LOGS);
+  _updClockInLabel();
+}
+const BIZ_JP={del:'宅配', col:'集荷'};
+function _updClockInLabel(){
+  const el=$('sel-clock-in'); if(!el) return;
+  const att=(ATT_LOGS||[]).find(a=>a.id===todayAttId);
+  if(!att || !att.clockIn){ el.style.display='none'; return; }
+  const ci=new Date(att.clockIn);
+  const hb=hourlyBizOf(driver);
+  const bizTxt = att.biz ? `（${BIZ_JP[att.biz]}）` : (hb.length>1 ? '（業務を選ぶと決まります）' : '');
+  el.textContent = `出勤: ${ci.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}${bizTxt}`;
+  el.style.display='block';
 }
 // 15分刻み丸め（7分以下切り捨て・8分以上切り上げ）
 // ★ 2026/08/31: 記録IDの生成。
@@ -3582,6 +3629,11 @@ function getSelectedPostOffice(){
 }
 
 function selectBiz(t){
+  // ★ 2026-09-23.1: 開いた業務を打刻に付ける（時間単価の業務が2つある人はここで決まる）
+  try{
+    const biz = (t==='yp') ? 'del' : 'col';
+    if(hourlyBizOf(driver).includes(biz)) setAttBiz(biz);
+  }catch(e){ console.warn('[打刻の業務]', e); }
   if(t==='yp'){
     $('yp-sub').textContent=`${driver.name} ／ ${driver.office}`;
     ypReset();
@@ -14099,14 +14151,15 @@ function _completeLoginContinue(d){
   const existing = ATT_LOGS.find(a=>a.driverId===d.id && a.date===todayStr && !a.clockOut);
   if(existing){
     todayAttId = existing.id;
-    const ci = new Date(existing.clockIn);
-    $('sel-clock-in').textContent = `出勤: ${ci.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}`;
-    $('sel-clock-in').style.display = 'block';
+    // ★ 2026-09-23.1: 時間単価の業務が1つの人は、その業務を打刻に付ける
+    if(!existing.biz && fixedBizOf(d)){ existing.biz=fixedBizOf(d); ls_set(LS.ATT_LOGS, ATT_LOGS); fbSet('att_logs', ATT_LOGS); }
+    _updClockInLabel();
   } else {
     // 新規出勤記録
     const att = {id:Date.now(), driverId:d.id, driverName:d.name, date:todayStr,
       clockIn:now.toISOString(), clockInGps:null, clockOut:null, clockOutGps:null,
-      adjustedOut:null, workMin:null, kyuyo:d.kyuyo||'個数制（歩合）'};
+      adjustedOut:null, workMin:null, kyuyo:d.kyuyo||'個数制（歩合）',
+      biz: fixedBizOf(d), hourlyBiz: hourlyBizOf(d)};   // ★ 2026-09-23.1
     todayAttId = att.id;
     if(navigator.geolocation){
       navigator.geolocation.getCurrentPosition(pos=>{
@@ -14117,9 +14170,9 @@ function _completeLoginContinue(d){
       },()=>{}, {timeout:8000, maximumAge:0});
     }
     ATT_LOGS.push(att);
+    ls_set(LS.ATT_LOGS, ATT_LOGS);
     fbSet('att_logs', ATT_LOGS);
-    $('sel-clock-in').textContent = `出勤: ${now.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}`;
-    $('sel-clock-in').style.display = 'block';
+    _updClockInLabel();
   }
   // パートはbiz-areaを非表示
   const isP = attType(d)==='part';
@@ -15749,7 +15802,11 @@ function confirmClockOut(){
     const rawMin=Math.round((now-new Date(att.clockIn))/60000);
     att.workMin=roundTo15(Math.max(0,rawMin));
   }
+  // ★ 2026-09-23.1: 退勤時にも業務を記録（未設定なら、時間単価の業務が1つの人はその業務）
+  if(!att.biz && fixedBizOf(driver)) att.biz=fixedBizOf(driver);
+  att.hourlyBiz = hourlyBizOf(driver);
   ATT_LOGS[idx]=att;
+  ls_set(LS.ATT_LOGS,ATT_LOGS);
   fbSet('att_logs',ATT_LOGS);
   // 完了画面へ
   $('done-title').textContent='退勤完了';
@@ -15760,6 +15817,7 @@ function confirmClockOut(){
     <div class="sum-row" style="border-top:none;">
       <span>退勤時刻</span><span class="fw7">${now.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}</span>
     </div>
+    ${att.biz?`<div class="sum-row"><span>業務</span><span class="fw7">${BIZ_JP[att.biz]||att.biz}</span></div>`:''}
     ${wm!=null?`<div class="sum-row"><span>稼働時間</span><span class="fw7" style="color:var(--clay)">${fmtMin(wm)}</span></div>`:''}
     ${att.adjustedOut?`<div class="sum-row"><span>帰社修正時刻</span><span class="fw7" style="color:var(--amber)">${new Date(att.adjustedOut).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}</span></div>`:''}
   `;
