@@ -554,7 +554,7 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
     <div class="tb-eye">軽貨物運送　日報システム</div>
     <div class="tb-title" style="color:var(--clay);">ドライバー日報</div>
     <div class="tb-sub" id="login-greeting">本日もよろしくお願いします</div>
-    <div class="tb-sub" id="app-ver-label" style="font-family:var(--mono);font-size:9px;opacity:.7;">ver 2026-09-23.9</div>
+    <div class="tb-sub" id="app-ver-label" style="font-family:var(--mono);font-size:9px;opacity:.7;">ver 2026-09-24.1</div>
   </div>
   <div class="p16">
     <div class="card mb12">
@@ -1950,6 +1950,7 @@ const LS={
   CUST_HIST:'nikki_cust_hist',
   YP_LOGS:'nikki_yp_logs', COL_LOGS:'nikki_col_logs',
   ATT_LOGS:'nikki_att_logs',
+  ATT_FIX:'nikki_att_fix',        // ★ 2026-09-24.1: 打刻の修正依頼
   EDIT_LOGS:'nikki_edit_logs',
   COL_ROUTES:'nikki_col_routes',
   SCHEDULE_OVERRIDES:'nikki_schedule_overrides',
@@ -2490,6 +2491,13 @@ function setupRealtimeSync() {
     try{ localStorage.setItem('nikki_owner_pins', JSON.stringify(window._ownerPins)); }catch(e){}
     _applyOwnerPins();
     if(typeof renderOwnerCompanies==='function') try{ renderOwnerCompanies(); }catch(e){}
+  });
+  // ★ 2026-09-24.1: 打刻の修正依頼（承認結果を受け取る）
+  subscribeNode('nikki/att_fix_requests', snap => {
+    if(!snap.exists()) return;
+    ATT_FIX = snap.val() || [];
+    ls_set(LS.ATT_FIX, ATT_FIX);
+    try{ if(typeof renderMonthlyView==='function' && $('scr-monthly')?.classList.contains('on')) renderMonthlyView(); }catch(e){}
   });
   subscribeNode('nikki/col_routes', snap => {
     if(snap.exists()){
@@ -3193,7 +3201,7 @@ function selectDriverId(id){
 
 
 // ★ 版の文字列（差し替えのたびに必ず上げる。ログイン画面の表示と一致させる）
-const APP_VER = '2026-09-23.9';
+const APP_VER = '2026-09-24.1';
 console.log('[日報アプリ] APP_VER', APP_VER);
 
 // ══ 勤怠ユーティリティ ══
@@ -3204,6 +3212,75 @@ function attType(d){
   if(k==='時間単価')return'jikan';      // 個人事業主（時間単価）
   return'other';                         // 歩合・委託・スポット
 }
+// ★ 2026-09-24.1: 打刻の修正依頼
+let ATT_FIX = ls_get(LS.ATT_FIX, []) || [];
+function _fixFor(date){
+  return (ATT_FIX||[]).filter(r=>r && String(r.driverId)===String(driver?.id) && r.date===date);
+}
+function _fixLatest(date){
+  const a=_fixFor(date).slice().sort((x,y)=>String(x.createdAt||'').localeCompare(String(y.createdAt||'')));
+  return a.length ? a[a.length-1] : null;
+}
+function _fixStatusLabel(r){
+  if(!r) return '';
+  if(r.status==='approved') return '<span class="bdg bg">承認されました</span>';
+  if(r.status==='rejected') return `<span class="bdg" style="background:rgba(196,68,68,.15);color:#c44;">却下されました</span>`;
+  return '<span class="bdg" style="background:rgba(230,126,34,.15);color:#b8791f;">依頼中</span>';
+}
+// 修正依頼を出す
+async function openAttFix(date){
+  if(!driver){ alert('ログイン情報が確認できません'); return; }
+  const recs=(ATT_LOGS||[]).filter(a=>a && String(a.driverId)===String(driver.id) && a.date===date);
+  const _hm=v=>v?new Date(v).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}):'';
+  const curIn=_hm(recs.map(a=>a.manualIn||a.clockIn).filter(Boolean).sort()[0]);
+  const curOut=_hm(recs.map(a=>a.manualOut||a.adjustedOut||a.clockOut).filter(Boolean).sort().slice(-1)[0]);
+  const inV=prompt(`${date} の正しい出勤時刻を入力してください（例 9:00）`, curIn||'');
+  if(inV===null) return;
+  const outV=prompt(`${date} の正しい退勤時刻を入力してください（例 18:07）`, curOut||'');
+  if(outV===null) return;
+  const norm=v=>{
+    let t=String(v||'').trim().replace(/：/g,':').replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0));
+    if(!t) return '';
+    let h,m;
+    if(t.includes(':')){ [h,m]=t.split(':'); }
+    else if(/^\d{1,2}$/.test(t)){ h=t; m='0'; }
+    else if(/^\d{3,4}$/.test(t)){ h=t.slice(0,-2); m=t.slice(-2); }
+    else return null;
+    h=Number(h); m=Number(m);
+    if(!Number.isInteger(h)||!Number.isInteger(m)||h<0||h>29||m<0||m>59) return null;
+    return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');
+  };
+  const ni=norm(inV), no=norm(outV);
+  if(ni===null||no===null||!ni||!no){ alert('時刻の形式が正しくありません。「900」「9:00」のように入力してください。'); return; }
+  const reason=prompt('修正の理由を入力してください（例：退勤の打刻を忘れたため）','');
+  if(reason===null) return;
+  if(!String(reason).trim()){ alert('理由の入力が必要です。'); return; }
+  const rec={
+    id: Date.now()*1000 + Math.floor(Math.random()*1000),
+    driverId:String(driver.id), driverName:driver.name, date,
+    biz:(recs.map(a=>a.biz).filter(Boolean)[0])||null,
+    reqIn:ni, reqOut:no, reason:String(reason).trim(),
+    createdAt:new Date().toISOString(), gps:null, status:'pending',
+  };
+  ATT_FIX = ls_get(LS.ATT_FIX, []) || [];
+  ATT_FIX.push(rec);
+  ls_set(LS.ATT_FIX, ATT_FIX);
+  fbSet('att_fix_requests', ATT_FIX);
+  if(navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(pos=>{
+      ATT_FIX = ls_get(LS.ATT_FIX, []) || [];
+      const i=ATT_FIX.findIndex(x=>x.id===rec.id);
+      if(i>=0){
+        ATT_FIX[i].gps={lat:pos.coords.latitude, lng:pos.coords.longitude, acc:pos.coords.accuracy};
+        ls_set(LS.ATT_FIX, ATT_FIX);
+        fbSet('att_fix_requests', ATT_FIX);
+      }
+    },()=>{}, {timeout:8000, maximumAge:0});
+  }
+  if(typeof toast==='function') toast('修正依頼を送りました','ok'); else alert('修正依頼を送りました');
+  try{ renderMonthlyView(); }catch(e){}
+}
+
 // ★ 2026-09-23.1: 時間単価の業務（経営管理から hourlyBiz で受け取る）
 //   経営管理で宅配・集荷それぞれに給与形態を設定できるようになったため、
 //   基本情報の給与形態だけでなく、業務ごとの設定で判定する。
@@ -15668,9 +15745,12 @@ function _buildDayDetailHTML(iso, dayData, withCloseBtn){
         const _co=_a.map(x=>x.adjustedOut||x.clockOut).filter(Boolean).sort().slice(-1)[0];
         const _hm=v=>v?new Date(v).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}):'--:--';
         const _bz=_a.map(x=>x.biz).filter(Boolean)[0];
+        const _fx=_fixLatest(iso);
         attLine = `<div class="mv-dd-sec"><div class="mv-dd-sec-title">勤務時間${_bz?`（${BIZ_JP[_bz]||_bz}）`:''}</div>`
           + `<div class="mv-dd-row mv-dd-total"><span>出勤</span><span>${_hm(_ci)}</span></div>`
           + `<div class="mv-dd-row mv-dd-total"><span>退勤</span><span>${_hm(_co)}</span></div>`
+          + (_fx?`<div class="mv-dd-row"><span>修正依頼 ${_fx.reqIn}〜${_fx.reqOut}</span><span>${_fixStatusLabel(_fx)}</span></div>`:'')
+          + (withCloseBtn?`<div style="margin-top:6px;"><button onclick="openAttFix('${iso}')" style="width:100%;padding:7px;border-radius:8px;background:rgba(230,126,34,.10);border:1px solid rgba(230,126,34,.35);color:#b8791f;font-size:11.5px;font-weight:700;cursor:pointer;">打刻の修正を依頼する</button></div>`:'')
           + `</div>`;
       }
     }
