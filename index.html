@@ -554,7 +554,7 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
     <div class="tb-eye">軽貨物運送　日報システム</div>
     <div class="tb-title" style="color:var(--clay);">ドライバー日報</div>
     <div class="tb-sub" id="login-greeting">本日もよろしくお願いします</div>
-    <div class="tb-sub" id="app-ver-label" style="font-family:var(--mono);font-size:9px;opacity:.7;">ver 2026-09-24.1</div>
+    <div class="tb-sub" id="app-ver-label" style="font-family:var(--mono);font-size:9px;opacity:.7;">ver 2026-09-24.2</div>
   </div>
   <div class="p16">
     <div class="card mb12">
@@ -1951,6 +1951,8 @@ const LS={
   YP_LOGS:'nikki_yp_logs', COL_LOGS:'nikki_col_logs',
   ATT_LOGS:'nikki_att_logs',
   ATT_FIX:'nikki_att_fix',        // ★ 2026-09-24.1: 打刻の修正依頼
+  SHIFTS:'nikki_shifts',          // ★ 2026-09-24.2: シフト表（その日のコース）
+  COURSES:'nikki_col_courses',    // ★ 2026-09-24.2: 集荷コース
   EDIT_LOGS:'nikki_edit_logs',
   COL_ROUTES:'nikki_col_routes',
   SCHEDULE_OVERRIDES:'nikki_schedule_overrides',
@@ -2491,6 +2493,17 @@ function setupRealtimeSync() {
     try{ localStorage.setItem('nikki_owner_pins', JSON.stringify(window._ownerPins)); }catch(e){}
     _applyOwnerPins();
     if(typeof renderOwnerCompanies==='function') try{ renderOwnerCompanies(); }catch(e){}
+  });
+  // ★ 2026-09-24.2: シフトと集荷コース（その日のコースの顧客を出すため）
+  subscribeNode('nikki/shifts', snap => {
+    if(!snap.exists()) return;
+    SHIFTS = snap.val() || {};
+    ls_set(LS.SHIFTS, SHIFTS);
+  });
+  subscribeNode('nikki/col_courses', snap => {
+    if(!snap.exists()) return;
+    COURSES = snap.val() || [];
+    ls_set(LS.COURSES, COURSES);
   });
   // ★ 2026-09-24.1: 打刻の修正依頼（承認結果を受け取る）
   subscribeNode('nikki/att_fix_requests', snap => {
@@ -3201,7 +3214,7 @@ function selectDriverId(id){
 
 
 // ★ 版の文字列（差し替えのたびに必ず上げる。ログイン画面の表示と一致させる）
-const APP_VER = '2026-09-24.1';
+const APP_VER = '2026-09-24.2';
 console.log('[日報アプリ] APP_VER', APP_VER);
 
 // ══ 勤怠ユーティリティ ══
@@ -3212,6 +3225,48 @@ function attType(d){
   if(k==='時間単価')return'jikan';      // 個人事業主（時間単価）
   return'other';                         // 歩合・委託・スポット
 }
+// ★ 2026-09-24.2: シフト表と集荷コース
+let SHIFTS = ls_get(LS.SHIFTS, {}) || {};
+let COURSES = ls_get(LS.COURSES, []) || [];
+// その日その人に割り当てられたコース
+function todayCourse(dateStr){
+  if(!driver) return null;
+  const d=String(dateStr||'').replace(/\//g,'-');
+  const mon=d.slice(0,7), day=Number(d.slice(8,10));
+  const st=(DRIVERS||[]).find(x=>x && (String(x.id)===String(driver.id) || x.name===driver.name));
+  const sid=st?st.staffId||st.id:driver.id;
+  const hits=[];
+  Object.values(SHIFTS||{}).forEach(rec=>{
+    if(!rec || rec.mon!==mon) return;
+    Object.entries(rec.cells||{}).forEach(([k,v])=>{
+      const [cellStaff, cellDay]=String(k).split('|');
+      if(Number(cellDay)!==day) return;
+      if(String(cellStaff)!==String(sid) && String(cellStaff)!==String(driver.id)) return;
+      if(String(v).startsWith('C:')){
+        const c=(COURSES||[]).find(x=>String(x.id)===String(v).slice(2));
+        if(c) hits.push(c);
+      }
+    });
+  });
+  return hits.length ? hits[0] : null;
+}
+// コースの顧客を集荷入力に並べる（その日だけの出し入れは自由）
+function applyCourseToCol(){
+  const date=$('col-date')?.value || (typeof today==='function'?today():'');
+  const c=todayCourse(date);
+  if(!c || !(c.stops||[]).length) return false;
+  let added=0;
+  (c.stops||[]).forEach(st=>{
+    const cu=(CUSTOMERS||[]).find(x=>String(x.id)===String(st.custId));
+    if(!cu) return;
+    if(typeof colBlocks!=='undefined' && Array.isArray(colBlocks)
+       && colBlocks.some(b=>b && b.type==='indiv' && String(b.custId)===String(cu.id))) return;
+    if(typeof _addIndivBlockDirect==='function'){ _addIndivBlockDirect(cu.id, cu.name, cu.region||''); added++; }
+  });
+  if(added && typeof toast==='function') toast(`${c.name} の顧客を${added}件並べました`,'ok');
+  return added>0;
+}
+
 // ★ 2026-09-24.1: 打刻の修正依頼
 let ATT_FIX = ls_get(LS.ATT_FIX, []) || [];
 function _fixFor(date){
@@ -16449,6 +16504,8 @@ function colReset(){
   buildRegionTabs();
   // 休業調査カードの表示更新
   if(typeof _renderColSurveyCard === 'function') _renderColSurveyCard();
+  // ★ 2026-09-24.2: その日のコースが決まっていれば、その顧客を並べる
+  try{ applyCourseToCol(); }catch(e){ console.warn('[コース展開]', e); }
 }
 
 /** 集荷日報内の休業調査カードを描画 */
@@ -17425,6 +17482,13 @@ function toggleCustNotesPanel(panelId, custId, custName){
 
 function filterCustAddPanel(q){
   renderCustAddList(toHankaku(q.trim().toLowerCase()));
+}
+// ★ 2026-09-24.2: コース展開用。ルートの重複確認を挟まずに単独ブロックを足す
+function _addIndivBlockDirect(custId, custName, region){
+  colBlocks.push({id:++colBlockIdSeq, type:'indiv', custId:custId||null, custName:custName||'', region:region||'', items:{}, rest:false});
+  renderColBlocks();
+  updateColSubmitBtn();
+  saveColDraft && saveColDraft();
 }
 function addIndivBlock(custId,custName,region){
   // ルート登録済み顧客チェック
