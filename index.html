@@ -2591,7 +2591,7 @@ function setupRealtimeSync() {
       NOTIFICATIONS = arr;
       // 30日経過した添付ファイルを自動削除(本文・タイトルは残す)
       _cleanupExpiredAttachments();
-      ls_set(LS.NOTIFICATIONS, NOTIFICATIONS);
+      _saveNotificationsLocal();
       // 受信したら通知バッジを更新
       _refreshNotificationBadges();
     }
@@ -3214,7 +3214,7 @@ function selectDriverId(id){
 
 
 // ★ 版の文字列（差し替えのたびに必ず上げる。ログイン画面の表示と一致させる）
-const APP_VER = '2026-09-24.2';
+const APP_VER = '2026-10-08.1';
 console.log('[日報アプリ] APP_VER', APP_VER);
 
 // ══ 勤怠ユーティリティ ══
@@ -4926,7 +4926,7 @@ async function _osqSendNotification(){
     readBy: {},
   };
   NOTIFICATIONS.push(notification);
-  ls_set(LS.NOTIFICATIONS, NOTIFICATIONS);
+  _saveNotificationsLocal();
   try {
     await fbSet('notifications', NOTIFICATIONS);
   } catch(e){
@@ -13668,7 +13668,7 @@ async function _markAllOwnerNotificationsRead(){
     }
   });
   if(changed){
-    ls_set(LS.NOTIFICATIONS, NOTIFICATIONS);
+    _saveNotificationsLocal();
     await fbSet('notifications', NOTIFICATIONS);
     _refreshNotificationBadges();
     _renderOwnerNotificationsTab(_getOwnerNotifications(co.id));
@@ -19055,10 +19055,33 @@ async function _createScheduleNotification(scheduleRecord, action){
   };
 
   NOTIFICATIONS.push(notification);
-  ls_set(LS.NOTIFICATIONS, NOTIFICATIONS);
+  _saveNotificationsLocal();
   await fbSet('notifications', NOTIFICATIONS);
   _refreshNotificationBadges();
   return notification;
+}
+
+/* ★ 2026-10-08.1: 端末の控えに添付の中身(dataUrl)を入れない。
+   お知らせの添付をbase64のまま通知データに埋め込み、それを全ドライバーの
+   端末へそのまま配っていたため、localStorage(約5MB)を食い潰していた。
+   容量が尽きると未送信ぶんの日報が保存できず、提出したつもりのまま消える。
+   添付はFirebaseに残っているので、開くときに取り直す。
+   メモリ上の NOTIFICATIONS には中身を持ったまま置くので、
+   受信後に開く分には今までどおり表示できる。 */
+function _notificationsForLocal(list){
+  return (list||[]).map(n=>{
+    if(!n || !Array.isArray(n.attachments) || !n.attachments.length) return n;
+    return Object.assign({}, n, {
+      attachments: n.attachments.map(a=>({
+        name: a && a.name, mimeType: a && a.mimeType, size: a && a.size,
+        _noLocal: true            // 中身は端末に置いていない印
+      }))
+    });
+  });
+}
+function _saveNotificationsLocal(){
+  try{ ls_set(LS.NOTIFICATIONS, _notificationsForLocal(NOTIFICATIONS)); }
+  catch(e){ console.warn('[notifications] 端末への保存に失敗', e); }
 }
 
 // 自分宛ての通知を取得(個人用)
@@ -19106,7 +19129,7 @@ async function _markNotificationRead(notificationId){
   if(!target.readBy) target.readBy = {};
   if(target.readBy[myId]) return; // 既読
   target.readBy[myId] = new Date().toISOString();   // 既読時刻を記録
-  ls_set(LS.NOTIFICATIONS, NOTIFICATIONS);
+  _saveNotificationsLocal();
   await fbSet('notifications', NOTIFICATIONS);
   _refreshNotificationBadges();
 }
@@ -19125,7 +19148,7 @@ async function _markAllNotificationsRead(){
     }
   });
   if(changed){
-    ls_set(LS.NOTIFICATIONS, NOTIFICATIONS);
+    _saveNotificationsLocal();
     await fbSet('notifications', NOTIFICATIONS);
     _refreshNotificationBadges();
   }
@@ -19577,7 +19600,7 @@ async function _hideNotificationFromMyList(notiId){
   ].filter(v=>v!==undefined && v!==null && v!=='').map(v=>String(v));
   if(!n.hiddenFor) n.hiddenFor = [];
   candidateIds.forEach(cid=>{ if(!n.hiddenFor.map(x=>String(x)).includes(cid)) n.hiddenFor.push(cid); });
-  ls_set(LS.NOTIFICATIONS, NOTIFICATIONS);
+  _saveNotificationsLocal();
   await fbSet('notifications', NOTIFICATIONS);
   toast('通知を削除しました','ok');
   _closeNotificationDetail();
@@ -19609,7 +19632,7 @@ async function _withdrawNotification(notiId){
   }
   n.withdrawn = true;
   n.withdrawnAt = new Date().toISOString();
-  ls_set(LS.NOTIFICATIONS, NOTIFICATIONS);
+  _saveNotificationsLocal();
   await fbSet('notifications', NOTIFICATIONS);
   toast('通知を取り下げました','ok');
   _closeNotificationDetail();
