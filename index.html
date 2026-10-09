@@ -120,6 +120,17 @@ input[type="date"].fi::-webkit-datetime-edit,input[type="month"].fi::-webkit-dat
 .fi-sm{padding:7px 10px;font-size:12px;}
 .sel{width:100%;padding:9px 12px;border-radius:8px;font-size:13px;border:1px solid var(--brd);background:var(--inp);color:var(--ink);outline:none;font-family:var(--sans);cursor:pointer;}
 .stpr{display:flex;align-items:center;gap:7px;width:100%;max-width:100%;}
+/* ★ 2026-10-09.1: 完了の内訳（夜間・大型）をぶら下げて見せる */
+.nest{border-left:3px solid var(--slate);background:rgba(96,112,128,.06);
+  border-radius:0 9px 9px 0;padding:9px 11px 2px;margin:0 0 8px 12px;}
+.nest-hd{font-size:11.5px;font-weight:700;color:var(--slate);margin-bottom:8px;}
+.nest-hd .n{font-family:var(--mono);font-size:14px;color:var(--ink);}
+.nest-sub{font-weight:400;color:var(--light);margin-left:4px;}
+.nest-hint{font-size:10.5px;color:var(--light);margin-top:5px;line-height:1.5;}
+.sval-nest::placeholder{color:var(--light);font-size:12px;font-weight:400;}
+.sval-nest.unset{border-color:var(--amber);background:rgba(154,122,58,.07);}
+.v-sub{margin-top:6px;padding-top:6px;border-top:1px dashed rgba(154,122,58,.45);
+  font-size:11px;font-weight:700;color:var(--amber);text-align:center;}
 .sbtn{flex:0 0 34px;width:34px;height:34px;border-radius:8px;border:1px solid var(--brd);background:var(--card);font-size:16px;cursor:pointer;color:var(--mid);}
 .sbtn.p{border:none;background:var(--clay);color:#faf8f5;}
 .sval{flex:1 1 0;width:0;min-width:0;padding:6px;border-radius:8px;font-size:17px;font-weight:700;border:1px solid var(--brd);background:var(--inp);color:var(--ink);text-align:center;outline:none;font-family:var(--sans);}
@@ -554,7 +565,7 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
     <div class="tb-eye">軽貨物運送　日報システム</div>
     <div class="tb-title" style="color:var(--clay);">ドライバー日報</div>
     <div class="tb-sub" id="login-greeting">本日もよろしくお願いします</div>
-    <div class="tb-sub" id="app-ver-label" style="font-family:var(--mono);font-size:9px;opacity:.7;">ver 2026-09-24.2</div>
+    <div class="tb-sub" id="app-ver-label" style="font-family:var(--mono);font-size:9px;opacity:.7;">ver 2026-10-09.1</div>
   </div>
   <div class="p16">
     <div class="card mb12">
@@ -979,9 +990,15 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
     <div id="yp-del-area">
     <div class="card mb8" id="yp-card-m"><div class="row-hd"><div class="row-ico" style="background:rgba(44,40,37,.07)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ink)" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/></svg></div><span class="row-lbl">持出個数</span></div><div class="stpr"><button class="sbtn" onclick="ypStep('m',-1)">−</button><input type="number" id="yp-m" class="sval" min="0" value="0" autocomplete="off" inputmode="numeric" oninput="valYP()"><button class="sbtn p" onclick="ypStep('m',1)">＋</button></div></div>
     <div class="card mb8" id="yp-card-k"><div class="row-hd"><div class="row-ico" style="background:rgba(107,124,106,.11)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--sage)" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div><span class="row-lbl" style="color:var(--sage)">配達完了数</span></div><div class="stpr"><button class="sbtn" onclick="ypStep('k',-1)">−</button><input type="number" id="yp-k" class="sval" min="0" value="0" autocomplete="off" inputmode="numeric" oninput="valYP()"><button class="sbtn p" style="background:var(--sage)" onclick="ypStep('k',1)">＋</button></div></div>
-    <div class="card mb8"><div class="row-hd"><div class="row-ico" style="background:rgba(96,112,128,.1)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--slate)" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></div><span class="row-lbl" style="color:var(--slate)">夜間配達（20時以降）</span><span class="tag" style="background:rgba(96,112,128,.1);color:var(--slate);margin-left:auto;">内計</span></div><div class="stpr"><button class="sbtn" onclick="ypStep('y',-1)">−</button><input type="number" id="yp-y" class="sval" min="0" value="0" autocomplete="off" inputmode="numeric" oninput="valYP()"><button class="sbtn p" style="background:var(--slate)" onclick="ypStep('y',1)">＋</button></div><div id="yp-y-err" class="xs mt8" style="color:var(--rust);display:none;">⚠ 完了数を超えています</div></div>
+    <!-- ★ 2026-10-09.1: 夜間・大型は「完了の内訳（再掲）」。持出の検算には入らないため、
+         0のまま提出されても検証OKが出てしまい、入力漏れに気づけなかった。
+         完了の下にぶら下げ、何件のうちの内訳かを見えるようにする。 -->
+    <div class="nest" id="yp-nest">
+      <div class="nest-hd">完了 <span class="n" id="yp-nest-k">0</span> 件のうち<span class="nest-sub">（再掲・持出の計算には入りません）</span></div>
+    <div class="card mb8"><div class="row-hd"><div class="row-ico" style="background:rgba(96,112,128,.1)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--slate)" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></div><span class="row-lbl" style="color:var(--slate)">夜間配達（20時以降）</span></div><div class="stpr"><button class="sbtn" onclick="ypStep('y',-1)">−</button><input type="number" id="yp-y" class="sval sval-nest" min="0" value="" placeholder="未入力" autocomplete="off" inputmode="numeric" oninput="valYP()"><button class="sbtn p" style="background:var(--slate)" onclick="ypStep('y',1)">＋</button></div><div class="nest-hint">20時以降に配達が完了した件数。再配達も含みます（20時ちょうども対象）。無い日は0のままで結構です</div><div id="yp-y-err" class="xs mt8" style="color:var(--rust);display:none;">⚠ 完了数を超えています</div></div>
+    <div class="card mb8"><div class="row-hd"><div class="row-ico" style="background:rgba(107,124,106,.11)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--sage)" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg></div><span class="row-lbl" style="color:var(--sage)">170サイズ超（大型）</span></div><div class="stpr"><button class="sbtn" onclick="ypStep('o',-1)">−</button><input type="number" id="yp-o" class="sval sval-nest" min="0" value="" placeholder="未入力" autocomplete="off" inputmode="numeric" oninput="valYP()"><button class="sbtn p" style="background:var(--sage)" onclick="ypStep('o',1)">＋</button></div><div class="nest-hint">170サイズを超える大型の件数</div><div id="yp-o-err" class="xs mt8" style="color:var(--rust);display:none;">⚠ 完了数を超えています</div></div>
+    </div>
     <div class="card mb8"><div class="row-hd"><div class="row-ico" style="background:rgba(136,128,120,.09)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--stone)" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></div><span class="row-lbl" style="color:var(--stone)">転送還付</span></div><div class="stpr"><button class="sbtn" onclick="ypStep('t',-1)">−</button><input type="number" id="yp-t" class="sval" min="0" value="0" autocomplete="off" inputmode="numeric" oninput="valYP()"><button class="sbtn p" style="background:var(--stone)" onclick="ypStep('t',1)">＋</button></div></div>
-    <div class="card mb8"><div class="row-hd"><div class="row-ico" style="background:rgba(107,124,106,.11)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--sage)" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg></div><span class="row-lbl" style="color:var(--sage)">170サイズ超（大型）</span><span class="tag" style="background:rgba(107,124,106,.11);color:var(--sage);margin-left:auto;">内計</span></div><div class="stpr"><button class="sbtn" onclick="ypStep('o',-1)">−</button><input type="number" id="yp-o" class="sval" min="0" value="0" autocomplete="off" inputmode="numeric" oninput="valYP()"><button class="sbtn p" style="background:var(--sage)" onclick="ypStep('o',1)">＋</button></div><div id="yp-o-err" class="xs mt8" style="color:var(--rust);display:none;">⚠ 完了数を超えています</div></div>
     <div class="card mb8"><div class="row-hd"><div class="row-ico" style="background:rgba(154,122,58,.1)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.63"/></svg></div><span class="row-lbl" style="color:var(--amber)">持ち戻り</span></div><div class="stpr"><button class="sbtn" onclick="ypStep('mo',-1)">−</button><input type="number" id="yp-mo" class="sval" min="0" value="0" autocomplete="off" inputmode="numeric" oninput="valYP()"><button class="sbtn p" style="background:var(--amber)" onclick="ypStep('mo',1)">＋</button></div></div>
     <div class="card mb8"><div class="row-hd"><div class="row-ico" style="background:rgba(136,128,120,.09)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--stone)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><span class="row-lbl" style="color:var(--stone)">翌日配達廻し</span></div><div class="stpr"><button class="sbtn" onclick="ypStep('yo',-1)">−</button><input type="number" id="yp-yo" class="sval" min="0" value="0" autocomplete="off" inputmode="numeric" oninput="valYP()"><button class="sbtn p" style="background:var(--stone)" onclick="ypStep('yo',1)">＋</button></div></div>
     <!-- 旧「集荷」入力欄は集荷タブに移動済みのため非表示で隠し維持 (互換用) -->
@@ -3214,7 +3231,7 @@ function selectDriverId(id){
 
 
 // ★ 版の文字列（差し替えのたびに必ず上げる。ログイン画面の表示と一致させる）
-const APP_VER = '2026-10-08.1';
+const APP_VER = '2026-10-09.1';
 console.log('[日報アプリ] APP_VER', APP_VER);
 
 // ══ 勤怠ユーティリティ ══
@@ -16175,7 +16192,10 @@ function doneLogout(){
 let _isAfterClockOut = false;
 
 // ══ ゆうパック ══
-function ypReset(){['yp-m','yp-k','yp-y','yp-t','yp-mo','yp-yo','yp-s'].forEach(id=>{const e=$(id);if(e)e.value=0;});$('yp-note').value='';$('yp-date').value=today();_ypColCounts={};_ypSpotEntries=[];setYpBizMode('del', true);valYP();}
+function ypReset(){['yp-m','yp-k','yp-t','yp-mo','yp-yo','yp-s'].forEach(id=>{const e=$(id);if(e)e.value=0;});
+  /* ★ 2026-10-09.1: 夜間・大型は「未入力」と「0件」を区別するため空にしておく。
+     0 を入れておくと、触らないまま提出しても気づけない。 */
+  ['yp-y','yp-o'].forEach(id=>{const e=$(id);if(e)e.value='';});$('yp-note').value='';$('yp-date').value=today();_ypColCounts={};_ypSpotEntries=[];setYpBizMode('del', true);valYP();}
 const ypN=id=>Math.max(0,parseInt($(id)?.value)||0);
 function ypStep(k,d){const map={m:'yp-m',k:'yp-k',y:'yp-y',t:'yp-t',mo:'yp-mo',yo:'yp-yo',o:'yp-o',s:'yp-s'};const el=$(map[k]);if(!el)return;el.value=Math.max(0,(parseInt(el.value)||0)+d);valYP();}
 function valYP(){
@@ -16186,6 +16206,24 @@ function valYP(){
   const vr=$('v-res');
   if(m>0&&sum>0){if(mOk&&yOk){vr.className='veq vok';vr.textContent=`✓ 検証OK：持出(${m}) ＝ 合計(${sum})`;}else{vr.className='veq vng';vr.textContent=`✗ 持出(${m}) ≠ 合計(${sum})${!yOk?' ／ 夜間エラー':''}`;}}else{vr.className='veq vwt';vr.textContent='数値を入力してください';}
   $('yp-y-err').style.display=!yOk&&y>0?'block':'none';
+  /* ★ 2026-10-09.1: 完了の内訳の見出しと、夜間が未入力の注意 */
+  {
+    const nk=$('yp-nest-k'); if(nk) nk.textContent=k;
+    const yEl=$('yp-y'), oEl=$('yp-o');
+    const yUnset = !!yEl && String(yEl.value).trim()==='';
+    const oUnset = !!oEl && String(oEl.value).trim()==='';
+    if(yEl) yEl.classList.toggle('unset', yUnset && m>0);
+    if(oEl) oEl.classList.toggle('unset', oUnset && m>0);
+    let sub=$('yp-v-sub');
+    if(!sub && $('yp-vbox')){ sub=document.createElement('div'); sub.id='yp-v-sub'; sub.className='v-sub'; $('yp-vbox').appendChild(sub); }
+    if(sub){
+      const miss=[];
+      if(yUnset) miss.push('夜間');
+      if(oUnset) miss.push('大型');
+      if(m>0 && miss.length){ sub.textContent='⚠ '+miss.join('・')+'が未入力です（0件の日はそのまま提出できます）'; sub.style.display='block'; }
+      else sub.style.display='none';
+    }
+  }
   $('yp-card-m').classList.toggle('warn',!mOk&&m>0); $('yp-card-k').classList.toggle('warn',!yOk&&y>0);
   const sm=$('yp-sum');
   if(m>0){sm.style.display='block';$('s-rate').textContent=m>0?Math.round(k/m*100)+'%':'-';$('s-y').textContent=y;const moEl=$('s-mo');if(moEl)moEl.textContent=mo;}else sm.style.display='none';
@@ -16211,7 +16249,8 @@ function updateYpTabBadges(){
   const delBtn = document.getElementById('yp-btab-del');
   const colBtn = document.getElementById('yp-btab-col');
   if(!delBtn || !colBtn) return;
-  const delFilled = ypN('yp-m') > 0 || ypN('yp-k') > 0 || ypN('yp-t') > 0 || ypN('yp-mo') > 0 || ypN('yp-yo') > 0;
+  // ★ 2026-10-09.1: 夜間（y）・大型（o）が抜けていた
+  const delFilled = ypN('yp-m') > 0 || ypN('yp-k') > 0 || ypN('yp-t') > 0 || ypN('yp-mo') > 0 || ypN('yp-yo') > 0 || ypN('yp-y') > 0 || ypN('yp-o') > 0;
   const colTotal = Object.values(_ypColCounts).reduce((a,v)=>a+(parseInt(v)||0),0);
   const colFilled = colTotal > 0;
   const indicator = '<span style="font-size:9px;color:#fca5a5;font-weight:700;margin-left:4px;">入力データあり</span>';
@@ -16245,7 +16284,8 @@ function submitYP(){
   const m=ypN('yp-m'),k=ypN('yp-k'),y=ypN('yp-y'),t=ypN('yp-t'),mo=ypN('yp-mo'),yo=ypN('yp-yo');
   const o=ypN('yp-o'); // ★ 2026/07/06: 170サイズ超(大型)
   const shukkaLegacy = ypN('yp-s'); // 旧「集荷(件数)」枠 (後方互換)
-  const hasDelInput = (m > 0 || k > 0 || t > 0 || mo > 0 || yo > 0 || o > 0);
+  // ★ 2026-10-09.1: 大型(o)は入っていたのに夜間(y)だけ抜けていた
+  const hasDelInput = (m > 0 || k > 0 || t > 0 || mo > 0 || yo > 0 || o > 0 || y > 0);
 
   // 集荷データ収集
   const canCol = _driverHasCol(driver, postOffice);
@@ -16291,6 +16331,25 @@ function submitYP(){
       }
     }
     if(y > k && !confirm(`夜間(${y})>完了(${k})\n保存しますか？`)) return;
+    /* ★ 2026-10-09.1: 夜間・大型が未入力のままなら、1回だけ聞く。
+       検証式（完了+転送+持戻+翌日=持出）に内数は含まれないため、
+       未入力でも「検証 OK」が出てしまい、漏れに気づけなかった。
+       0件の日もあるので、そのまま出せる選択肢を必ず残す。 */
+    {
+      const yEl=$('yp-y'), oEl=$('yp-o');
+      const unset=[];
+      if(yEl && String(yEl.value).trim()==='') unset.push('夜間');
+      if(oEl && String(oEl.value).trim()==='') unset.push('大型');
+      if(unset.length){
+        const nm=unset.join('・');
+        if(!confirm(`${nm}の件数が未入力です。\n\n`
+          +`夜間：20時以降に配達が完了した件数（再配達も含む、20時ちょうども対象）\n\n`
+          +`OK → ${nm} 0件として提出\n`
+          +`キャンセル → 戻って入力する`)) return;
+        if(yEl && String(yEl.value).trim()==='') yEl.value=0;
+        if(oEl && String(oEl.value).trim()==='') oEl.value=0;
+      }
+    }
   }
 
   // 同日・同人・同郵便局の重複チェック
