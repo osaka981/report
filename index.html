@@ -565,7 +565,7 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
     <div class="tb-eye">軽貨物運送　日報システム</div>
     <div class="tb-title" style="color:var(--clay);">ドライバー日報</div>
     <div class="tb-sub" id="login-greeting">本日もよろしくお願いします</div>
-    <div class="tb-sub" id="app-ver-label" style="font-family:var(--mono);font-size:9px;opacity:.7;">ver 2026-10-09.3</div>
+    <div class="tb-sub" id="app-ver-label" style="font-family:var(--mono);font-size:9px;opacity:.7;">ver 2026-10-09.4</div>
   </div>
   <div class="p16">
     <div class="card mb12">
@@ -3279,7 +3279,7 @@ function selectDriverId(id){
 
 
 // ★ 版の文字列（差し替えのたびに必ず上げる。ログイン画面の表示と一致させる）
-const APP_VER = '2026-10-09.3';
+const APP_VER = '2026-10-09.4';
 console.log('[日報アプリ] APP_VER', APP_VER);
 
 // ══ 勤怠ユーティリティ ══
@@ -3692,11 +3692,22 @@ function renderYpYoko(){
 
 /* 「給油した」は会社のカードを使う人だけに出す。
    自分のカードで給油する人はCSVも来ないので、欄ごと出さない。
-   判定は経営管理から渡る driver.gasCard（カード貸出あり or 燃料CSVの車番あり）。 */
+   ★ 2026-10-09.4: 経営管理の渡し方が版によって違うので、どれでも拾う。
+     gasCardOn … 判定ずみ（.29以降）
+     gasCardLend='あり' / gasCardNo あり … 元の設定（.29以降）
+     gasCard===true … .28 の渡し方 */
+function _driverHasGasCard(d){
+  if(!d) return false;
+  if(d.gasCardOn === true) return true;
+  if(d.gasCard === true) return true;
+  if(String(d.gasCardLend || '') === 'あり') return true;
+  if(String(d.gasCardNo || '').trim()) return true;
+  return false;
+}
 function syncYpGasRow(){
   const row = document.getElementById('yp-gas-row');
   if(!row) return;
-  const on = !!(driver && driver.gasCard);
+  const on = _driverHasGasCard(driver);
   row.style.display = on ? '' : 'none';
   if(!on){ const c = document.getElementById('yp-gas'); if(c) c.checked = false; }
 }
@@ -16510,7 +16521,7 @@ function submitYP(){
      parking は駐車料金の立替（円）。refueled は給油したかどうか。 */
   const _yokoNames = _ypYokoNames.map(n=>String(n||'').trim()).filter(Boolean);
   const _park = Math.max(0, parseInt($('yp-park')?.value) || 0);
-  const _gasOn = !!(driver && driver.gasCard) && !!$('yp-gas')?.checked;
+  const _gasOn = _driverHasGasCard(driver) && !!$('yp-gas')?.checked;
   if(_yokoNames.length || _park > 0 || _gasOn){
     form.teate = {
       yokonori: _yokoNames.length,
