@@ -565,7 +565,7 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
     <div class="tb-eye">軽貨物運送　日報システム</div>
     <div class="tb-title" style="color:var(--clay);">ドライバー日報</div>
     <div class="tb-sub" id="login-greeting">本日もよろしくお願いします</div>
-    <div class="tb-sub" id="app-ver-label" style="font-family:var(--mono);font-size:9px;opacity:.7;">ver 2026-10-09.2</div>
+    <div class="tb-sub" id="app-ver-label" style="font-family:var(--mono);font-size:9px;opacity:.7;">ver 2026-10-09.3</div>
   </div>
   <div class="p16">
     <div class="card mb12">
@@ -1037,6 +1037,54 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
         </div>
       </div>
     </div>
+    <!-- ★ 2026-10-09.3: 紙の日報に書いてある手当・立替をここで入れる。
+         会社側は見比べるだけで済むようにするのが目的。
+         特別手当と違約金は月末にしか決まらないので、ここには出さない。 -->
+    <div class="card mb8" id="yp-teate-card">
+      <div class="row-hd">
+        <div class="row-ico" style="background:rgba(107,124,106,.11)">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--sage)" stroke-width="2"><path d="M20 12V8H6a2 2 0 0 1 0-4h12v4"/><path d="M4 6v12a2 2 0 0 0 2 2h14v-4"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/></svg>
+        </div>
+        <span class="row-lbl" style="color:var(--sage)">手当・立替</span>
+        <span style="font-size:9px;color:var(--mid);margin-left:6px;">紙の日報どおりに</span>
+      </div>
+      <div style="font-size:9.5px;color:var(--light);margin-top:6px;line-height:1.6;">
+        無い日は空のままで結構です。
+      </div>
+
+      <div style="margin-top:10px;">
+        <div style="display:flex;align-items:baseline;gap:7px;">
+          <span style="font-size:11.5px;font-weight:600;">横乗り</span>
+          <span style="font-size:9.5px;color:var(--mid);">誰の横乗りをしたか</span>
+          <div style="flex:1;"></div>
+          <span style="font-size:10px;color:var(--mid);"><b id="yp-yoko-cnt" style="font-size:14px;color:var(--sage);">0</b> 件</span>
+        </div>
+        <div id="yp-yoko-list" style="display:flex;flex-direction:column;gap:6px;margin-top:6px;"></div>
+        <button type="button" onclick="ypYokoAdd()" style="margin-top:6px;width:100%;padding:9px;background:rgba(107,124,106,.08);border:1.5px dashed rgba(107,124,106,.4);color:var(--sage);border-radius:8px;font-size:11.5px;font-weight:600;cursor:pointer;">+ 相手を追加</button>
+        <div style="font-size:9.5px;color:var(--light);margin-top:6px;line-height:1.5;">
+          ※ 名字だけで結構です。件数は行の数になります。
+        </div>
+      </div>
+
+      <div style="margin-top:12px;display:flex;align-items:center;gap:8px;">
+        <label for="yp-park" style="flex:1;font-size:11.5px;font-weight:600;">駐車料金 立替<span style="font-size:9.5px;color:var(--mid);font-weight:400;">（円）</span></label>
+        <input type="number" id="yp-park" class="fi" min="0" value="" placeholder="0" autocomplete="off" inputmode="numeric" style="width:120px;text-align:right;font-family:var(--mono);font-weight:700;">
+      </div>
+      <div style="font-size:9.5px;color:var(--light);margin-top:4px;line-height:1.5;">
+        ※ 領収書は紙の日報に添付してください。
+      </div>
+
+      <div id="yp-gas-row" style="display:none;margin-top:12px;padding-top:10px;border-top:1px dashed var(--brd);">
+        <label for="yp-gas" style="display:flex;align-items:center;gap:9px;cursor:pointer;">
+          <input type="checkbox" id="yp-gas" style="width:19px;height:19px;">
+          <span style="font-size:11.5px;font-weight:600;">給油した</span>
+        </label>
+        <div style="font-size:9.5px;color:var(--light);margin-top:5px;padding-left:28px;line-height:1.5;">
+          金額は入れません。領収書は紙の日報に添付してください。
+        </div>
+      </div>
+    </div>
+
     <div class="card mb8"><div class="row-hd"><div class="row-ico" style="background:rgba(136,128,120,.09)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--stone)" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div><span class="row-lbl" style="color:var(--stone)">備考</span></div><textarea id="yp-note" class="fi" rows="3" placeholder="トラブル・特記事項など"></textarea></div>
     <button id="yp-submit" class="btn-main" onclick="submitYP()" style="background:var(--slate);color:#faf8f5;">日報を提出する</button>
     <div style="height:28px;"></div>
@@ -3231,7 +3279,7 @@ function selectDriverId(id){
 
 
 // ★ 版の文字列（差し替えのたびに必ず上げる。ログイン画面の表示と一致させる）
-const APP_VER = '2026-10-09.2';
+const APP_VER = '2026-10-09.3';
 console.log('[日報アプリ] APP_VER', APP_VER);
 
 // ══ 勤怠ユーティリティ ══
@@ -3605,6 +3653,54 @@ let _ypBizMode = 'del'; // 'del' or 'col'
 let _ypColCounts = {};  // {companyName: count}
 let _ypSpotEntries = []; // [{name:'', count:0}] スポット集荷
 
+/* ★ 2026-10-09.3: 横乗りの相手。会社の従事員一覧は渡さないので、
+   候補は出さずそのまま書いてもらう。新人など未登録の人も書ける。
+   支払は件数（この配列の長さ）だけで計算し、名前は使わない。 */
+let _ypYokoNames = [];   // ['田中さん', ...]
+
+function ypYokoAdd(name){
+  _ypYokoNames.push(String(name || ''));
+  renderYpYoko();
+}
+function ypYokoDel(i){
+  _ypYokoNames.splice(i, 1);
+  renderYpYoko();
+}
+function ypYokoInput(i, v){
+  _ypYokoNames[i] = String(v || '');
+  const b = document.getElementById('yp-yoko-cnt');
+  if(b) b.textContent = _ypYokoCount();
+}
+function _ypYokoCount(){
+  return _ypYokoNames.filter(n => String(n||'').trim()).length;
+}
+function renderYpYoko(){
+  const wrap = document.getElementById('yp-yoko-list');
+  if(!wrap) return;
+  wrap.innerHTML = _ypYokoNames.map((n, i) => `
+    <div style="display:flex;gap:6px;align-items:center;">
+      <input type="text" value="${_esc(n)}" placeholder="名前を入れてください"
+        aria-label="横乗りの相手" autocomplete="off" class="fi"
+        oninput="ypYokoInput(${i}, this.value)"
+        style="flex:1;min-width:0;font-size:12.5px;">
+      <button type="button" onclick="ypYokoDel(${i})" aria-label="この行を消す"
+        style="width:34px;height:34px;flex-shrink:0;background:none;border:1px solid var(--brd);border-radius:8px;color:var(--mid);font-size:13px;cursor:pointer;">✕</button>
+    </div>`).join('');
+  const b = document.getElementById('yp-yoko-cnt');
+  if(b) b.textContent = _ypYokoCount();
+}
+
+/* 「給油した」は会社のカードを使う人だけに出す。
+   自分のカードで給油する人はCSVも来ないので、欄ごと出さない。
+   判定は経営管理から渡る driver.gasCard（カード貸出あり or 燃料CSVの車番あり）。 */
+function syncYpGasRow(){
+  const row = document.getElementById('yp-gas-row');
+  if(!row) return;
+  const on = !!(driver && driver.gasCard);
+  row.style.display = on ? '' : 'none';
+  if(!on){ const c = document.getElementById('yp-gas'); if(c) c.checked = false; }
+}
+
 function updateYpBizTabs(){
   const tabs = document.getElementById('yp-biz-tabs');
   if(!tabs) return;
@@ -3861,6 +3957,7 @@ function selectBiz(t){
   if(t==='yp'){
     $('yp-sub').textContent=`${driver.name} ／ ${driver.office}`;
     ypReset();
+    try{ syncYpGasRow(); }catch(e){}   // ★ 2026-10-09.3
     buildPostOfficeBtns(); // 郵便局選択ボタンを構築
     show('scr-yp');
   } else {
@@ -16201,7 +16298,11 @@ let _isAfterClockOut = false;
 function ypReset(){['yp-m','yp-k','yp-t','yp-mo','yp-yo','yp-s'].forEach(id=>{const e=$(id);if(e)e.value=0;});
   /* ★ 2026-10-09.1: 夜間・大型は「未入力」と「0件」を区別するため空にしておく。
      0 を入れておくと、触らないまま提出しても気づけない。 */
-  ['yp-y','yp-o'].forEach(id=>{const e=$(id);if(e)e.value='';});$('yp-note').value='';$('yp-date').value=today();_ypColCounts={};_ypSpotEntries=[];_ypColGrace='';setYpBizMode('del', true);valYP();}
+  ['yp-y','yp-o'].forEach(id=>{const e=$(id);if(e)e.value='';});$('yp-note').value='';$('yp-date').value=today();_ypColCounts={};_ypSpotEntries=[];_ypColGrace='';
+  // ★ 2026-10-09.3: 手当・立替も空に戻す
+  _ypYokoNames=[]; if($('yp-park'))$('yp-park').value=''; if($('yp-gas'))$('yp-gas').checked=false;
+  try{ renderYpYoko(); syncYpGasRow(); }catch(e){}
+  setYpBizMode('del', true);valYP();}
 const ypN=id=>Math.max(0,parseInt($(id)?.value)||0);
 function ypStep(k,d){const map={m:'yp-m',k:'yp-k',y:'yp-y',t:'yp-t',mo:'yp-mo',yo:'yp-yo',o:'yp-o',s:'yp-s'};const el=$(map[k]);if(!el)return;el.value=Math.max(0,(parseInt(el.value)||0)+d);valYP();}
 function valYP(){
@@ -16401,6 +16502,27 @@ function submitYP(){
   if(hasColInput){
     const colTotal = allColEntries.reduce((a,e)=>a+e.count, 0);
     form.col = { companies: allColEntries, total: colTotal };
+  }
+
+  /* ★ 2026-10-09.3: 手当・立替。
+     yokonori は件数（支払の計算に使う既存の項目）。
+     yokonoriWith は誰の横乗りかの記録で、支払には使わない。
+     parking は駐車料金の立替（円）。refueled は給油したかどうか。 */
+  const _yokoNames = _ypYokoNames.map(n=>String(n||'').trim()).filter(Boolean);
+  const _park = Math.max(0, parseInt($('yp-park')?.value) || 0);
+  const _gasOn = !!(driver && driver.gasCard) && !!$('yp-gas')?.checked;
+  if(_yokoNames.length || _park > 0 || _gasOn){
+    form.teate = {
+      yokonori: _yokoNames.length,
+      yokonoriWith: _yokoNames,
+      parking: _park,
+      refueled: _gasOn
+    };
+    // 経営管理が form 直下も読むため、そのまま写す
+    form.yokonori     = _yokoNames.length;
+    form.yokonoriWith = _yokoNames;
+    form.parking      = _park;
+    form.refueled     = _gasOn;
   }
 
   const rec = {
@@ -20292,6 +20414,19 @@ function doEdit(){
     if(Object.keys(_ypColCounts).length || _ypSpotEntries.length){
       _ypColGrace = lastResult.postOffice || '';
     }
+    // ★ 2026-10-09.3: 手当・立替を戻す
+    _ypYokoNames = [];
+    const _te = f.teate || f;
+    if(Array.isArray(_te.yokonoriWith)){
+      _ypYokoNames = _te.yokonoriWith.map(x=>String(x||''));
+    }else if(parseInt(_te.yokonori) > 0){
+      // 名前を持たない古いデータ。件数ぶんの空欄を出して書いてもらう
+      _ypYokoNames = new Array(parseInt(_te.yokonori)).fill('');
+    }
+    if($('yp-park')) $('yp-park').value = (parseInt(_te.parking) > 0) ? parseInt(_te.parking) : '';
+    if($('yp-gas'))  $('yp-gas').checked = !!_te.refueled;
+    try{ renderYpYoko(); syncYpGasRow(); }catch(e){}
+
     $('yp-date').value = lastResult.date;
     $('yp-note').value = f.notes || '';
     buildPostOfficeBtns();
