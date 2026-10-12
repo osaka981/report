@@ -565,7 +565,7 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
     <div class="tb-eye">軽貨物運送　日報システム</div>
     <div class="tb-title" style="color:var(--clay);">ドライバー日報</div>
     <div class="tb-sub" id="login-greeting">本日もよろしくお願いします</div>
-    <div class="tb-sub" id="app-ver-label" style="font-family:var(--mono);font-size:9px;opacity:.7;">ver 2026-10-09.4</div>
+    <div class="tb-sub" id="app-ver-label" style="font-family:var(--mono);font-size:9px;opacity:.7;">ver 2026-10-09.5</div>
   </div>
   <div class="p16">
     <div class="card mb12">
@@ -1045,7 +1045,7 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
         <div class="row-ico" style="background:rgba(107,124,106,.11)">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--sage)" stroke-width="2"><path d="M20 12V8H6a2 2 0 0 1 0-4h12v4"/><path d="M4 6v12a2 2 0 0 0 2 2h14v-4"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/></svg>
         </div>
-        <span class="row-lbl" style="color:var(--sage)">手当・立替</span>
+        <span class="row-lbl" style="color:var(--sage)">横乗り</span>
         <span style="font-size:9px;color:var(--mid);margin-left:6px;">紙の日報どおりに</span>
       </div>
       <div style="font-size:9.5px;color:var(--light);margin-top:6px;line-height:1.6;">
@@ -1054,7 +1054,6 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
 
       <div style="margin-top:10px;">
         <div style="display:flex;align-items:baseline;gap:7px;">
-          <span style="font-size:11.5px;font-weight:600;">横乗り</span>
           <span style="font-size:9.5px;color:var(--mid);">誰の横乗りをしたか</span>
           <div style="flex:1;"></div>
           <span style="font-size:10px;color:var(--mid);"><b id="yp-yoko-cnt" style="font-size:14px;color:var(--sage);">0</b> 件</span>
@@ -1066,28 +1065,143 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
         </div>
       </div>
 
-      <div style="margin-top:12px;display:flex;align-items:center;gap:8px;">
-        <label for="yp-park" style="flex:1;font-size:11.5px;font-weight:600;">駐車料金 立替<span style="font-size:9.5px;color:var(--mid);font-weight:400;">（円）</span></label>
-        <input type="number" id="yp-park" class="fi" min="0" value="" placeholder="0" autocomplete="off" inputmode="numeric" style="width:120px;text-align:right;font-family:var(--mono);font-weight:700;">
-      </div>
-      <div style="font-size:9.5px;color:var(--light);margin-top:4px;line-height:1.5;">
-        ※ 領収書は紙の日報に添付してください。
-      </div>
+    </div>
 
-      <div id="yp-gas-row" style="display:none;margin-top:12px;padding-top:10px;border-top:1px dashed var(--brd);">
-        <label for="yp-gas" style="display:flex;align-items:center;gap:9px;cursor:pointer;">
-          <input type="checkbox" id="yp-gas" style="width:19px;height:19px;">
-          <span style="font-size:11.5px;font-weight:600;">給油した</span>
-        </label>
-        <div style="font-size:9.5px;color:var(--light);margin-top:5px;padding-left:28px;line-height:1.5;">
-          金額は入れません。領収書は紙の日報に添付してください。
-        </div>
+    <!-- ★ 2026-10-09.5: 走行距離・駐車料金・給油は提出の直前に聞く -->
+    <div class="card mb8" style="background:rgba(74,122,155,.07);border-color:rgba(74,122,155,.35);">
+      <div style="font-size:10.5px;color:var(--ink);line-height:1.7;">
+        <b style="color:var(--slate);">提出を押すと、確認の画面が出ます。</b><br>
+        そこで 走行距離 ・ 駐車料金 ・ 給油 を入れてから提出します。
       </div>
     </div>
 
     <div class="card mb8"><div class="row-hd"><div class="row-ico" style="background:rgba(136,128,120,.09)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--stone)" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div><span class="row-lbl" style="color:var(--stone)">備考</span></div><textarea id="yp-note" class="fi" rows="3" placeholder="トラブル・特記事項など"></textarea></div>
     <button id="yp-submit" class="btn-main" onclick="submitYP()" style="background:var(--slate);color:#faf8f5;">日報を提出する</button>
     <div style="height:28px;"></div>
+<!-- ══ 提出前の確認（走行距離・駐車料金・給油） 2026-10-09.5 ══ -->
+<div id="yp-cf" style="display:none;position:fixed;inset:0;z-index:900;background:var(--bg,#211e1b);">
+  <div style="height:100%;display:flex;flex-direction:column;">
+    <div style="padding:13px 16px 11px;border-bottom:1px solid var(--brd);display:flex;align-items:center;gap:9px;">
+      <button type="button" onclick="closeYpConfirm()" aria-label="戻る" style="background:none;border:none;color:var(--mid);font-size:17px;padding:0 4px;cursor:pointer;">‹</button>
+      <div style="flex:1;">
+        <div style="font-size:16px;font-weight:700;">提出の前に</div>
+        <div style="font-size:10px;color:var(--mid);margin-top:1px;" id="yp-cf-head"></div>
+      </div>
+    </div>
+
+    <div style="flex:1;min-height:0;overflow:auto;padding:11px 16px 16px;display:flex;flex-direction:column;gap:10px;">
+
+      <div class="card" style="padding:9px 12px;">
+        <div style="font-size:10px;font-weight:700;color:var(--mid);letter-spacing:.06em;margin-bottom:7px;">入れた数</div>
+        <div id="yp-cf-sum" style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;"></div>
+      </div>
+
+      <div style="background:rgba(74,122,155,.07);border:1.5px solid var(--slate);border-radius:9px;padding:11px 13px;">
+        <div style="display:flex;align-items:baseline;gap:7px;margin-bottom:9px;">
+          <span style="font-size:12px;font-weight:700;color:var(--slate);">走行距離</span>
+          <span style="font-size:9.5px;color:var(--mid);">メーターの数字を</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;">
+          <label for="yp-cf-odo1" style="flex:1;font-size:12.5px;">出発時</label>
+          <input id="yp-cf-odo1" type="number" min="0" inputmode="numeric" class="fi" oninput="ypCfCalc()" placeholder="0" style="width:124px;text-align:right;font-family:var(--mono);font-weight:700;">
+          <span style="font-size:11px;color:var(--mid);width:18px;">km</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <label for="yp-cf-odo2" style="flex:1;font-size:12.5px;">帰局時</label>
+          <input id="yp-cf-odo2" type="number" min="0" inputmode="numeric" class="fi" oninput="ypCfCalc()" placeholder="0" style="width:124px;text-align:right;font-family:var(--mono);font-weight:700;">
+          <span style="font-size:11px;color:var(--mid);width:18px;">km</span>
+        </div>
+        <div style="margin-top:9px;padding-top:8px;border-top:1px dashed var(--brd);display:flex;align-items:baseline;">
+          <span style="font-size:11.5px;color:var(--mid);">この日の走行</span>
+          <div style="flex:1;"></div>
+          <span id="yp-cf-dist" style="font-family:var(--mono);font-size:20px;font-weight:700;color:var(--slate);">-</span>
+          <span style="font-size:11px;color:var(--mid);margin-left:4px;">km</span>
+        </div>
+        <div id="yp-cf-odo-err" style="font-size:10.5px;color:var(--rust);margin-top:6px;display:none;"></div>
+
+        <div id="yp-cf-oil-row" style="margin-top:7px;padding-top:7px;border-top:1px dashed var(--brd);display:none;align-items:center;">
+          <span style="font-size:11px;color:var(--mid);">次回オイル交換</span>
+          <div style="flex:1;"></div>
+          <span id="yp-cf-oil-next" style="font-family:var(--mono);font-size:13px;color:var(--ink);">-</span>
+          <span style="font-size:10px;color:var(--mid);margin-left:3px;">km</span>
+          <span id="yp-cf-oil-left" style="font-size:10px;color:var(--mid);margin-left:7px;"></span>
+          <button type="button" id="yp-cf-oil-btn" onclick="openYpOilEdit('change')" style="margin-left:9px;background:none;border:1px solid var(--brd);border-radius:6px;color:var(--ink);font-size:10.5px;padding:4px 9px;cursor:pointer;">変更</button>
+        </div>
+        <div id="yp-cf-oil-hint" style="font-size:9.5px;color:var(--light);margin-top:5px;line-height:1.5;display:none;">代車に乗っている日など、距離が違うときは「変更」から直せます。</div>
+      </div>
+
+      <div style="background:rgba(107,124,106,.07);border:1.5px solid var(--sage);border-radius:9px;padding:11px 13px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <label for="yp-cf-park" style="flex:1;font-size:12.5px;font-weight:700;color:var(--sage);">駐車料金 立替<span style="font-size:9.5px;color:var(--mid);font-weight:400;">（円）</span></label>
+          <input id="yp-cf-park" type="number" min="0" inputmode="numeric" class="fi" placeholder="0" style="width:124px;text-align:right;font-family:var(--mono);font-weight:700;">
+        </div>
+        <div style="font-size:9.5px;color:var(--light);margin-top:6px;line-height:1.5;">無ければ 0 のままで結構です。領収書は紙の日報に添付してください。</div>
+      </div>
+
+      <div id="yp-cf-gas-card" style="background:rgba(154,122,58,.07);border:1.5px solid rgba(154,122,58,.5);border-radius:9px;padding:11px 13px;display:none;">
+        <label for="yp-cf-gas" style="display:flex;align-items:center;gap:9px;cursor:pointer;">
+          <input id="yp-cf-gas" type="checkbox" style="width:19px;height:19px;">
+          <span style="font-size:12.5px;font-weight:700;color:var(--amber);">給油した</span>
+        </label>
+        <div style="font-size:9.5px;color:var(--light);margin-top:6px;padding-left:28px;line-height:1.5;">金額は入れません。領収書は紙の日報に添付してください。</div>
+      </div>
+
+      <div style="font-size:10px;color:var(--light);line-height:1.7;">
+        横乗りは前の画面で入れます。特別手当と違約金は月末に会社側で入れます。
+      </div>
+
+    </div>
+
+    <div style="padding:10px 16px 16px;border-top:1px solid var(--brd);display:flex;flex-direction:column;gap:8px;">
+      <button type="button" class="btn-main" onclick="ypConfirmSubmit()">この内容で提出する</button>
+      <button type="button" onclick="closeYpConfirm()" style="width:100%;background:none;border:1px solid var(--brd);border-radius:9px;color:var(--ink);font-size:13px;padding:11px 0;cursor:pointer;">戻って直す</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ オイル交換の確認 ══ -->
+<div id="yp-oil" style="display:none;position:fixed;inset:0;z-index:960;background:rgba(18,16,14,.72);">
+  <div style="position:absolute;left:16px;right:16px;top:14%;background:var(--card,#2b2723);border:1.5px solid rgba(154,122,58,.6);border-radius:14px;padding:18px;box-shadow:0 10px 40px rgba(0,0,0,.5);">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+      <div style="width:34px;height:34px;flex-shrink:0;border-radius:9px;background:rgba(154,122,58,.18);display:flex;align-items:center;justify-content:center;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="注意"><path d="M12 2L3 20h18L12 2z"/><line x1="12" y1="9" x2="12" y2="14"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      </div>
+      <div>
+        <div style="font-size:15px;font-weight:700;color:var(--amber);">オイル交換の時期です</div>
+        <div id="yp-oil-sub" style="font-size:10.5px;color:var(--mid);margin-top:2px;"></div>
+      </div>
+    </div>
+    <div style="background:var(--bg,#211e1b);border:1px solid var(--brd);border-radius:9px;padding:11px 13px;margin-bottom:14px;" id="yp-oil-rows"></div>
+    <div style="font-size:12px;color:var(--ink);line-height:1.7;margin-bottom:14px;">オイルは交換しましたか。</div>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <button type="button" onclick="openYpOilEdit('done')" style="width:100%;background:var(--amber);border:none;border-radius:9px;color:#221c16;font-size:14px;font-weight:700;padding:13px 0;cursor:pointer;">交換した</button>
+      <button type="button" onclick="ypOilSkip()" style="width:100%;background:none;border:1px solid var(--brd);border-radius:9px;color:var(--ink);font-size:13px;padding:11px 0;cursor:pointer;">まだ（次も知らせる）</button>
+    </div>
+    <div style="font-size:10px;color:var(--light);line-height:1.6;margin-top:11px;">「まだ」を選んでも提出はできます。次に走った日にまた出ます。</div>
+  </div>
+</div>
+
+<!-- ══ 次回のオイル交換距離 ══ -->
+<div id="yp-oiledit" style="display:none;position:fixed;inset:0;z-index:970;background:rgba(18,16,14,.72);">
+  <div style="position:absolute;left:16px;right:16px;top:13%;background:var(--card,#2b2723);border:1.5px solid var(--sage);border-radius:14px;padding:18px;box-shadow:0 10px 40px rgba(0,0,0,.5);">
+    <div style="margin-bottom:13px;">
+      <div style="font-size:15px;font-weight:700;color:var(--sage);">次回の交換距離</div>
+      <div id="yp-oiledit-sub" style="font-size:10.5px;color:var(--mid);margin-top:2px;"></div>
+    </div>
+    <label for="yp-oiledit-km" style="display:block;font-size:12px;color:var(--ink);margin-bottom:7px;">次回の交換距離</label>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <input id="yp-oiledit-km" type="number" min="0" inputmode="numeric" class="fi" style="flex:1;min-width:0;text-align:right;font-family:var(--mono);font-size:20px;font-weight:700;">
+      <span style="font-size:12px;color:var(--mid);width:20px;">km</span>
+    </div>
+    <div id="yp-oiledit-note" style="font-size:10.5px;color:var(--light);line-height:1.6;margin-top:7px;"></div>
+    <div style="display:flex;gap:7px;margin-top:11px;" id="yp-oiledit-chips"></div>
+    <div style="margin-top:16px;display:flex;flex-direction:column;gap:8px;">
+      <button type="button" onclick="ypOilSave()" style="width:100%;background:var(--sage);border:none;border-radius:9px;color:#faf8f5;font-size:14px;font-weight:700;padding:13px 0;cursor:pointer;">この距離で記録する</button>
+      <button type="button" onclick="closeYpOilEdit()" style="width:100%;background:none;border:1px solid var(--brd);border-radius:9px;color:var(--ink);font-size:13px;padding:11px 0;cursor:pointer;">戻る</button>
+    </div>
+  </div>
+</div>
+
   </div>
 </div>
 
@@ -2031,6 +2145,10 @@ const LS={
   // ★ 2026/08/28: 集荷の写真(顧客ごと)。日報本体とは別ノードに置く。
   //   { "<日付>__<顧客キー>": [ {id,ts,by,byName,cust,thumb,full} ] }
   COL_PHOTOS:'nikki_col_photos',
+  /* ★ 2026-10-09.5: オイル交換の状態。ドライバーごとに
+     { "<driverId>": {nextKm, lastKm, changedAt} } で持つ。
+     nikki/drivers は経営管理が作り直すので、そこへは書かない。 */
+  OIL:'nikki_oil_state',
 };
 
 // ── Firebase設定を自動注入（セットアップ不要） ──
@@ -2173,7 +2291,7 @@ async function syncFromFirebase() {
   // ★ 2026/08/28: col_photos はここに入れない。
   //   全期間の写真を起動のたびに落とすことになり、通信量が現実的でない。
   //   写真は表示する日付の分だけ、その都度読み込む(loadPhotosForDate)。
-  const keys = ['drivers','customers','offices','regions','yp_logs','col_logs','att_logs','edit_logs','sec_pin','adm_pin'];
+  const keys = ['drivers','customers','offices','regions','yp_logs','col_logs','att_logs','edit_logs','sec_pin','adm_pin','oil_state'];
   // ★ 2026/07/06: 各取得に3秒タイムアウトを設け、全キーを並列取得(順番待ちしない)。
   //   電波が悪くても、応答が無いキーは諦めて先へ進む。
   function getWithTimeout(k, ms){
@@ -2199,6 +2317,7 @@ async function syncFromFirebase() {
   COL_LOGS  = ls_get(LS.COL_LOGS, []);
   try{ _mergeJetIntoColLogs(); }catch(e){}
   ATT_LOGS  = ls_get(LS.ATT_LOGS, []);
+  OIL_STATE = ls_get(LS.OIL, {}) || {};   // ★ 2026-10-09.5
   console.log('Firebase同期完了');
   // ★ 2026/07/06: 起動を待たない方式にしたため、裏で読込完了後に
   //   ログイン画面(ドライバー一覧)を再描画して最新データを反映する。
@@ -2995,6 +3114,11 @@ const today=()=>{
 const fmtD=s=>{const d=new Date(s+'T00:00:00');return`${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;};
 const n=id=>Math.max(0,parseInt($(id)?.value)||0);
 let driver=null, lastResult=null;
+/* ★ 2026-10-09.5: オイル交換の状態（ドライバーごと）
+   { "<driverId>": { nextKm:52296, lastKm:48296, changedAt:'2026-10-12' } } */
+let OIL_STATE = ls_get(LS.OIL, {}) || {};
+const OIL_WARN_KM = 300;      // 次回まで何kmで知らせるか
+const OIL_INTERVAL_KM = 4000; // 入力が無いときの次回までの距離
 let colRows=[], colCustId=null, colCustName='', colRegion='';
 
 // ══ 画面切替 ══
@@ -3279,7 +3403,7 @@ function selectDriverId(id){
 
 
 // ★ 版の文字列（差し替えのたびに必ず上げる。ログイン画面の表示と一致させる）
-const APP_VER = '2026-10-09.4';
+const APP_VER = '2026-10-09.5';
 console.log('[日報アプリ] APP_VER', APP_VER);
 
 // ══ 勤怠ユーティリティ ══
@@ -3704,12 +3828,286 @@ function _driverHasGasCard(d){
   if(String(d.gasCardNo || '').trim()) return true;
   return false;
 }
+
+/* ════════════════════════════════════════════════════════════
+   ★ 2026-10-09.5: 提出前の確認（走行距離・駐車料金・給油）とオイル交換
+     「日報を提出する」を押すと、まずこの画面が出る。
+     入れ忘れが多いものを、提出の直前にまとめて聞く。
+   ════════════════════════════════════════════════════════════ */
+let _ypPending = null;   // 確認画面で提出を押すまで持っておく日報の中身
+let _ypOilMode = '';     // 'done' = 交換した / 'change' = 距離だけ直す
+
+function _oilKey(){ return String((driver && (driver.id || driver.empNo)) || ''); }
+function _oilGet(){
+  const k=_oilKey();
+  const o=(OIL_STATE && OIL_STATE[k]) || null;
+  return o && typeof o==='object' ? o : null;
+}
+function _oilSet(obj){
+  const k=_oilKey(); if(!k) return;
+  if(!OIL_STATE || typeof OIL_STATE!=='object') OIL_STATE={};
+  OIL_STATE[k]=obj;
+  fbSet('oil_state', OIL_STATE);
+}
+const _km = v => { const n=parseInt(String(v==null?'':v).replace(/[^0-9-]/g,'')); return isNaN(n)?null:n; };
+const _kmFmt = n => (n==null?'-':Number(n).toLocaleString());
+
+// 確認画面を開く
+function openYpConfirm(){
+  const cf=$('yp-cf'); if(!cf) return;
+  const head=$('yp-cf-head');
+  if(head) head.textContent = (_ypPending ? (_ypPending.date + '　' + _ypPending.postOffice) : '');
+
+  // 入れた数のおさらい
+  const d=(_ypPending && _ypPending.form && _ypPending.form.del) || {};
+  const colT=(_ypPending && _ypPending.form && _ypPending.form.col && _ypPending.form.col.total) || 0;
+  const yoko=(_ypPending && _ypPending.yokoNames && _ypPending.yokoNames.length) || 0;
+  const cells=[
+    {l:'持出', v:d.mochidashi||0, c:''},
+    {l:'完了', v:d.kanryo||0,     c:'color:var(--sage);'},
+    {l:'夜間', v:d.yakan||0,      c:'color:var(--slate);'},
+    {l:'大型', v:d.ogata||0,      c:'color:var(--clay);'},
+    {l:'転送', v:d.tenso||0,      c:''},
+    {l:'持戻', v:d.mochimodoiri||0, c:''},
+    {l:'翌日', v:d['翌日廻し']||0, c:''},
+    {l: colT ? '集荷' : '横乗', v: colT || yoko, c:'color:var(--sage);'}
+  ];
+  const sum=$('yp-cf-sum');
+  if(sum) sum.innerHTML = cells.map(x=>`<div style="text-align:center;">
+      <div style="font-family:var(--mono);font-size:16px;font-weight:700;${x.c}">${x.v}</div>
+      <div style="font-size:9px;color:var(--light);margin-top:1px;">${x.l}</div>
+    </div>`).join('');
+
+  // 給油は会社カードの人だけ
+  const gc=$('yp-cf-gas-card');
+  if(gc) gc.style.display = _driverHasGasCard(driver) ? '' : 'none';
+  if(!_driverHasGasCard(driver)){ const g=$('yp-cf-gas'); if(g) g.checked=false; }
+
+  ypCfCalc();
+  cf.style.display='block';
+  setTimeout(()=>{ const e=$('yp-cf-odo1'); if(e && !e.value) e.focus(); }, 80);
+}
+function closeYpConfirm(){ const cf=$('yp-cf'); if(cf) cf.style.display='none'; }
+
+// 走行距離の計算と、オイルの残り表示
+function ypCfCalc(){
+  const a=_km($('yp-cf-odo1')?.value), b=_km($('yp-cf-odo2')?.value);
+  const dist=(a!=null && b!=null && b>=a) ? (b-a) : null;
+  const de=$('yp-cf-dist'); if(de) de.textContent = (dist==null?'-':_kmFmt(dist));
+  const err=$('yp-cf-odo-err');
+  if(err){
+    if(a!=null && b!=null && b<a){ err.textContent='⚠ 帰局時が出発時より小さくなっています'; err.style.display='block'; }
+    else { err.style.display='none'; }
+  }
+  /* オイル。まだ一度も登録していない人は「未設定」と出し、
+     その場で次回の距離を決められるようにする。
+     登録が無いあいだは知らせも出さない。 */
+  const oil=_oilGet();
+  const row=$('yp-cf-oil-row'), hint=$('yp-cf-oil-hint');
+  const next = oil ? _km(oil.nextKm) : null;
+  if(row){
+    row.style.display='flex';
+    if(hint) hint.style.display='block';
+    const ne=$('yp-cf-oil-next'), le=$('yp-cf-oil-left');
+    const bt=$('yp-cf-oil-btn');
+    if(next==null){
+      if(ne) ne.textContent='未設定';
+      if(le) le.innerHTML='';
+      if(bt) bt.textContent='設定';
+    }else{
+      if(bt) bt.textContent='変更';
+      if(ne) ne.textContent=_kmFmt(next);
+      if(le){
+        if(b==null){ le.textContent=''; }
+        else{
+          const left=next-b;
+          le.innerHTML = (left<=0)
+            ? '<span style="color:var(--rust);font-weight:700;">超過 '+_kmFmt(Math.abs(left))+' km</span>'
+            : 'あと <b style="font-family:var(--mono);font-size:14px;color:'+(left<=OIL_WARN_KM?'var(--amber)':'var(--mid)')+';">'+_kmFmt(left)+'</b> km';
+        }
+      }
+    }
+  }
+}
+
+// オイルの知らせを出すべきか
+function _ypOilDue(){
+  const oil=_oilGet(); if(!oil) return false;
+  const next=_km(oil.nextKm); if(next==null) return false;
+  const b=_km($('yp-cf-odo2')?.value); if(b==null) return false;
+  return (next - b) <= OIL_WARN_KM;
+}
+
+function openYpOil(){
+  const m=$('yp-oil'); if(!m) return;
+  const oil=_oilGet()||{};
+  const b=_km($('yp-cf-odo2')?.value);
+  const next=_km(oil.nextKm);
+  const sub=$('yp-oil-sub');
+  if(sub){
+    const left=(next!=null && b!=null) ? (next-b) : null;
+    sub.textContent = (left==null) ? '' : (left<=0 ? ('予定を '+_kmFmt(Math.abs(left))+' km 超えています') : ('次回予定まで あと '+_kmFmt(left)+' km'));
+  }
+  const rows=[
+    ['今日の帰局メーター', b,              'color:var(--ink);font-weight:700;'],
+    ['前回の交換',         _km(oil.lastKm), 'color:var(--mid);'],
+    ['次回の予定',         next,            'color:var(--amber);font-weight:700;']
+  ];
+  const box=$('yp-oil-rows');
+  if(box) box.innerHTML = rows.map(([l,v,st])=>`<div style="display:flex;align-items:baseline;padding:3px 0;">
+      <span style="font-size:11.5px;color:var(--mid);">${l}</span><div style="flex:1;"></div>
+      <span style="font-family:var(--mono);font-size:14px;${st}">${_kmFmt(v)}</span>
+      <span style="font-size:10px;color:var(--light);margin-left:3px;">km</span>
+    </div>`).join('');
+  m.style.display='block';
+}
+function closeYpOil(){ const m=$('yp-oil'); if(m) m.style.display='none'; }
+
+// 「まだ」= 交換していない。次回の距離はそのまま、提出へ進む
+function ypOilSkip(){ closeYpOil(); _ypCommit(); }
+
+/* 次回の交換距離を入れる画面。
+   mode='done'   … 交換した。今回のメーターを前回交換として記録する
+   mode='change' … 距離だけ直す（代車など）。交換の記録はしない */
+function openYpOilEdit(mode){
+  _ypOilMode = mode || 'change';
+  closeYpOil();
+  const m=$('yp-oiledit'); if(!m) return;
+  const oil=_oilGet()||{};
+  const b=_km($('yp-cf-odo2')?.value);
+  const base=(b!=null) ? b : (_km(oil.lastKm) || 0);
+  const sub=$('yp-oiledit-sub');
+  const note=$('yp-oiledit-note');
+  if(_ypOilMode==='done'){
+    if(sub)  sub.textContent='交換を記録します　今回 '+_kmFmt(b)+' km';
+    if(note) note.textContent='そのままで構いません。'+_kmFmt(OIL_INTERVAL_KM)+' km 先を入れてあります。';
+    const inp=$('yp-oiledit-km'); if(inp) inp.value = base + OIL_INTERVAL_KM;
+  }else if(_km(oil.nextKm)==null){
+    // まだ一度も登録していない人（初回の設定）
+    if(sub)  sub.textContent='次にオイルを交換する距離を決めます';
+    if(note) note.textContent='分からなければ、そのままで構いません。交換の記録はしません。';
+    const inp=$('yp-oiledit-km'); if(inp) inp.value = base + OIL_INTERVAL_KM;
+  }else{
+    if(sub)  sub.textContent='代車に乗っている日など、距離が違うとき';
+    if(note) note.textContent='交換の記録はしません。次回の距離だけを直します。';
+    const inp=$('yp-oiledit-km'); if(inp) inp.value = _km(oil.nextKm);
+  }
+  // +3,000 / +4,000 / +5,000
+  const chips=$('yp-oiledit-chips');
+  if(chips){
+    chips.innerHTML=[3000,4000,5000].map(n=>{
+      const on=(n===OIL_INTERVAL_KM && _ypOilMode==='done');
+      const st=on
+        ? 'flex:1 1 0;background:rgba(107,124,106,.16);border:1px solid var(--sage);border-radius:7px;color:var(--sage);font-size:11.5px;font-weight:700;padding:8px 0;cursor:pointer;'
+        : 'flex:1 1 0;background:none;border:1px solid var(--brd);border-radius:7px;color:var(--ink);font-size:11.5px;padding:8px 0;cursor:pointer;';
+      return `<button type="button" onclick="ypOilChip(${n})" style="${st}">+${n.toLocaleString()}</button>`;
+    }).join('');
+  }
+  m.style.display='block';
+}
+function closeYpOilEdit(){
+  const m=$('yp-oiledit'); if(m) m.style.display='none';
+  // 交換の確認から来た場合は、そこへ戻す
+  if(_ypOilMode==='done') openYpOil();
+}
+function ypOilChip(n){
+  const b=_km($('yp-cf-odo2')?.value);
+  const oil=_oilGet()||{};
+  const base=(b!=null) ? b : (_km(oil.lastKm) || 0);
+  const inp=$('yp-oiledit-km'); if(inp) inp.value = base + n;
+  openYpOilEditChipsRefresh(n);
+}
+function openYpOilEditChipsRefresh(sel){
+  const chips=$('yp-oiledit-chips'); if(!chips) return;
+  chips.innerHTML=[3000,4000,5000].map(n=>{
+    const on=(n===sel);
+    const st=on
+      ? 'flex:1 1 0;background:rgba(107,124,106,.16);border:1px solid var(--sage);border-radius:7px;color:var(--sage);font-size:11.5px;font-weight:700;padding:8px 0;cursor:pointer;'
+      : 'flex:1 1 0;background:none;border:1px solid var(--brd);border-radius:7px;color:var(--ink);font-size:11.5px;padding:8px 0;cursor:pointer;';
+    return `<button type="button" onclick="ypOilChip(${n})" style="${st}">+${n.toLocaleString()}</button>`;
+  }).join('');
+}
+
+function ypOilSave(){
+  const b=_km($('yp-cf-odo2')?.value);
+  const oil=_oilGet()||{};
+  let next=_km($('yp-oiledit-km')?.value);
+  const base=(b!=null) ? b : (_km(oil.lastKm) || 0);
+  if(next==null) next = base + OIL_INTERVAL_KM;   // 空のまま記録 → 4,000km先
+  const rec={
+    nextKm: next,
+    lastKm: (_ypOilMode==='done') ? (b!=null ? b : (_km(oil.lastKm)||null)) : (_km(oil.lastKm)||null),
+    changedAt: (_ypOilMode==='done') ? today() : (oil.changedAt || null)
+  };
+  _oilSet(rec);
+  const m=$('yp-oiledit'); if(m) m.style.display='none';
+  closeYpOil();
+  ypCfCalc();
+  if(_ypOilMode==='done'){
+    toast('オイル交換を記録しました','ok');
+    _ypCommit();          // 交換の記録まで終わったのでそのまま提出へ
+  }else{
+    toast('次回の交換距離を直しました','ok');
+  }
+  _ypOilMode='';
+}
+
+// 確認画面の「この内容で提出する」
+function ypConfirmSubmit(){
+  if(!_ypPending){ closeYpConfirm(); return; }
+  const a=_km($('yp-cf-odo1')?.value), b=_km($('yp-cf-odo2')?.value);
+  if(a!=null && b!=null && b<a){ toast('帰局時が出発時より小さくなっています','err'); return; }
+  if(a==null || b==null){
+    if(!confirm('走行距離が空のままです。\nこのまま提出しますか？')) return;
+  }
+  // オイルの時期なら、先に確認を出す
+  if(_ypOilDue()){ openYpOil(); return; }
+  _ypCommit();
+}
+
+// 実際に保存する
+function _ypCommit(){
+  if(!_ypPending) return;
+  const p=_ypPending;
+  const form=p.form;
+  const a=_km($('yp-cf-odo1')?.value), b=_km($('yp-cf-odo2')?.value);
+  const dist=(a!=null && b!=null && b>=a) ? (b-a) : null;
+  const park=Math.max(0, parseInt($('yp-cf-park')?.value)||0);
+  const gasOn=_driverHasGasCard(driver) && !!$('yp-cf-gas')?.checked;
+  const names=p.yokoNames||[];
+
+  if(names.length || park>0 || gasOn || a!=null || b!=null){
+    form.teate={
+      yokonori:names.length, yokonoriWith:names,
+      parking:park, refueled:gasOn,
+      odoStart:a, odoEnd:b, distance:dist
+    };
+    form.yokonori=names.length; form.yokonoriWith=names;
+    form.parking=park; form.refueled=gasOn;
+    form.odoStart=a; form.odoEnd=b; form.distance=dist;
+  }
+
+  const rec={
+    id: genRecId(), type:'yuupack', driver:{...driver}, date:p.date,
+    postOffice:p.postOffice,
+    form,
+    companyId: String(driver.companyId || ''),
+    submittedAt: new Date().toISOString(),
+  };
+  YP_LOGS.push(rec); fbSet('yp_logs', YP_LOGS);
+  lastResult = rec;
+  _ypPending = null;
+  closeYpConfirm();
+  showDone();
+}
+
 function syncYpGasRow(){
-  const row = document.getElementById('yp-gas-row');
+  // ★ 2026-10-09.5: 給油の欄は「提出の前に」の画面へ移した
+  const row = document.getElementById('yp-cf-gas-card');
   if(!row) return;
   const on = _driverHasGasCard(driver);
   row.style.display = on ? '' : 'none';
-  if(!on){ const c = document.getElementById('yp-gas'); if(c) c.checked = false; }
+  if(!on){ const c = document.getElementById('yp-cf-gas'); if(c) c.checked = false; }
 }
 
 function updateYpBizTabs(){
@@ -16311,8 +16709,10 @@ function ypReset(){['yp-m','yp-k','yp-t','yp-mo','yp-yo','yp-s'].forEach(id=>{co
      0 を入れておくと、触らないまま提出しても気づけない。 */
   ['yp-y','yp-o'].forEach(id=>{const e=$(id);if(e)e.value='';});$('yp-note').value='';$('yp-date').value=today();_ypColCounts={};_ypSpotEntries=[];_ypColGrace='';
   // ★ 2026-10-09.3: 手当・立替も空に戻す
-  _ypYokoNames=[]; if($('yp-park'))$('yp-park').value=''; if($('yp-gas'))$('yp-gas').checked=false;
-  try{ renderYpYoko(); syncYpGasRow(); }catch(e){}
+  _ypYokoNames=[]; _ypPending=null;
+  ['yp-cf-odo1','yp-cf-odo2','yp-cf-park'].forEach(id=>{const e=$(id);if(e)e.value='';});
+  if($('yp-cf-gas')) $('yp-cf-gas').checked=false;
+  try{ renderYpYoko(); syncYpGasRow(); ypCfCalc(); }catch(e){}
   setYpBizMode('del', true);valYP();}
 const ypN=id=>Math.max(0,parseInt($(id)?.value)||0);
 function ypStep(k,d){const map={m:'yp-m',k:'yp-k',y:'yp-y',t:'yp-t',mo:'yp-mo',yo:'yp-yo',o:'yp-o',s:'yp-s'};const el=$(map[k]);if(!el)return;el.value=Math.max(0,(parseInt(el.value)||0)+d);valYP();}
@@ -16515,41 +16915,14 @@ function submitYP(){
     form.col = { companies: allColEntries, total: colTotal };
   }
 
-  /* ★ 2026-10-09.3: 手当・立替。
-     yokonori は件数（支払の計算に使う既存の項目）。
-     yokonoriWith は誰の横乗りかの記録で、支払には使わない。
-     parking は駐車料金の立替（円）。refueled は給油したかどうか。 */
+  /* ★ 2026-10-09.5: ここでは保存しない。
+     走行距離・駐車料金・給油を提出の直前にまとめて聞くため、
+     中身を持ったまま「提出の前に」の画面へ進む。
+     実際の保存は _ypCommit() が行う。
+     横乗りの名前はこの画面で入れたものをそのまま持っていく。 */
   const _yokoNames = _ypYokoNames.map(n=>String(n||'').trim()).filter(Boolean);
-  const _park = Math.max(0, parseInt($('yp-park')?.value) || 0);
-  const _gasOn = _driverHasGasCard(driver) && !!$('yp-gas')?.checked;
-  if(_yokoNames.length || _park > 0 || _gasOn){
-    form.teate = {
-      yokonori: _yokoNames.length,
-      yokonoriWith: _yokoNames,
-      parking: _park,
-      refueled: _gasOn
-    };
-    // 経営管理が form 直下も読むため、そのまま写す
-    form.yokonori     = _yokoNames.length;
-    form.yokonoriWith = _yokoNames;
-    form.parking      = _park;
-    form.refueled     = _gasOn;
-  }
-
-  const rec = {
-    id: genRecId(), type:'yuupack', driver:{...driver}, date,
-    postOffice,
-    form,
-    /* ★ 2026/09/15: どの委託会社のデータかをレコード自身に持たせる。
-       Firebaseのルールは会社ID(companyId)だけを見て、委託会社が
-       他社のデータを読めないようにする。この値が無いと絞り込めない。
-       自社のドライバーは空になる（自社＝制限の対象外）。 */
-    companyId: String(driver.companyId || ''),
-    submittedAt: new Date().toISOString(),
-  };
-  YP_LOGS.push(rec); fbSet('yp_logs', YP_LOGS);
-  lastResult = rec;
-  showDone();
+  _ypPending = { date, postOffice, form, yokoNames: _yokoNames };
+  openYpConfirm();
 }
 
 // ══ 集荷 ══
@@ -20434,9 +20807,11 @@ function doEdit(){
       // 名前を持たない古いデータ。件数ぶんの空欄を出して書いてもらう
       _ypYokoNames = new Array(parseInt(_te.yokonori)).fill('');
     }
-    if($('yp-park')) $('yp-park').value = (parseInt(_te.parking) > 0) ? parseInt(_te.parking) : '';
-    if($('yp-gas'))  $('yp-gas').checked = !!_te.refueled;
-    try{ renderYpYoko(); syncYpGasRow(); }catch(e){}
+    if($('yp-cf-park')) $('yp-cf-park').value = (parseInt(_te.parking) > 0) ? parseInt(_te.parking) : '';
+    if($('yp-cf-gas'))  $('yp-cf-gas').checked = !!_te.refueled;
+    if($('yp-cf-odo1')) $('yp-cf-odo1').value = (_te.odoStart != null) ? _te.odoStart : '';
+    if($('yp-cf-odo2')) $('yp-cf-odo2').value = (_te.odoEnd   != null) ? _te.odoEnd   : '';
+    try{ renderYpYoko(); syncYpGasRow(); ypCfCalc(); }catch(e){}
 
     $('yp-date').value = lastResult.date;
     $('yp-note').value = f.notes || '';
