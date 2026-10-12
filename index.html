@@ -565,7 +565,7 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
     <div class="tb-eye">軽貨物運送　日報システム</div>
     <div class="tb-title" style="color:var(--clay);">ドライバー日報</div>
     <div class="tb-sub" id="login-greeting">本日もよろしくお願いします</div>
-    <div class="tb-sub" id="app-ver-label" style="font-family:var(--mono);font-size:9px;opacity:.7;">ver 2026-10-09.1</div>
+    <div class="tb-sub" id="app-ver-label" style="font-family:var(--mono);font-size:9px;opacity:.7;">ver 2026-10-09.2</div>
   </div>
   <div class="p16">
     <div class="card mb12">
@@ -982,7 +982,7 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
         </button>
       </div>
       <div id="yp-btab-col-notice" class="xs mt8" style="display:none;color:var(--light);">
-        ※選択中の郵便局に集荷業務の権限がありません
+        ※この郵便局の集荷担当になっていません。<br>担当する場合は会社にご連絡ください。
       </div>
     </div>
 
@@ -3231,7 +3231,7 @@ function selectDriverId(id){
 
 
 // ★ 版の文字列（差し替えのたびに必ず上げる。ログイン画面の表示と一致させる）
-const APP_VER = '2026-10-09.1';
+const APP_VER = '2026-10-09.2';
 console.log('[日報アプリ] APP_VER', APP_VER);
 
 // ══ 勤怠ユーティリティ ══
@@ -3489,12 +3489,18 @@ function _normalizeSubOffices(list){
     return {name:item.name||'', del:!!item.del, col:!!item.col};
   }).filter(x=>x.name);
 }
-// ドライバーが指定郵便局で集荷業務を担当できるか
+/* ドライバーが指定郵便局で集荷業務を担当できるか
+   ★ 2026-10-09.2: メイン営業所を無条件に許可していたため、
+   その局の全員に集荷先（＝お客様の名前）が見えていた。
+   判定を従業員台帳の担当郵便局 → ⚙ →「集荷」のチェック
+   （subOffices[].col）だけにする。メインの局も、集荷を担当するなら
+   バッジを押して集荷にチェックを入れること。 */
+/* 既に集荷が入っている日報を直すときだけ、その局の集荷欄を出す。
+   担当から外れたあとに、過去の数が見えないまま消えるのを防ぐ。 */
+var _ypColGrace = '';
 function _driverHasCol(drv, officeName){
   if(!drv || !officeName) return false;
-  // メイン営業所は宅配+集荷両方可能とする
-  if(drv.office === officeName) return true;
-  // サブ営業所は col:true のもののみ
+  if(_ypColGrace && _ypColGrace === officeName) return true;
   const subs = _normalizeSubOffices(drv.subOffices);
   const found = subs.find(s=>s.name===officeName);
   return !!(found && found.col);
@@ -16195,7 +16201,7 @@ let _isAfterClockOut = false;
 function ypReset(){['yp-m','yp-k','yp-t','yp-mo','yp-yo','yp-s'].forEach(id=>{const e=$(id);if(e)e.value=0;});
   /* ★ 2026-10-09.1: 夜間・大型は「未入力」と「0件」を区別するため空にしておく。
      0 を入れておくと、触らないまま提出しても気づけない。 */
-  ['yp-y','yp-o'].forEach(id=>{const e=$(id);if(e)e.value='';});$('yp-note').value='';$('yp-date').value=today();_ypColCounts={};_ypSpotEntries=[];setYpBizMode('del', true);valYP();}
+  ['yp-y','yp-o'].forEach(id=>{const e=$(id);if(e)e.value='';});$('yp-note').value='';$('yp-date').value=today();_ypColCounts={};_ypSpotEntries=[];_ypColGrace='';setYpBizMode('del', true);valYP();}
 const ypN=id=>Math.max(0,parseInt($(id)?.value)||0);
 function ypStep(k,d){const map={m:'yp-m',k:'yp-k',y:'yp-y',t:'yp-t',mo:'yp-mo',yo:'yp-yo',o:'yp-o',s:'yp-s'};const el=$(map[k]);if(!el)return;el.value=Math.max(0,(parseInt(el.value)||0)+d);valYP();}
 function valYP(){
@@ -20271,6 +20277,7 @@ function doEdit(){
     // 集荷データ
     _ypColCounts = {};
     _ypSpotEntries = [];
+    _ypColGrace = '';
     if(f.col && Array.isArray(f.col.companies)){
       f.col.companies.forEach(c=>{
         if(c.spot){
@@ -20280,6 +20287,10 @@ function doEdit(){
           _ypColCounts[c.name] = c.count;
         }
       });
+    }
+    // ★ 2026-10-09.2: 既に集荷が入っている日報なら、担当から外れていても欄を出す
+    if(Object.keys(_ypColCounts).length || _ypSpotEntries.length){
+      _ypColGrace = lastResult.postOffice || '';
     }
     $('yp-date').value = lastResult.date;
     $('yp-note').value = f.notes || '';
