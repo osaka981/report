@@ -565,7 +565,7 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
     <div class="tb-eye">軽貨物運送　日報システム</div>
     <div class="tb-title" style="color:var(--clay);">ドライバー日報</div>
     <div class="tb-sub" id="login-greeting">本日もよろしくお願いします</div>
-    <div class="tb-sub" id="app-ver-label" style="font-family:var(--mono);font-size:9px;opacity:.7;">ver 2026-10-09.5</div>
+    <div class="tb-sub" id="app-ver-label" style="font-family:var(--mono);font-size:9px;opacity:.7;">ver 2026-10-09.6</div>
   </div>
   <div class="p16">
     <div class="card mb12">
@@ -1079,8 +1079,9 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
     <button id="yp-submit" class="btn-main" onclick="submitYP()" style="background:var(--slate);color:#faf8f5;">日報を提出する</button>
     <div style="height:28px;"></div>
 <!-- ══ 提出前の確認（走行距離・駐車料金・給油） 2026-10-09.5 ══ -->
-<div id="yp-cf" style="display:none;position:fixed;inset:0;z-index:900;background:var(--bg,#211e1b);">
-  <div style="height:100%;display:flex;flex-direction:column;">
+<div id="yp-cf" style="display:none;position:fixed;inset:0;z-index:900;background:var(--page);">
+  <!-- ★ 2026-10-09.6: アプリ本体(.app)は430px幅。画面いっぱいに広がらないよう揃える -->
+  <div style="height:100%;max-width:430px;margin:0 auto;background:var(--page);display:flex;flex-direction:column;box-shadow:0 0 0 1px var(--brd);">
     <div style="padding:13px 16px 11px;border-bottom:1px solid var(--brd);display:flex;align-items:center;gap:9px;">
       <button type="button" onclick="closeYpConfirm()" aria-label="戻る" style="background:none;border:none;color:var(--mid);font-size:17px;padding:0 4px;cursor:pointer;">‹</button>
       <div style="flex:1;">
@@ -1092,23 +1093,23 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
     <div style="flex:1;min-height:0;overflow:auto;padding:11px 16px 16px;display:flex;flex-direction:column;gap:10px;">
 
       <div class="card" style="padding:9px 12px;">
-        <div style="font-size:10px;font-weight:700;color:var(--mid);letter-spacing:.06em;margin-bottom:7px;">入れた数</div>
+        <div style="font-size:10.5px;font-weight:700;color:var(--mid);letter-spacing:.06em;margin-bottom:8px;">入れた数</div>
         <div id="yp-cf-sum" style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;"></div>
       </div>
 
       <div style="background:rgba(74,122,155,.07);border:1.5px solid var(--slate);border-radius:9px;padding:11px 13px;">
         <div style="display:flex;align-items:baseline;gap:7px;margin-bottom:9px;">
-          <span style="font-size:12px;font-weight:700;color:var(--slate);">走行距離</span>
-          <span style="font-size:9.5px;color:var(--mid);">メーターの数字を</span>
+          <span style="font-size:12.5px;font-weight:700;color:var(--slate);">走行距離</span>
+          <span style="font-size:10px;color:var(--mid);">メーターの数字を</span>
         </div>
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;">
           <label for="yp-cf-odo1" style="flex:1;font-size:12.5px;">出発時</label>
-          <input id="yp-cf-odo1" type="number" min="0" inputmode="numeric" class="fi" oninput="ypCfCalc()" placeholder="0" style="width:124px;text-align:right;font-family:var(--mono);font-weight:700;">
+          <input id="yp-cf-odo1" type="number" min="0" inputmode="numeric" class="fi" oninput="ypCfCalc()" placeholder="0" style="width:120px;flex-shrink:0;box-sizing:border-box;text-align:right;font-family:var(--mono);font-size:15px;font-weight:700;padding:9px 10px;">
           <span style="font-size:11px;color:var(--mid);width:18px;">km</span>
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
           <label for="yp-cf-odo2" style="flex:1;font-size:12.5px;">帰局時</label>
-          <input id="yp-cf-odo2" type="number" min="0" inputmode="numeric" class="fi" oninput="ypCfCalc()" placeholder="0" style="width:124px;text-align:right;font-family:var(--mono);font-weight:700;">
+          <input id="yp-cf-odo2" type="number" min="0" inputmode="numeric" class="fi" oninput="ypCfCalc()" placeholder="0" style="width:120px;flex-shrink:0;box-sizing:border-box;text-align:right;font-family:var(--mono);font-size:15px;font-weight:700;padding:9px 10px;">
           <span style="font-size:11px;color:var(--mid);width:18px;">km</span>
         </div>
         <div style="margin-top:9px;padding-top:8px;border-top:1px dashed var(--brd);display:flex;align-items:baseline;">
@@ -1119,7 +1120,7 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
         </div>
         <div id="yp-cf-odo-err" style="font-size:10.5px;color:var(--rust);margin-top:6px;display:none;"></div>
 
-        <div id="yp-cf-oil-row" style="margin-top:7px;padding-top:7px;border-top:1px dashed var(--brd);display:none;align-items:center;">
+        <div id="yp-cf-oil-row" style="margin-top:7px;padding-top:7px;border-top:1px dashed var(--brd);display:none;align-items:center;flex-wrap:wrap;gap:3px 0;">
           <span style="font-size:11px;color:var(--mid);">次回オイル交換</span>
           <div style="flex:1;"></div>
           <span id="yp-cf-oil-next" style="font-family:var(--mono);font-size:13px;color:var(--ink);">-</span>
@@ -1133,14 +1134,14 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
       <div style="background:rgba(107,124,106,.07);border:1.5px solid var(--sage);border-radius:9px;padding:11px 13px;">
         <div style="display:flex;align-items:center;gap:8px;">
           <label for="yp-cf-park" style="flex:1;font-size:12.5px;font-weight:700;color:var(--sage);">駐車料金 立替<span style="font-size:9.5px;color:var(--mid);font-weight:400;">（円）</span></label>
-          <input id="yp-cf-park" type="number" min="0" inputmode="numeric" class="fi" placeholder="0" style="width:124px;text-align:right;font-family:var(--mono);font-weight:700;">
+          <input id="yp-cf-park" type="number" min="0" inputmode="numeric" class="fi" placeholder="0" style="width:120px;flex-shrink:0;box-sizing:border-box;text-align:right;font-family:var(--mono);font-size:15px;font-weight:700;padding:9px 10px;">
         </div>
         <div style="font-size:9.5px;color:var(--light);margin-top:6px;line-height:1.5;">無ければ 0 のままで結構です。領収書は紙の日報に添付してください。</div>
       </div>
 
       <div id="yp-cf-gas-card" style="background:rgba(154,122,58,.07);border:1.5px solid rgba(154,122,58,.5);border-radius:9px;padding:11px 13px;display:none;">
         <label for="yp-cf-gas" style="display:flex;align-items:center;gap:9px;cursor:pointer;">
-          <input id="yp-cf-gas" type="checkbox" style="width:19px;height:19px;">
+          <input id="yp-cf-gas" type="checkbox" style="width:19px;height:19px;accent-color:var(--amber);">
           <span style="font-size:12.5px;font-weight:700;color:var(--amber);">給油した</span>
         </label>
         <div style="font-size:9.5px;color:var(--light);margin-top:6px;padding-left:28px;line-height:1.5;">金額は入れません。領収書は紙の日報に添付してください。</div>
@@ -1153,15 +1154,15 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
     </div>
 
     <div style="padding:10px 16px 16px;border-top:1px solid var(--brd);display:flex;flex-direction:column;gap:8px;">
-      <button type="button" class="btn-main" onclick="ypConfirmSubmit()">この内容で提出する</button>
+      <button type="button" class="btn-main" onclick="ypConfirmSubmit()" style="background:var(--clay);color:#faf8f5;">この内容で提出する</button>
       <button type="button" onclick="closeYpConfirm()" style="width:100%;background:none;border:1px solid var(--brd);border-radius:9px;color:var(--ink);font-size:13px;padding:11px 0;cursor:pointer;">戻って直す</button>
     </div>
   </div>
 </div>
 
 <!-- ══ オイル交換の確認 ══ -->
-<div id="yp-oil" style="display:none;position:fixed;inset:0;z-index:960;background:rgba(18,16,14,.72);">
-  <div style="position:absolute;left:16px;right:16px;top:14%;background:var(--card,#2b2723);border:1.5px solid rgba(154,122,58,.6);border-radius:14px;padding:18px;box-shadow:0 10px 40px rgba(0,0,0,.5);">
+<div id="yp-oil" style="display:none;position:fixed;inset:0;z-index:960;background:rgba(18,16,14,.6);align-items:center;justify-content:center;padding:16px;">
+  <div style="width:100%;max-width:398px;max-height:90vh;overflow:auto;background:var(--card);border:1.5px solid var(--amber);border-radius:14px;padding:18px;box-shadow:0 10px 40px rgba(0,0,0,.4);">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
       <div style="width:34px;height:34px;flex-shrink:0;border-radius:9px;background:rgba(154,122,58,.18);display:flex;align-items:center;justify-content:center;">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="注意"><path d="M12 2L3 20h18L12 2z"/><line x1="12" y1="9" x2="12" y2="14"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
@@ -1171,7 +1172,7 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
         <div id="yp-oil-sub" style="font-size:10.5px;color:var(--mid);margin-top:2px;"></div>
       </div>
     </div>
-    <div style="background:var(--bg,#211e1b);border:1px solid var(--brd);border-radius:9px;padding:11px 13px;margin-bottom:14px;" id="yp-oil-rows"></div>
+    <div style="background:var(--inp);border:1px solid var(--brd);border-radius:9px;padding:11px 13px;margin-bottom:14px;" id="yp-oil-rows"></div>
     <div style="font-size:12px;color:var(--ink);line-height:1.7;margin-bottom:14px;">オイルは交換しましたか。</div>
     <div style="display:flex;flex-direction:column;gap:8px;">
       <button type="button" onclick="openYpOilEdit('done')" style="width:100%;background:var(--amber);border:none;border-radius:9px;color:#221c16;font-size:14px;font-weight:700;padding:13px 0;cursor:pointer;">交換した</button>
@@ -1182,8 +1183,8 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
 </div>
 
 <!-- ══ 次回のオイル交換距離 ══ -->
-<div id="yp-oiledit" style="display:none;position:fixed;inset:0;z-index:970;background:rgba(18,16,14,.72);">
-  <div style="position:absolute;left:16px;right:16px;top:13%;background:var(--card,#2b2723);border:1.5px solid var(--sage);border-radius:14px;padding:18px;box-shadow:0 10px 40px rgba(0,0,0,.5);">
+<div id="yp-oiledit" style="display:none;position:fixed;inset:0;z-index:970;background:rgba(18,16,14,.6);align-items:center;justify-content:center;padding:16px;">
+  <div style="width:100%;max-width:398px;max-height:90vh;overflow:auto;background:var(--card);border:1.5px solid var(--sage);border-radius:14px;padding:18px;box-shadow:0 10px 40px rgba(0,0,0,.4);">
     <div style="margin-bottom:13px;">
       <div style="font-size:15px;font-weight:700;color:var(--sage);">次回の交換距離</div>
       <div id="yp-oiledit-sub" style="font-size:10.5px;color:var(--mid);margin-top:2px;"></div>
@@ -3403,7 +3404,7 @@ function selectDriverId(id){
 
 
 // ★ 版の文字列（差し替えのたびに必ず上げる。ログイン画面の表示と一致させる）
-const APP_VER = '2026-10-09.5';
+const APP_VER = '2026-10-09.6';
 console.log('[日報アプリ] APP_VER', APP_VER);
 
 // ══ 勤怠ユーティリティ ══
@@ -3959,7 +3960,7 @@ function openYpOil(){
       <span style="font-family:var(--mono);font-size:14px;${st}">${_kmFmt(v)}</span>
       <span style="font-size:10px;color:var(--light);margin-left:3px;">km</span>
     </div>`).join('');
-  m.style.display='block';
+  m.style.display='flex';
 }
 function closeYpOil(){ const m=$('yp-oil'); if(m) m.style.display='none'; }
 
@@ -4003,7 +4004,7 @@ function openYpOilEdit(mode){
       return `<button type="button" onclick="ypOilChip(${n})" style="${st}">+${n.toLocaleString()}</button>`;
     }).join('');
   }
-  m.style.display='block';
+  m.style.display='flex';
 }
 function closeYpOilEdit(){
   const m=$('yp-oiledit'); if(m) m.style.display='none';
