@@ -565,7 +565,7 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
     <div class="tb-eye">軽貨物運送　日報システム</div>
     <div class="tb-title" style="color:var(--clay);">ドライバー日報</div>
     <div class="tb-sub" id="login-greeting">本日もよろしくお願いします</div>
-    <div class="tb-sub" id="app-ver-label" style="font-family:var(--mono);font-size:9px;opacity:.7;">ver 2026-10-09.6</div>
+    <div class="tb-sub" id="app-ver-label" style="font-family:var(--mono);font-size:9px;opacity:.7;">ver 2026-10-09.7</div>
   </div>
   <div class="p16">
     <div class="card mb12">
@@ -3404,7 +3404,7 @@ function selectDriverId(id){
 
 
 // ★ 版の文字列（差し替えのたびに必ず上げる。ログイン画面の表示と一致させる）
-const APP_VER = '2026-10-09.6';
+const APP_VER = '2026-10-09.7';
 console.log('[日報アプリ] APP_VER', APP_VER);
 
 // ══ 勤怠ユーティリティ ══
@@ -14266,7 +14266,8 @@ document.addEventListener('DOMContentLoaded', ()=>setTimeout(_bindPinKeypads, 30
 
 async function loginPinKey(k){
   if(_isPinLocked()){
-    $('login-pin-err').textContent = `ロック中: あと${_getLockRemainSec()}秒`;
+    const el=$('login-pin-err');
+    if(el) el.textContent = `ロック中です。あと ${_getLockRemainSec()} 秒お待ちください`;
     return;
   }
   if(k==='DEL'){
@@ -14281,13 +14282,49 @@ async function loginPinKey(k){
   $('login-pin-err').textContent = '';
 
   if(_loginPin.length === 6){
-    setTimeout(()=>_verifyLoginPin(), 100);
+    /* ★ 2026-10-09.7: ここは _verifyLoginPin() の中で例外が出ると
+       どこにも出ないまま終わり、「PINが反応しない」状態になっていた。
+       失敗を必ず画面に出す。 */
+    setTimeout(()=>{
+      try{
+        const r=_verifyLoginPin();
+        if(r && typeof r.catch==='function') r.catch(e=>_loginPinErr(e));
+      }catch(e){ _loginPinErr(e); }
+    }, 100);
+  }
+}
+/* PIN照合でつまずいたときに、必ず画面に出す */
+function _loginPinErr(e){
+  console.error('[PIN]', e);
+  _loginPin='';
+  [0,1,2,3,4,5].forEach(i=>{ const el=$('lpd'+i); if(el) el.classList.remove('on'); });
+  const el=$('login-pin-err');
+  if(el){
+    const sec = (typeof crypto==='undefined' || !crypto.subtle);
+    el.innerHTML = sec
+      ? 'この画面では暗号の機能が使えないため確認できません。<br>https で始まるアドレスから開き直してください。'
+      : 'PINを確認できませんでした。もう一度お試しください。<br><span style="font-size:10px;">'
+        + String(e&&e.message||e).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</span>';
   }
 }
 
 async function _verifyLoginPin(){
   const d = _pendingLoginDriver;
-  if(!d) return;
+  /* ★ 2026-10-09.7: ここで無言で終わるのが「反応しない」の主な原因だった。
+     画面を戻したり同期が走ったりすると対象者が消えることがある。 */
+  if(!d){
+    _loginPin='';
+    [0,1,2,3,4,5].forEach(i=>{ const el=$('lpd'+i); if(el) el.classList.remove('on'); });
+    const el=$('login-pin-err');
+    if(el) el.innerHTML='やり直してください。<br>社員番号の入力からもう一度お願いします。';
+    setTimeout(()=>{ try{ show('scr-login'); }catch(e){} }, 1600);
+    return;
+  }
+  /* 暗号の機能が使えない環境（https でないなど）では先に知らせる */
+  if(typeof crypto==='undefined' || !crypto.subtle){
+    _loginPinErr(new Error('crypto.subtle が使えません'));
+    return;
+  }
 
   const inputHash = await _sha256(_loginPin);
 
