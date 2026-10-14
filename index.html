@@ -241,7 +241,7 @@ details.cat-fold > .cat-fold-summary-tag{color:var(--mid);font-weight:500;}
 .ank.emp{background:transparent;border-color:transparent;cursor:default;}
 
 /* TOAST */
-#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(16px);z-index:9999;background:var(--card);border-radius:10px;padding:10px 16px;box-shadow:0 4px 20px rgba(0,0,0,.13);display:flex;align-items:center;gap:8px;min-width:210px;font-size:12.5px;opacity:0;transition:all .28s;pointer-events:none;}
+#toast{position:fixed;bottom:calc(84px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%) translateY(16px);z-index:9999;background:var(--card);border-radius:10px;padding:10px 16px;box-shadow:0 4px 20px rgba(0,0,0,.13);display:flex;align-items:center;gap:8px;min-width:210px;font-size:12.5px;opacity:0;transition:all .28s;pointer-events:none;}
 #toast.on{opacity:1;transform:translateX(-50%) translateY(0);}
 
 /* MISC */
@@ -565,7 +565,7 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
     <div class="tb-eye">軽貨物運送　日報システム</div>
     <div class="tb-title" style="color:var(--clay);">ドライバー日報</div>
     <div class="tb-sub" id="login-greeting">本日もよろしくお願いします</div>
-    <div class="tb-sub" id="app-ver-label" style="font-family:var(--mono);font-size:9px;opacity:.7;">ver 2026-10-09.7</div>
+    <div class="tb-sub" id="app-ver-label" style="font-family:var(--mono);font-size:9px;opacity:.7;">ver 2026-10-14.8</div>
   </div>
   <div class="p16">
     <div class="card mb12">
@@ -1379,14 +1379,20 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
       <div id="correct-diff-area" style="margin-bottom:12px;"></div>
       <!-- 訂正理由 -->
       <div class="lbl" style="margin-bottom:4px;">訂正理由<span style="color:var(--rust);margin-left:4px;">必須</span></div>
-      <textarea id="correct-reason" class="fi" rows="2" placeholder="例：入力漏れのため・夜間件数を誤って入力したため" style="font-size:12px;resize:none;"></textarea>
+      <!-- ★ 2026-10-14.8: 理由が空のまま押すと、下のトーストに出るエラーが
+           iPhoneのSafariの下部バーに隠れて「押しても何も起きない」ように見えていた。
+           欄のすぐ下にも出す。 -->
+      <textarea id="correct-reason" class="fi" rows="2" placeholder="例：入力漏れのため・夜間件数を誤って入力したため" style="font-size:12px;resize:none;" oninput="_correctReasonCheck()"></textarea>
+      <div id="correct-reason-err" style="display:none;margin-top:6px;font-size:11.5px;color:var(--rust);font-weight:700;">
+        ⚠ 訂正理由を入れてください。入れると下のボタンが押せるようになります。
+      </div>
       <!-- 警告 -->
       <div style="background:rgba(139,74,58,.07);border:1px solid rgba(139,74,58,.2);border-radius:7px;padding:8px 10px;margin-top:10px;font-size:10px;color:var(--rust);">
         ⚠️ 虚偽・不正な訂正は支払い対象外になる場合があります。訂正履歴はすべて記録されます。
       </div>
       <div style="display:flex;gap:8px;margin-top:12px;">
         <button onclick="closeCorrectModal()" class="btn-main btn-ghost" style="flex:1;font-size:12px;">キャンセル</button>
-        <button onclick="applyCorrection()" class="btn-main" style="flex:2;background:var(--amber);color:#faf8f5;font-size:12px;">訂正を確定する</button>
+        <button id="correct-go" onclick="applyCorrection()" class="btn-main" style="flex:2;background:var(--amber);color:#faf8f5;font-size:12px;opacity:.45;">訂正を確定する</button>
       </div>
     </div>
   </div>
@@ -3404,7 +3410,7 @@ function selectDriverId(id){
 
 
 // ★ 版の文字列（差し替えのたびに必ず上げる。ログイン画面の表示と一致させる）
-const APP_VER = '2026-10-09.7';
+const APP_VER = '2026-10-14.8';
 console.log('[日報アプリ] APP_VER', APP_VER);
 
 // ══ 勤怠ユーティリティ ══
@@ -21019,6 +21025,9 @@ function openCorrectModal(logId, logType){
   }
 
   $('correct-reason').value = '';
+  // ★ 2026-10-14.8: 開くたびにボタンを薄く、注意書きを消した状態に戻す
+  { const e=$('correct-reason-err'); if(e) e.style.display='none'; }
+  try{ _correctReasonCheck(); }catch(e){}
   $('m-correct').style.display = 'flex';
 }
 
@@ -21029,9 +21038,27 @@ function closeCorrectModal(){
 }
 
 // 訂正を確定する
+/* ★ 2026-10-14.8: 訂正理由が入っているかを見て、ボタンの濃さと注意書きを切り替える。
+   理由が空のまま押しても画面が動かず、エラーのトーストは画面の一番下に出るため
+   iPhoneのSafariの下部バーに隠れていた。押せない理由がその場で分かるようにする。 */
+function _correctReasonCheck(){
+  const v = ($('correct-reason')?.value||'').trim();
+  const btn = $('correct-go');
+  const err = $('correct-reason-err');
+  if(btn) btn.style.opacity = v ? '1' : '.45';
+  if(err && v) err.style.display='none';
+  return !!v;
+}
 function applyCorrection(){
   const reason = $('correct-reason')?.value.trim();
-  if(!reason){ toast('訂正理由を入力してください','err'); return; }
+  if(!reason){
+    const err = $('correct-reason-err');
+    if(err) err.style.display='block';
+    const ta = $('correct-reason');
+    if(ta){ try{ ta.focus(); ta.scrollIntoView({block:'center', behavior:'smooth'}); }catch(e){} }
+    toast('訂正理由を入力してください','err');
+    return;
+  }
   if(!correctTarget){ closeCorrectModal(); return; }
 
   const {rec, logType} = correctTarget;
