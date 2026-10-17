@@ -565,7 +565,7 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
     <div class="tb-eye">軽貨物運送　日報システム</div>
     <div class="tb-title" style="color:var(--clay);">ドライバー日報</div>
     <div class="tb-sub" id="login-greeting">本日もよろしくお願いします</div>
-    <div class="tb-sub" id="app-ver-label" style="font-family:var(--mono);font-size:9px;opacity:.7;">ver 2026-10-17.1</div>
+    <div class="tb-sub" id="app-ver-label" style="font-family:var(--mono);font-size:9px;opacity:.7;">ver 2026-10-17.2</div>
   </div>
   <div class="p16">
     <div class="card mb12">
@@ -3472,7 +3472,7 @@ function selectDriverId(id){
 
 
 // ★ 版の文字列（差し替えのたびに必ず上げる。ログイン画面の表示と一致させる）
-const APP_VER = '2026-10-17.1';
+const APP_VER = '2026-10-17.2';
 console.log('[日報アプリ] APP_VER', APP_VER);
 
 // ══ 勤怠ユーティリティ ══
@@ -21277,23 +21277,34 @@ function renderCustList(){
     </div>`
   ).join(''):'<div style="padding:12px;color:var(--light);font-size:11px;text-align:center;">登録顧客なし</div>';
 }
-function addCust(){
-  const customerNo=$('new-cust-no').value.trim();
-  const name=$('new-cust-name').value.trim(), region=$('new-cust-region').value.trim();
-  if(!name||!region){toast('顧客名と地域を入力してください','err');return;}
-  if(CUSTOMERS.find(c=>c.name===name)){toast('同名の顧客が既に存在します','err');return;}
-  if(customerNo&&CUSTOMERS.find(c=>c.customerNo===customerNo)){toast('その顧客番号は既に使用されています','err');return;}
-  CUSTOMERS.push({id:Date.now(),customerNo:customerNo||'',name,region});
-  fbSet('customers',CUSTOMERS);
-  $('new-cust-no').value='';$('new-cust-name').value=''; $('new-cust-region').value='';
-  renderCustList(); refreshRegions(); toast(`「${name}」を登録しました`);
+/* ══════════════════════════════════════════════════════════
+   ★ 2026-10-17.2: 日報アプリからマスタを書き戻す経路を外した。
+
+   顧客マスタと営業所マスタの持ち主は経営管理システムで、
+   日報アプリは読むだけにする。ここで書き戻すと台帳が壊れるため。
+
+   何が起きていたか：
+   ・顧客 … 日報アプリが持っている顧客データは、画面を組むのに要る項目
+     だけを抜き出した「写し」で、住所・電話・担当者名・集荷単価・
+     インボイス・支払条件は入っていない。その状態で登録や削除を押すと、
+     その写しがそのまま nikki/customers に書き戻され、
+     39社ぶんの住所・担当者名・単価が一度に消えていた。
+   ・営業所 … 日報アプリの営業所一覧は、この端末に保存された分だけで、
+     何も無ければ「大阪北営業所・大阪南営業所・豊中営業所・吹田営業所」
+     という初期値が入る。経営管理の実際の営業所とは別物。
+     しかも一覧を開くだけで自動で書き戻していたため、
+     営業所コード（社員番号の採番に使う）ごと消える状態だった。
+
+   どちらも画面には出したまま、書き戻しだけを止める。
+   登録・削除は経営管理で行う。
+   ══════════════════════════════════════════════════════════ */
+function _masterReadOnly(what){
+  alert(what + 'の登録・削除は経営管理システムで行ってください。\n\n'
+    + 'この画面は確認用です。ここから書き換えると、経営管理側の\n'
+    + '住所・単価・営業所コードなどが消えてしまうため止めています。');
 }
-function delCust(id){
-  const c=CUSTOMERS.find(x=>x.id===id);
-  if(!confirm(`「${c?.name}」を削除しますか？`))return;
-  CUSTOMERS=CUSTOMERS.filter(x=>x.id!==id); fbSet('customers',CUSTOMERS);
-  renderCustList(); refreshRegions(); toast('顧客を削除しました');
-}
+function addCust(){ _masterReadOnly('顧客'); }
+function delCust(id){ _masterReadOnly('顧客'); }
 
 // 社員管理
 let selectedEmpType=null; // 'delivery_営業所名' or 'collection'
@@ -21367,11 +21378,13 @@ function delEmp(id){
 // ══ 営業所管理 ══
 function renderOfficeList(){
   // DRIVERSから現存する営業所名を自動マージ
+  /* ★ 2026-10-17.2: 一覧を開くだけで nikki/offices に書き戻していた。
+     この端末にある分だけで上書きするため、経営管理の営業所コードが消える。
+     画面に出すための足し算だけ行い、書き戻しはしない。 */
   const fromDrivers=[...new Set(DRIVERS.map(d=>d.office))];
   fromDrivers.forEach(name=>{
-    if(!OFFICES.find(o=>o.name===name)){
+    if(name && !OFFICES.find(o=>o.name===name)){
       OFFICES.push({id:Date.now()+Math.random(),name,addr:''});
-      fbSet('offices',OFFICES);
     }
   });
 
@@ -21406,16 +21419,7 @@ function renderOfficeList(){
   if(dl) dl.innerHTML=OFFICES.map(o=>`<option value="${o.name}">`).join('');
 }
 
-function addOffice(){
-  const name=$('new-office-name').value.trim();
-  const addr=$('new-office-addr').value.trim();
-  if(!name){toast('営業所名を入力してください','err');return;}
-  if(OFFICES.find(o=>o.name===name)){toast('同名の営業所が既に存在します','err');return;}
-  OFFICES.push({id:Date.now(),name,addr});
-  fbSet('offices',OFFICES);
-  $('new-office-name').value=''; $('new-office-addr').value='';
-  renderOfficeList(); toast(`「${name}」を登録しました`);
-}
+function addOffice(){ _masterReadOnly('営業所'); }
 
 function delOffice(id){
   const o=OFFICES.find(x=>x.id===id);
@@ -21425,8 +21429,7 @@ function delOffice(id){
   }else{
     if(!confirm(`「${o?.name}」を削除しますか？`))return;
   }
-  OFFICES=OFFICES.filter(x=>x.id!==id); fbSet('offices',OFFICES);
-  renderOfficeList(); toast('営業所を削除しました');
+  _masterReadOnly('営業所');
 }
 
 // PIN変更
