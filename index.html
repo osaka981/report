@@ -565,7 +565,7 @@ document.dispatchEvent(new Event('fb-sdk-ready'));
     <div class="tb-eye">軽貨物運送　日報システム</div>
     <div class="tb-title" style="color:var(--clay);">ドライバー日報</div>
     <div class="tb-sub" id="login-greeting">本日もよろしくお願いします</div>
-    <div class="tb-sub" id="app-ver-label" style="font-family:var(--mono);font-size:9px;opacity:.7;">ver 2026-10-14.8</div>
+    <div class="tb-sub" id="app-ver-label" style="font-family:var(--mono);font-size:9px;opacity:.7;">ver 2026-10-17.1</div>
   </div>
   <div class="p16">
     <div class="card mb12">
@@ -2663,19 +2663,23 @@ function setupRealtimeSync() {
       fbSet('drivers', DRIVERS);
     }
   });
-  // 委託会社データ(Step C): オーナーログイン認証で使用
-  // ★ 2026/06/25: ノードを経営管理と同じ nikki/companies に統一。
-  //   従来は 'companies'(プレフィックスなし)を読んでいたため、経営管理の
-  //   nikki/companies と別ノードになり、削除が反映されず復活していた。
-  //   空(全削除)も正しく反映する。
-  subscribeNode('nikki/companies', snap => {
-    const v = snap.exists() ? snap.val() : [];
-    const arr = Array.isArray(v) ? v : (v ? Object.values(v) : []);
-    COMPANIES = arr;
-    _applyOwnerPins(); // ★ 専用ノードのPINを反映
-    try{ ls_set('nikki_companies', COMPANIES); }catch(e){}
-    if(typeof renderOwnerCompanies==='function') try{ renderOwnerCompanies(); }catch(e){}
-  });
+  /* ══════════════════════════════════════════════════════════
+     ★ 2026-10-17.1: 顧客と委託会社は「名前だけの写し」から読む。
+
+     これまで nikki/customers と nikki/companies をそのまま読んでいた。
+     この中には顧客の住所・担当者名・電話・集荷単価、委託会社の口座・
+     インボイス番号・単価まで入っているので、ドライバー全員の端末に
+     会社の金額と取引先の個人情報が流れていた。
+
+     経営管理が nikki/pub/ に「金額と個人情報を落とした写し」を
+     書き出すようにしたので、こちらを読む。
+
+     写しがまだ空のときは、2.5秒待ってから今までのノードを読む。
+     だから写す前に差し替えても日報は止まらない。
+     写しが届いた側は、もう古いノードを読みにいかない。
+     ══════════════════════════════════════════════════════════ */
+  _subMaster('customers', 'nikki/pub/customers', 'nikki/customers', _applyCustomersList);
+  _subMaster('companies', 'nikki/pub/companies', 'nikki/companies', _applyCompaniesList);
   // ★ 2026/06/29: オーナーPIN専用ノード。委託会社マスタとは別に永続化。
   //   マスタを書き戻さずPINだけ保存することで、委託会社の復活バグを起こさず
   //   オーナーPINが初回ログイン後リロードで消える問題を解消する。
@@ -2796,36 +2800,94 @@ function setupRealtimeSync() {
     applyUserItemDefs(v);
     try{ if(typeof renderColBlocks==='function') renderColBlocks(); }catch(e){}
   });
-  subscribeNode('nikki/customers', snap => {
-    if (!snap.exists()) return;
-    // Firebase顧客データを経営管理システムのフォーマットに対応
-    const fbCusts = snap.val() || CUSTOMERS;
-    if(Array.isArray(fbCusts) && fbCusts.length){
-      // custNo・region・colPrices付きの完全データに更新
-      CUSTOMERS = fbCusts.map(fc=>({
-        id: fc.id,
-        custNo: fc.custNo||'',
-        name: fc.name||'',
-        region: fc.region||'',
-        start: fc.start||'',
-        colPrices: fc.colPrices||{},
-        // ★ 2026/09/12: 細分化品目の出し分けに必要
-        useItems: fc.useItems||[],
-        // ★ 2026/09/12: カスタム品目。ここで捨てていたため itemsGridHtml の
-        //   カスタム品目欄（ASLAJ等）が常に非表示になっていた。
-        otherItems: fc.otherItems||[],
-      })).filter(c=>c.name);
-      ls_set(LS.CUSTOMERS, CUSTOMERS);
-      // REGIONS も更新
-      const fbRegions=[...new Set(CUSTOMERS.map(c=>c.region).filter(Boolean))].sort();
-      if(fbRegions.length){
-        REGIONS=[...new Set([...REGIONS,...fbRegions])].sort();
-        ls_set(LS.REGIONS, REGIONS);
-      }
-    } else {
-      CUSTOMERS = fbCusts || CUSTOMERS;
-    }
-  });
+}
+
+/* ══════════════════════════════════════════════════════════
+   ★ 2026-10-17.1: 台帳は「写し優先・古いノードは予備」で読む。
+
+   _subMaster は写し(pubPath)を先に購読する。
+   中身が届いたらそれを使い、以後は古いノード(oldPath)を読まない。
+   2.5秒待っても写しが空なら、そのときだけ古いノードを購読する。
+
+   これで差し替えの順番を気にしなくてよくなる。
+   ・写しがまだ無い → 今までどおり古いノードで動く
+   ・写しができた   → 自動で写しに切り替わる
+   ・後でルールで古いノードを閉じる → 写しだけで動く（読みに行かない）
+   ══════════════════════════════════════════════════════════ */
+const _pubGot = {};
+function _subMaster(kind, pubPath, oldPath, apply){
+  let fellBack = false;
+  subscribeNode(pubPath, snap => {
+    const v = snap.exists() ? snap.val() : null;
+    const arr = Array.isArray(v) ? v : (v ? Object.values(v) : []);
+    if(!arr.length) return;             // 空の写しで上書きしない
+    _pubGot[kind] = true;
+    console.log('[写し] ' + kind + ' を写しから読みました ' + arr.length + '件');
+    apply(arr);
+  }, kind);
+  setTimeout(()=>{
+    if(_pubGot[kind] || fellBack) return;
+    fellBack = true;
+    console.warn('[写し] ' + kind + ' の写しがまだ無いので ' + oldPath + ' を読みます');
+    subscribeNode(oldPath, snap => {
+      if(_pubGot[kind]) return;         // 写しが届いたら古い方は無視する
+      const v = snap.exists() ? snap.val() : null;
+      const arr = Array.isArray(v) ? v : (v ? Object.values(v) : []);
+      apply(arr);
+    }, kind);
+  }, 2500);
+}
+
+/* 顧客マスタの反映。写しも古いノードも同じ形で受ける。
+   ★ 2026-10-17.1: visitFrom / visitTo / visitNote をここで捨てていたため、
+     集荷カードの「基本の訪問時間」(2026/08/03の機能)がずっと空だった。
+     写しには入っているので、一緒に拾うようにした。 */
+function _applyCustomersList(arr){
+  const list = Array.isArray(arr) ? arr : [];
+  if(!list.length){ return; }
+  CUSTOMERS = list.map(fc=>({
+    id: fc.id,
+    custNo: fc.custNo||'',
+    name: fc.name||'',
+    status: fc.status||'',
+    region: fc.region||'',
+    start: fc.start||'',
+    // 写しには金額が入らない。有無だけを hasColPrice で受ける。
+    colPrices: fc.colPrices||{},
+    hasColPrice: (fc.hasColPrice===true) || _hasAnyPrice(fc.colPrices),
+    // ★ 2026/09/12: 細分化品目の出し分けに必要
+    useItems: fc.useItems||[],
+    // ★ 2026/09/12: カスタム品目。ここで捨てていたため itemsGridHtml の
+    //   カスタム品目欄（ASLAJ等）が常に非表示になっていた。
+    otherItems: fc.otherItems||[],
+    // ★ 2026-10-17.1: 集荷の時間帯
+    visitFrom: fc.visitFrom||'',
+    visitTo:   fc.visitTo||'',
+    visitNote: fc.visitNote||'',
+  })).filter(c=>c.name);
+  ls_set(LS.CUSTOMERS, CUSTOMERS);
+  // REGIONS も更新
+  const fbRegions=[...new Set(CUSTOMERS.map(c=>c.region).filter(Boolean))].sort();
+  if(fbRegions.length){
+    REGIONS=[...new Set([...REGIONS,...fbRegions])].sort();
+    ls_set(LS.REGIONS, REGIONS);
+  }
+}
+/* 単価が1つでも入っているか。_tax などの設定キーは数えない。 */
+function _hasAnyPrice(o){
+  try{
+    if(!o || typeof o!=='object') return false;
+    return Object.keys(o).some(k=>k.charAt(0)!=='_' && Number(o[k])>0);
+  }catch(e){ return false; }
+}
+/* 委託会社マスタの反映。オーナーログインと担当顧客の絞り込みに使う。
+   ★ 2026/06/25: ノードを経営管理と同じ nikki/companies に統一した経緯あり。
+   空(全削除)も正しく反映する。 */
+function _applyCompaniesList(arr){
+  COMPANIES = Array.isArray(arr) ? arr : [];
+  _applyOwnerPins(); // ★ 専用ノードのPINを反映
+  try{ ls_set('nikki_companies', COMPANIES); }catch(e){}
+  if(typeof renderOwnerCompanies==='function') try{ renderOwnerCompanies(); }catch(e){}
 }
 
 // DOMが読み込まれたらFirebase初期化
@@ -3410,7 +3472,7 @@ function selectDriverId(id){
 
 
 // ★ 版の文字列（差し替えのたびに必ず上げる。ログイン画面の表示と一致させる）
-const APP_VER = '2026-10-14.8';
+const APP_VER = '2026-10-17.1';
 console.log('[日報アプリ] APP_VER', APP_VER);
 
 // ══ 勤怠ユーティリティ ══
@@ -10807,9 +10869,12 @@ function _getOwnerCompanyCustomerIds(){
   });
   // ② 集荷顧客は全員(暫定: ドライバー固定割当機能未実装)
   // colPrices / prices どちらでも認識
+  /* ★ 2026-10-17.1: 写しには金額が入らないので、まず hasColPrice を見る。
+     古いノードから読んだときは今までどおり単価の中身で判定する。 */
   (CUSTOMERS||[]).forEach(c => {
-    const cp = c.colPrices || c.prices || {};
-    if(typeof cp === 'object' && Object.values(cp).some(v => Number(v) > 0)){
+    if(c && c.hasColPrice === true){ ids.add(String(c.id)); return; }
+    const cp = (c && (c.colPrices || c.prices)) || {};
+    if(typeof cp === 'object' && Object.keys(cp).some(k => k.charAt(0)!=='_' && Number(cp[k]) > 0)){
       ids.add(String(c.id));
     }
   });
@@ -15130,9 +15195,12 @@ function _getDriverCustomerIds(){
     }
   });
   // ② 単価設定ある集荷顧客は全員(暫定: ドライバー固定割当機能未実装のため、全集荷顧客を担当扱い)
+  /* ★ 2026-10-17.1: 写しには金額が入らないので、まず hasColPrice を見る。
+     古いノードから読んだときは今までどおり単価の中身で判定する。 */
   (CUSTOMERS||[]).forEach(c => {
-    const cp = c.colPrices || c.prices || {};
-    if(typeof cp === 'object' && Object.values(cp).some(v => Number(v) > 0)){
+    if(c && c.hasColPrice === true){ ids.add(String(c.id)); return; }
+    const cp = (c && (c.colPrices || c.prices)) || {};
+    if(typeof cp === 'object' && Object.keys(cp).some(k => k.charAt(0)!=='_' && Number(cp[k]) > 0)){
       ids.add(String(c.id));
     }
   });
@@ -17616,6 +17684,12 @@ function renderCustAddList(q){
   if(_myCoId){
     const co = (COMPANIES||[]).find(c=>String(c.id)===_myCoId);
     const allowed = new Set();
+    /* ★ 2026-10-17.1: 写しは扱える顧客のIDだけを custIds にまとめて持っている。
+       金額は写しに入らないので、まずこちらを見る。
+       古いノードから読んだときは今までどおり単価設定とルートから拾う。 */
+    ((co && co.custIds) || []).forEach(id=>{
+      if(id!=null && id!=='') allowed.add(String(id));
+    });
     ((co && co.prices && co.prices.custRoutes) || []).forEach(e=>{
       if(e && e.custId!=null) allowed.add(String(e.custId));
     });
