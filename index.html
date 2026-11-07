@@ -3472,8 +3472,19 @@ function selectDriverId(id){
 
 
 // ★ 版の文字列（差し替えのたびに必ず上げる。ログイン画面の表示と一致させる）
-const APP_VER = '2026-11-07.3';
+const APP_VER = '2026-11-07.4';
 console.log('[日報アプリ] APP_VER', APP_VER);
+/* ★ 2026-11-07.4: 画面の「ver ...」はHTMLに直接書いてあり、
+   APP_VER と連動していなかった。差し替えても画面の表示だけ
+   古いままになるので、ここで入れ直す。版は APP_VER の1か所で管理する。 */
+try{
+  const _vl = document.getElementById('app-ver-label');
+  if(_vl) _vl.textContent = 'ver ' + APP_VER;
+  else document.addEventListener('DOMContentLoaded', ()=>{
+    const e = document.getElementById('app-ver-label');
+    if(e) e.textContent = 'ver ' + APP_VER;
+  });
+}catch(e){}
 
 // ══ 勤怠ユーティリティ ══
 // 給与形態から勤怠タイプを判定
