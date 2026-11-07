@@ -3472,7 +3472,7 @@ function selectDriverId(id){
 
 
 // ★ 版の文字列（差し替えのたびに必ず上げる。ログイン画面の表示と一致させる）
-const APP_VER = '2026-10-17.2';
+const APP_VER = '2026-11-07.3';
 console.log('[日報アプリ] APP_VER', APP_VER);
 
 // ══ 勤怠ユーティリティ ══
@@ -18618,7 +18618,7 @@ function renderColBlocks(){
   // 写真はブロック描画時に必要なので、未読込ならここで読む(通信はしない)
   if(!COL_PHOTOS || !Object.keys(COL_PHOTOS).length){
     try{
-      const v = lsGet(LS_KEYS.COL_PHOTOS, {});
+      const v = ls_get(LS.COL_PHOTOS, {});
       if(v && typeof v==='object' && !Array.isArray(v)) COL_PHOTOS = v;
     }catch(e){}
   }
@@ -21679,7 +21679,7 @@ function _photoKey(dateStr, custName){
 
 async function loadColPhotos(){
   try{
-    const v = lsGet(LS_KEYS.COL_PHOTOS, {});
+    const v = ls_get(LS.COL_PHOTOS, {});
     COL_PHOTOS = (v && typeof v==='object' && !Array.isArray(v)) ? v : {};
   }catch(e){ COL_PHOTOS = {}; }
   return COL_PHOTOS;
@@ -21700,7 +21700,7 @@ async function _saveColPhotoIndex(dateStr, mapForDate){
       }
     });
     COL_PHOTO_INDEX = idx;
-    lsSet('nikki_col_photo_index', idx);
+    ls_set('nikki_col_photo_index', idx);
     if(fbDB && window._fbImports){
       const { ref, set } = window._fbImports;
       await set(ref(fbDB, 'nikki/col_photo_index'), idx);
@@ -21714,11 +21714,11 @@ async function loadColPhotoIndex(){
       const { ref, get } = window._fbImports;
       const snap = await get(ref(fbDB, 'nikki/col_photo_index'));
       COL_PHOTO_INDEX = snap.exists() ? (snap.val()||{}) : {};
-      lsSet('nikki_col_photo_index', COL_PHOTO_INDEX);
+      ls_set('nikki_col_photo_index', COL_PHOTO_INDEX);
     }else{
-      COL_PHOTO_INDEX = lsGet('nikki_col_photo_index', {}) || {};
+      COL_PHOTO_INDEX = ls_get('nikki_col_photo_index', {}) || {};
     }
-  }catch(e){ COL_PHOTO_INDEX = lsGet('nikki_col_photo_index', {}) || {}; }
+  }catch(e){ COL_PHOTO_INDEX = ls_get('nikki_col_photo_index', {}) || {}; }
   return COL_PHOTO_INDEX;
 }
 
@@ -21727,7 +21727,7 @@ async function _saveColPhotosForDate(dateStr, mapForDate, reason){
     COL_PHOTOS = {...COL_PHOTOS};
     Object.keys(COL_PHOTOS).forEach(k=>{ if(k.startsWith(dateStr+'__')) delete COL_PHOTOS[k]; });
     Object.assign(COL_PHOTOS, mapForDate);
-    lsSet(LS_KEYS.COL_PHOTOS, COL_PHOTOS);
+    ls_set(LS.COL_PHOTOS, COL_PHOTOS);
     if(fbDB && window._fbImports){
       const { ref, set } = window._fbImports;
       await set(ref(fbDB, 'nikki/col_photos/' + dateStr), mapForDate);
@@ -21752,7 +21752,7 @@ async function loadPhotosForDate(dateStr){
       COL_PHOTOS = {...COL_PHOTOS};
       Object.keys(COL_PHOTOS).forEach(k=>{ if(k.startsWith(dateStr+'__')) delete COL_PHOTOS[k]; });
       Object.assign(COL_PHOTOS, val);
-      lsSet(LS_KEYS.COL_PHOTOS, COL_PHOTOS);
+      ls_set(LS.COL_PHOTOS, COL_PHOTOS);
     }
   }catch(e){ console.error('[loadPhotosForDate]', e); }
   if(typeof renderColBlocks==='function') renderColBlocks();
@@ -22091,7 +22091,7 @@ async function purgeOldColPhotos(){
     const idx = {...(COL_PHOTO_INDEX||{})};
     Object.keys(idx).forEach(k=>{ if(oldDates.includes(String(idx[k].date||''))) delete idx[k]; });
     COL_PHOTO_INDEX = idx;
-    lsSet('nikki_col_photo_index', idx);
+    ls_set('nikki_col_photo_index', idx);
     if(fbDB && window._fbImports){
       const { ref, set } = window._fbImports;
       await set(ref(fbDB, 'nikki/col_photo_index'), idx);
@@ -22099,7 +22099,7 @@ async function purgeOldColPhotos(){
     const local = {...(COL_PHOTOS||{})};
     Object.keys(local).forEach(k=>{ if(oldDates.some(d=>k.startsWith(d+'__'))) delete local[k]; });
     COL_PHOTOS = local;
-    lsSet(LS_KEYS.COL_PHOTOS, local);
+    ls_set(LS.COL_PHOTOS, local);
 
     console.log('[purgeOldColPhotos] 保管期限切れを削除:', oldDates.length, '日分 (基準', cutoff, ')');
   }catch(e){ console.error('[purgeOldColPhotos]', e); }
