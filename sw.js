@@ -1,7 +1,17 @@
 // 日報アプリ Service Worker (オフライン起動対応) 2026/05/23
 // 方針: アプリ本体(HTML/アイコン)はキャッシュしてオフラインでも開けるようにする。
 //       データ通信(Firebase)はキャッシュせず常にネットワークへ。
-const CACHE_NAME = 'nikki-app-v1';
+//
+// ★ 2026-11-07: 差し替えても古い版が出る問題の対策。
+//   この SW は network-first なので本来は新しいものが出るが、
+//   fetch(e.request) はブラウザ自身のHTTPキャッシュを通るため、
+//   GitHub Pages が付ける有効期限（通常10分）が切れるまで
+//   古いファイルが返り続けていた。
+//   HTML と sw.js だけは no-store で取りに行き、必ず最新にする。
+//
+//   CACHE_NAME は差し替えるたびに日付を上げること。
+//   名前が変われば古いキャッシュが activate で消える。
+const CACHE_NAME = 'nikki-app-2026-11-07a';
 const APP_SHELL = [
   './',
   './index.html',
@@ -42,9 +52,17 @@ self.addEventListener('fetch', e => {
   if (url.includes('report_admin') || url.includes('manifest-admin') || url.includes('icon-admin')) {
     return;
   }
+  /* ★ 2026-11-07: HTML と sw.js はブラウザのキャッシュを使わずに取る。
+     同じオリジンなので URL を渡し直すだけでよい。
+     画像・アイコンは今までどおり（容量が大きく、変わらないため）。 */
+  const _isShell = (e.request.mode === 'navigate')
+                || /\.html(\?|$)/.test(url)
+                || /\/sw\.js(\?|$)/.test(url)
+                || /\/$/.test(url.split('?')[0]);
+
   // アプリ本体: network-first(最新を取りに行き、失敗時のみキャッシュ)
   e.respondWith(
-    fetch(e.request)
+    fetch(_isShell ? new Request(url, {cache:'no-store', credentials:'same-origin'}) : e.request)
       .then(res => {
         // 取得成功 → キャッシュも更新
         const copy = res.clone();
