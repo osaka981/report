@@ -424,10 +424,12 @@ textarea.fi{resize:none;}
 <script type="module">
 // Firebase SDK (CDN)
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getDatabase, ref, set, get, onValue, push, remove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { getDatabase, ref, set, get, onValue, push, remove, update } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 import { getAuth, signInAnonymously, onIdTokenChanged,
          signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 window._fbImports = { initializeApp, getDatabase, ref, set, get, onValue, push, remove, getAuth, signInAnonymously, onIdTokenChanged,
+         /* ★ 2026-11-09.6: 日報を1件ずつ足すために update を使う */
+         update,
          /* ★ 2026/09/15: 端末アカウント（IDとパスワード）のログイン用 */
          signInWithEmailAndPassword, signOut };
 /* ★ 2026/09/14: これは「SDKの読み込みが終わった」という意味のフラグ。
@@ -2306,9 +2308,33 @@ function saveFbConfig() {
      IDキー    { 'A':{...}, 'B':{...} }
    ════════════════════════════════════════════════════════════ */
 function _toLogArray(v){
-  if(Array.isArray(v)) return v.filter(x=>x!=null);
-  if(v && typeof v==='object') return Object.keys(v).map(k=>v[k]).filter(x=>x!=null);
-  return [];
+  const arr = Array.isArray(v) ? v.filter(x=>x!=null)
+            : (v && typeof v==='object') ? Object.keys(v).map(k=>v[k]).filter(x=>x!=null)
+            : [];
+  /* ★ 2026-11-09.6: 移行の途中は「古い配列のぶん」と「新しいIDキーのぶん」が
+     同じノードに並ぶ。同じ id が2つ出たら後に見つかったほうを使う
+     （移行は新しい形で書いてから古いほうを消すので、後勝ちで正しい）。 */
+  const seen = {};
+  const out = [];
+  arr.forEach(r=>{
+    const id = (r && r.id!=null) ? String(r.id) : '';
+    if(!id){ out.push(r); return; }
+    if(seen[id]!==undefined) out[seen[id]] = r;
+    else { seen[id] = out.length; out.push(r); }
+  });
+  return out;
+}
+/* 日報の1件をFirebaseのキーにする。
+   13桁の数字をそのままキーにすると Firebase が巨大な配列と誤解することが
+   あるので、必ず接頭辞を付ける。 */
+function _logKey(rec, i){
+  const id = (rec && rec.id!=null && String(rec.id)!=='') ? String(rec.id) : ('x'+i);
+  return 'r_' + id.replace(/[.$#\[\]\/]/g,'_');
+}
+function _logToObj(arr){
+  const o = {};
+  (Array.isArray(arr)?arr:[]).forEach((r,i)=>{ if(r) o[_logKey(r,i)] = r; });
+  return o;
 }
 const _LOG_NODES = ['yp_logs','col_logs','att_logs','edit_logs'];
 function _isLogNode(k){ return _LOG_NODES.indexOf(String(k||''))>=0; }
@@ -2355,14 +2381,30 @@ async function syncFromFirebase() {
 }
 
 // Firebase書き込み
+/* ════════════════════════════════════════════════════════════
+   ★ 2026-11-09.6: 日報は「配列まるごと」ではなく「1件ずつ」書く
+
+   これまでは日報を1件出すたびに nikki/yp_logs を配列ごと上書きして
+   いた。端末が全員分を持っている前提の作りで、自分の分だけを持つ
+   ようにすると他の人の日報を消してしまう。
+   日報・集荷・打刻・修正履歴は update で1件ずつ足す形にする。
+   これで端末が何を持っていても、他人のぶんには触らない。
+
+   全消去（空配列）のときだけは、これまでどおりノードごと置き換える。
+   ════════════════════════════════════════════════════════════ */
 async function fbSet(key, value) {
   // ★ 2026/09/10: 計数アプリ由来の仮レコードは保存しない（表示・集計のためだけに混ぜている）
   if (key === 'col_logs' && Array.isArray(value)) value = value.filter(r => !r || !r._fromJet);
   ls_set('nikki_' + key, value); // localStorageは常に更新
   if (!fbDB) { _pendQueueAdd(key, value); _pendBadgeUpdate(); return; }
-  const { ref, set } = window._fbImports;
+  const { ref, set, update } = window._fbImports;
+  const _isLog = _isLogNode(key) && Array.isArray(value);
   try {
-    await set(ref(fbDB, 'nikki/' + key), value);
+    if (_isLog && value.length) {
+      await update(ref(fbDB, 'nikki/' + key), _logToObj(value));   /* 1件ずつ足す */
+    } else {
+      await set(ref(fbDB, 'nikki/' + key), value);                 /* 全消去などは従来どおり */
+    }
     _pendQueueRemove(key);   // 送信成功 → キューから除去
   } catch(e) {
     console.error('fb write error:', e);
@@ -2498,11 +2540,17 @@ async function _pendFlush(showResult){
   if(keys.length === 0){ if(showResult) _toast('未送信データはありません'); return; }
   _pendFlushing = true;
   _pendBadgeUpdate('送信中…');
-  const { ref, set } = window._fbImports;
+  const { ref, set, update } = window._fbImports;
   let ok = 0, fail = 0;
   for(const key of keys){
     try {
-      await set(ref(fbDB, 'nikki/' + key), q[key].value);
+      /* ★ 2026-11-09.6: 日報は1件ずつ足す（他人のぶんを消さない） */
+      const _v = q[key].value;
+      if(_isLogNode(key) && Array.isArray(_v) && _v.length){
+        await update(ref(fbDB, 'nikki/' + key), _logToObj(_v));
+      } else {
+        await set(ref(fbDB, 'nikki/' + key), _v);
+      }
       _pendQueueRemove(key);  // 成功を確認してから削除(消失防止の生命線)
       ok++;
     } catch(e){
@@ -3495,7 +3543,7 @@ function selectDriverId(id){
 
 
 // ★ 版の文字列（差し替えのたびに必ず上げる。ログイン画面の表示と一致させる）
-const APP_VER = '2026-11-08.5';
+const APP_VER = '2026-11-09.6';
 console.log('[日報アプリ] APP_VER', APP_VER);
 /* ★ 2026-11-07.4: 画面の「ver ...」はHTMLに直接書いてあり、
    APP_VER と連動していなかった。差し替えても画面の表示だけ
