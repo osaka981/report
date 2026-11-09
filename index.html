@@ -2374,6 +2374,7 @@ function _rememberLogin(d){
     localStorage.setItem(LAST_LOGIN_KEY, JSON.stringify({
       id: d.id||'', name: d.name||'', driverNo: d.driverNo||'',
       companyId: d.companyId||'', isOwner: !!d._isOwner, isOsq: !!d.role,
+      office: d.office||'',          /* ★ .10: 本社の人は絞らない */
     }));
   }catch(e){}
 }
@@ -2385,6 +2386,10 @@ function _logScope(){
   const d = (typeof driver!=='undefined' && driver) ? driver : _lastLogin();
   if(!d) return null;                                   // 一度もログインしていない
   if(d.isOsq || d.role) return null;                    // 大阪急配の役員
+  /* ★ 2026-11-09.10: 本社には現場のドライバーがいない。
+     役員・内勤は全員分を見る必要があるので、営業所が本社なら絞らない。
+     （川村宝 9103・川村知弘 9105・松岡花歩 9007 は -999 でも 99 始まりでもない） */
+  if(String(d.office||'') === '本社') return null;      // 本社（役員・内勤）
   const no = String(d.driverNo || d.id || '');
   if(no.endsWith('-999') || no.startsWith('99')) return null;   // 管理者
   if(d._isOwner || d.isOwner) return { companyId: String(d.companyId||'') };
@@ -3664,7 +3669,7 @@ function selectDriverId(id){
 
 
 // ★ 版の文字列（差し替えのたびに必ず上げる。ログイン画面の表示と一致させる）
-const APP_VER = '2026-11-09.9';
+const APP_VER = '2026-11-09.10';
 console.log('[日報アプリ] APP_VER', APP_VER);
 /* ★ 2026-11-07.4: 画面の「ver ...」はHTMLに直接書いてあり、
    APP_VER と連動していなかった。差し替えても画面の表示だけ
