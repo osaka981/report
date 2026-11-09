@@ -2292,6 +2292,27 @@ function saveFbConfig() {
 }
 
 // Firebase → localStorage へ同期（起動時）
+/* ════════════════════════════════════════════════════════════
+   ★ 2026-11-08.5: 日報のFirebase上の形を2通り受け付ける
+
+   いまは nikki/yp_logs などに「配列まるごと」を書いている。そのため
+   1件出すたびに全員分を上書きしており、端末が自分の分しか持って
+   いない状態では他人の日報を消してしまう。
+   これを「IDをキーにしたもの」に変えて1件ずつ書けるようにするが、
+   経営管理アプリと同時に切り替えないと壊れるので、まず読む側を
+   どちらの形でも読めるようにしておく（この版では書き方は変えない）。
+
+     配列      [ {id:'A',...}, {id:'B',...} ]
+     IDキー    { 'A':{...}, 'B':{...} }
+   ════════════════════════════════════════════════════════════ */
+function _toLogArray(v){
+  if(Array.isArray(v)) return v.filter(x=>x!=null);
+  if(v && typeof v==='object') return Object.keys(v).map(k=>v[k]).filter(x=>x!=null);
+  return [];
+}
+const _LOG_NODES = ['yp_logs','col_logs','att_logs','edit_logs'];
+function _isLogNode(k){ return _LOG_NODES.indexOf(String(k||''))>=0; }
+
 async function syncFromFirebase() {
   if (!fbDB) return;
   const { ref, get } = window._fbImports;
@@ -2305,7 +2326,9 @@ async function syncFromFirebase() {
     return Promise.race([
       get(ref(fbDB, 'nikki/' + k)).then(function(snap){
         if (snap.exists()) {
-          const val = snap.val();
+          let val = snap.val();
+          /* ★ 2026-11-08.5: IDキーで来ても配列にそろえる */
+          if (_isLogNode(k)) val = _toLogArray(val);
           localStorage.setItem('nikki_' + k, typeof val === 'string' ? val : JSON.stringify(val));
         }
         return true;
@@ -3472,7 +3495,7 @@ function selectDriverId(id){
 
 
 // ★ 版の文字列（差し替えのたびに必ず上げる。ログイン画面の表示と一致させる）
-const APP_VER = '2026-11-07.4';
+const APP_VER = '2026-11-08.5';
 console.log('[日報アプリ] APP_VER', APP_VER);
 /* ★ 2026-11-07.4: 画面の「ver ...」はHTMLに直接書いてあり、
    APP_VER と連動していなかった。差し替えても画面の表示だけ
