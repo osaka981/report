@@ -2395,6 +2395,14 @@ function _logScope(){
   if(d._isOwner || d.isOwner) return { companyId: String(d.companyId||'') };
   return { id: String(d.id||''), name: String(d.name||'') };
 }
+/* いま端末が「誰のぶんを持っているか」の合図。
+   これが変わったら、持っている中身も入れ替える必要がある。 */
+const SCOPE_KEY = 'nikki_log_scope';
+function _scopeSig(){
+  const sc = _logScope();
+  if(!sc) return 'all';
+  return sc.companyId ? ('c:'+sc.companyId) : ('d:'+(sc.id||'')+'/'+(sc.name||''));
+}
 /* その1件が、いま端末に置くべきものか */
 function _logKeep(key, r, sc, cutoff){
   if(!r) return false;
@@ -2437,12 +2445,24 @@ function _trimLogs(key, arr){
   const out = arr.filter(r=>_logKeep(key, r, sc, cutoff));
   if(out.length !== arr.length){
     console.log(`[控え] ${key}: ${arr.length}件 → ${out.length}件（自分のぶん・${cutoff}以降）`);
+    /* ★ .11: 削ったということは、この端末は「この人のぶん」しか持っていない。
+       次に別の人が入ったら読み直せるよう、誰のぶんかを残す。 */
+    try{ localStorage.setItem(SCOPE_KEY, _scopeSig()); }catch(e){}
   }
   return out;
 }
 /* ログインしたあと、控えを絞り直す。
    起動時は前回の人で絞っているので、別の人がログインしたときに要る。 */
+/* ★ 2026-11-09.11: 使う人が変わったら読み直す。
+   絞り込みは「手元にあるものを削る」だけなので、Aさんの端末に
+   Bさんがログインすると、Bさんの日報はどこからも補充されない
+   （削られたまま0件になる）。誰のぶんを持っているかを覚えておき、
+   変わったときだけFirebaseから読み直す。 */
 function _retrimAfterLogin(){
+  /* ★ .11: 絞り直す前に、いま誰のぶんを持っているかを控えておく。
+     _trimLogs が削ると同時に新しい人の合図を書くので、先に読む。 */
+  let prev = '';
+  try{ prev = localStorage.getItem(SCOPE_KEY) || ''; }catch(e){}
   try{
     [['yp_logs', LS.YP_LOGS], ['col_logs', LS.COL_LOGS], ['att_logs', LS.ATT_LOGS]].forEach(([k, lsKey])=>{
       const cur = ls_get(lsKey, []);
@@ -2454,9 +2474,17 @@ function _retrimAfterLogin(){
     COL_LOGS = ls_get(LS.COL_LOGS, []);
     ATT_LOGS = ls_get(LS.ATT_LOGS, []);
   }catch(e){ console.warn('[控え] 絞り直しに失敗', e); }
+  try{
+    const sig = _scopeSig();
+    localStorage.setItem(SCOPE_KEY, sig);
+    if(prev && prev !== sig){
+      console.log('[控え] 使う人が変わったので読み直します', prev, '→', sig);
+      if(typeof syncFromFirebase==='function') syncFromFirebase();
+    }
+  }catch(e){ console.warn('[控え] 読み直しに失敗', e); }
 }
 window._trimLogs=_trimLogs; window._logScope=_logScope; window._logCutoff=_logCutoff;
-window._isMgmtDevice=_isMgmtDevice;
+window._isMgmtDevice=_isMgmtDevice; window._scopeSig=_scopeSig;
 window._retrimAfterLogin=_retrimAfterLogin; window._rememberLogin=_rememberLogin;
 
 async function syncFromFirebase() {
@@ -3669,7 +3697,7 @@ function selectDriverId(id){
 
 
 // ★ 版の文字列（差し替えのたびに必ず上げる。ログイン画面の表示と一致させる）
-const APP_VER = '2026-11-09.10';
+const APP_VER = '2026-11-09.11';
 console.log('[日報アプリ] APP_VER', APP_VER);
 /* ★ 2026-11-07.4: 画面の「ver ...」はHTMLに直接書いてあり、
    APP_VER と連動していなかった。差し替えても画面の表示だけ
