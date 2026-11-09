@@ -2410,9 +2410,23 @@ function _logKeep(key, r, sc, cutoff){
   const nm = String((r.driver && r.driver.name) || r.driverName || '');
   return !!(nm && sc.name && nm === sc.name);
 }
+/* ★ 2026-11-09.9: 経営管理v3と同じ localStorage を使っている。
+   nikki_yp_logs などは日報アプリと経営管理で同じ1つのキーを共有して
+   いるので、管理用の端末でここを絞ると経営管理の控えまで削ってしまう。
+   経営管理だけが書くキーがあれば、その端末では絞らない。 */
+const _MGMT_KEYS = ['nikki_delivery','nikki_post_logs','nikki_cmp_state','nikki_staff_full'];
+function _isMgmtDevice(){
+  try{
+    return _MGMT_KEYS.some(k=>{ const v = localStorage.getItem(k); return !!v && v.length > 2; });
+  }catch(e){ return false; }
+}
 function _trimLogs(key, arr){
   if(!Array.isArray(arr) || !arr.length) return arr;
   if(key === 'edit_logs') return arr;        // 小さいので絞らない
+  if(_isMgmtDevice()){                        // ★ .9: 経営管理の控えを削らない
+    if(!window._mgmtNoted){ window._mgmtNoted=1; console.log('[控え] 経営管理のデータがある端末なので絞りません'); }
+    return arr;
+  }
   const sc = _logScope();
   const cutoff = _logCutoff();
   const out = arr.filter(r=>_logKeep(key, r, sc, cutoff));
@@ -2437,6 +2451,7 @@ function _retrimAfterLogin(){
   }catch(e){ console.warn('[控え] 絞り直しに失敗', e); }
 }
 window._trimLogs=_trimLogs; window._logScope=_logScope; window._logCutoff=_logCutoff;
+window._isMgmtDevice=_isMgmtDevice;
 window._retrimAfterLogin=_retrimAfterLogin; window._rememberLogin=_rememberLogin;
 
 async function syncFromFirebase() {
@@ -3649,7 +3664,7 @@ function selectDriverId(id){
 
 
 // ★ 版の文字列（差し替えのたびに必ず上げる。ログイン画面の表示と一致させる）
-const APP_VER = '2026-11-09.8';
+const APP_VER = '2026-11-09.9';
 console.log('[日報アプリ] APP_VER', APP_VER);
 /* ★ 2026-11-07.4: 画面の「ver ...」はHTMLに直接書いてあり、
    APP_VER と連動していなかった。差し替えても画面の表示だけ
