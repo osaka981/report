@@ -2339,6 +2339,106 @@ function _logToObj(arr){
 const _LOG_NODES = ['yp_logs','col_logs','att_logs','edit_logs'];
 function _isLogNode(k){ return _LOG_NODES.indexOf(String(k||''))>=0; }
 
+/* ════════════════════════════════════════════════════════════
+   ★ 2026-11-09.7: 端末に置くのは「自分のぶん・6か月」だけにする
+
+   これまでは全員・全期間の日報を端末に控えていた。浜寺の1局だけで
+   45人・1,535件・約1.1MBあり、局を増やすと端末の保存容量（iPhoneは
+   5MB前後）が尽きて、日報が送れなくなるところだった。
+
+   ドライバー本人に要るのは自分の日報だけなので、受け取ったものを
+   保存する前に絞る。いちばん多い人でも6か月で約100KBになる。
+
+     ドライバー        … 自分のぶん・6か月
+     管理者            … 全部（これまでどおり）
+     委託会社オーナー  … 自社のドライバーぶん・6か月
+     大阪急配の役員    … 全部
+
+   Firebaseのデータは減らない。端末の控えを減らすだけ。
+   日報を出すときは1件ずつ足す形（.6）なので、自分のぶんしか
+   持っていなくても他の人の日報は消えない。
+   ════════════════════════════════════════════════════════════ */
+const LOG_KEEP_MONTHS = 6;
+function _logCutoff(){
+  const d = new Date();
+  d.setDate(1);
+  d.setMonth(d.getMonth() - LOG_KEEP_MONTHS);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-01';
+}
+/* 最後にログインした人を覚えておく。
+   起動したときはまだログイン前なので、これが無いと絞れない。 */
+const LAST_LOGIN_KEY = 'nikki_last_login';
+function _rememberLogin(d){
+  try{
+    if(!d){ localStorage.removeItem(LAST_LOGIN_KEY); return; }
+    localStorage.setItem(LAST_LOGIN_KEY, JSON.stringify({
+      id: d.id||'', name: d.name||'', driverNo: d.driverNo||'',
+      companyId: d.companyId||'', isOwner: !!d._isOwner, isOsq: !!d.role,
+    }));
+  }catch(e){}
+}
+function _lastLogin(){
+  try{ return JSON.parse(localStorage.getItem(LAST_LOGIN_KEY)||'null'); }catch(e){ return null; }
+}
+/* 絞り込みの条件。null なら絞らない（全部持つ） */
+function _logScope(){
+  const d = (typeof driver!=='undefined' && driver) ? driver : _lastLogin();
+  if(!d) return null;                                   // 一度もログインしていない
+  if(d.isOsq || d.role) return null;                    // 大阪急配の役員
+  const no = String(d.driverNo || d.id || '');
+  if(no.endsWith('-999') || no.startsWith('99')) return null;   // 管理者
+  if(d._isOwner || d.isOwner) return { companyId: String(d.companyId||'') };
+  return { id: String(d.id||''), name: String(d.name||'') };
+}
+/* その1件が、いま端末に置くべきものか */
+function _logKeep(key, r, sc, cutoff){
+  if(!r) return false;
+  const date = String(r.date || r.targetDate || '');
+  if(date && date < cutoff) return false;
+  if(!sc) return true;
+  if(sc.companyId){
+    // 委託会社オーナー: 自社のドライバーぶん
+    const cid = String((r.driver && r.driver.companyId) || r.companyId || '');
+    if(cid && cid === sc.companyId) return true;
+    // 会社IDが入っていない古い記録は、名簿で引いて判定する
+    const did = String((r.driver && r.driver.id) || r.driverId || '');
+    const hit = (DRIVERS||[]).find(x=>x && String(x.id)===did);
+    return !!(hit && String(hit.companyId||'')===sc.companyId);
+  }
+  const did = String((r.driver && r.driver.id) || r.driverId || '');
+  if(did && sc.id && did === sc.id) return true;
+  const nm = String((r.driver && r.driver.name) || r.driverName || '');
+  return !!(nm && sc.name && nm === sc.name);
+}
+function _trimLogs(key, arr){
+  if(!Array.isArray(arr) || !arr.length) return arr;
+  if(key === 'edit_logs') return arr;        // 小さいので絞らない
+  const sc = _logScope();
+  const cutoff = _logCutoff();
+  const out = arr.filter(r=>_logKeep(key, r, sc, cutoff));
+  if(out.length !== arr.length){
+    console.log(`[控え] ${key}: ${arr.length}件 → ${out.length}件（自分のぶん・${cutoff}以降）`);
+  }
+  return out;
+}
+/* ログインしたあと、控えを絞り直す。
+   起動時は前回の人で絞っているので、別の人がログインしたときに要る。 */
+function _retrimAfterLogin(){
+  try{
+    [['yp_logs', LS.YP_LOGS], ['col_logs', LS.COL_LOGS], ['att_logs', LS.ATT_LOGS]].forEach(([k, lsKey])=>{
+      const cur = ls_get(lsKey, []);
+      if(!Array.isArray(cur) || !cur.length) return;
+      const next = _trimLogs(k, cur);
+      if(next.length !== cur.length) ls_set(lsKey, next);
+    });
+    YP_LOGS  = ls_get(LS.YP_LOGS, []);
+    COL_LOGS = ls_get(LS.COL_LOGS, []);
+    ATT_LOGS = ls_get(LS.ATT_LOGS, []);
+  }catch(e){ console.warn('[控え] 絞り直しに失敗', e); }
+}
+window._trimLogs=_trimLogs; window._logScope=_logScope; window._logCutoff=_logCutoff;
+window._retrimAfterLogin=_retrimAfterLogin; window._rememberLogin=_rememberLogin;
+
 async function syncFromFirebase() {
   if (!fbDB) return;
   const { ref, get } = window._fbImports;
@@ -2354,7 +2454,7 @@ async function syncFromFirebase() {
         if (snap.exists()) {
           let val = snap.val();
           /* ★ 2026-11-08.5: IDキーで来ても配列にそろえる */
-          if (_isLogNode(k)) val = _toLogArray(val);
+          if (_isLogNode(k)) val = _trimLogs(k, _toLogArray(val));   /* ★ .7: 自分のぶんだけ残す */
           localStorage.setItem('nikki_' + k, typeof val === 'string' ? val : JSON.stringify(val));
         }
         return true;
@@ -3543,7 +3643,7 @@ function selectDriverId(id){
 
 
 // ★ 版の文字列（差し替えのたびに必ず上げる。ログイン画面の表示と一致させる）
-const APP_VER = '2026-11-09.6';
+const APP_VER = '2026-11-09.7';
 console.log('[日報アプリ] APP_VER', APP_VER);
 /* ★ 2026-11-07.4: 画面の「ver ...」はHTMLに直接書いてあり、
    APP_VER と連動していなかった。差し替えても画面の表示だけ
@@ -3786,6 +3886,8 @@ function getDriverOfficeCoord(d){
 let todayAttId = null; // 本日の勤怠ID
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&$('scr-login').classList.contains('on'))doLogin();});
 function doLogout(){driver=null;todayAttId=null;clockOutGps=null;$('emp-id').value='';_pendingLoginDriver=null;_loginPin='';_isViewOnlyMode=false;show('scr-login');}
+/* ★ 2026-11-09.7: ログアウトしても「前回の人」は消さない。
+   次に起動したときの絞り込みに使う（別の人がログインすればそこで絞り直す）。 */
 function goTop(){
   // 提出後のトップ → モード選択画面へ
   show('scr-mode');
@@ -5133,6 +5235,7 @@ let _osqTab = 'home';       // 現在のタブ
 function _completeOsqOwnerLogin(d){
   driver = d;                // driver変数も使えるようにしておく(通知配信先計算等で参照)
   _osqOwner = d;
+  try{ _rememberLogin(d); }catch(e){}   /* ★ .7: 役員は全部見るので絞らない */
   // 表示
   const roleLabel = d.role==='president' ? '社長' : (d.role==='director' ? '役員' : '');
   if($('osq-tb-name')) $('osq-tb-name').textContent = `${d.name} さん`;
@@ -14900,6 +15003,8 @@ function _completeLogin(d){
   // ── モード選択画面へ遷移 ──
   // PIN認証成功後、業務 / 月次確認・設定 / お知らせ を選んでもらう
   driver = d;
+  /* ★ 2026-11-09.7: 誰が入ったかを覚えて、端末の控えを自分のぶんに絞り直す */
+  try{ _rememberLogin(d); _retrimAfterLogin(); }catch(e){}
   if($('mode-name')) $('mode-name').textContent = `${d.name} さん`;
   if($('mode-sub')) $('mode-sub').textContent = `${d.office}　ID: ${d.id}`;
   // 通知バッジ更新
@@ -15054,6 +15159,7 @@ function enterMode(mode){
 function _enterWorkMode(d){
   _isViewOnlyMode = false;
   driver = d;
+  try{ _rememberLogin(d); _retrimAfterLogin(); }catch(e){}   /* ★ .7 */
   const now = new Date();
   const dt = now.toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric',weekday:'short'});
   $('sel-name').textContent = `${d.name} さん`;
@@ -21581,6 +21687,14 @@ function renderLogList(){
   ).join('');
 }
 function clearLogs(){
+  /* ★ 2026-11-09.7: 自分のぶんの控えしか持たない端末からは消させない。
+     ここは Firebase のノードごと空にするので、絞られた端末から押されると
+     手元に無い他の人の日報まで消える。 */
+  if(typeof _logScope==='function' && _logScope()){
+    alert('この端末は自分のぶんの控えしか持っていないため、全件削除はできません。\n'
+        + '管理者の端末から行ってください。');
+    return;
+  }
   if(!confirm('提出済み日報を全件削除しますか？\n（この操作は元に戻せません）'))return;
   YP_LOGS=[]; COL_LOGS=[]; fbSet('yp_logs',[]); fbSet('col_logs',[]);
   renderLogList(); toast('日報を全件削除しました');
