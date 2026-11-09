@@ -2765,15 +2765,21 @@ function setupRealtimeSync() {
   if (!fbDB) return;
   const { ref, onValue } = window._fbImports;
   // 日報ログをリアルタイムで受信
+  /* ★ 2026-11-09.8: ここは受け取ったものを fbSet でそのまま Firebase に
+     書き戻していた。受信したものを送り返す意味はなく、
+       ・IDキーの形で来たものを配列にせずに持ってしまう
+         （COL_LOGS.filter が無い、というエラーになっていた）
+       ・自分のぶんに絞る処理（.7）を素通りして全員分を端末に残す
+     の2つが起きていた。配列にそろえて絞り、端末の控えだけ更新する。 */
   subscribeNode('nikki/yp_logs', snap => {
     if (!snap.exists()) return;
-    YP_LOGS = snap.val() || [];
-    fbSet('yp_logs', YP_LOGS);
+    YP_LOGS = _trimLogs('yp_logs', _toLogArray(snap.val()));
+    ls_set(LS.YP_LOGS, YP_LOGS);
   });
   subscribeNode('nikki/col_logs', snap => {
     if (!snap.exists()) return;
-    COL_LOGS = snap.val() || [];
-    fbSet('col_logs', COL_LOGS);
+    COL_LOGS = _trimLogs('col_logs', _toLogArray(snap.val()));
+    ls_set(LS.COL_LOGS, COL_LOGS);
     _mergeJetIntoColLogs();
   });
   // ★ 2026/09/01: バーコード計数アプリの便別実績（読むだけ。書かない）
@@ -3643,7 +3649,7 @@ function selectDriverId(id){
 
 
 // ★ 版の文字列（差し替えのたびに必ず上げる。ログイン画面の表示と一致させる）
-const APP_VER = '2026-11-09.7';
+const APP_VER = '2026-11-09.8';
 console.log('[日報アプリ] APP_VER', APP_VER);
 /* ★ 2026-11-07.4: 画面の「ver ...」はHTMLに直接書いてあり、
    APP_VER と連動していなかった。差し替えても画面の表示だけ
@@ -13832,7 +13838,8 @@ function _jetToColRows(){
 }
 function _mergeJetIntoColLogs(){
   try{
-    COL_LOGS=(COL_LOGS||[]).filter(r=>!r||!r._fromJet).concat(_jetToColRows());
+    /* ★ 2026-11-09.8: 念のため配列にそろえてから扱う */
+    COL_LOGS=_toLogArray(COL_LOGS).filter(r=>!r||!r._fromJet).concat(_jetToColRows());
   }catch(e){ console.warn('[計数の合流] 失敗:',e); }
 }
 
