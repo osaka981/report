@@ -2040,6 +2040,7 @@ async function initFirebase() {
       try { await (window._fbAuthReady || Promise.resolve(true)); } catch(e) {}
       setupRealtimeSync();    // リアルタイム更新を購読(裏でデータが最新化される)
       syncFromFirebase();     // await しない → 裏で実行(完了を待たずに先へ進む)
+      try{ _markSeen(); }catch(e){}   /* ★ .14: この端末の版を書き残す */
     })();
     // 起動時: 未送信キューがあれば再送信
     try{ acctPaint(); }catch(e){}   // ★ 2026/09/15: 端末アカウントの状態を表示
@@ -2520,6 +2521,51 @@ function _verBanner(){
   el.textContent = 'アプリが古い版です（' + APP_VER + '）。タップして最新にしてください';
   try{ _pendBanner(); }catch(e){}
 }
+/* ════════════════════════════════════════════════════════════
+   ★ 2026-11-09.14: この端末がどの版かを書き残す
+
+   「古い版のままの端末が何台あるか」を経営管理で見られるようにする。
+   端末ごとに変わらない番号を1つ持たせ、nikki/app_seen/<番号> に
+   版と日時と名前を書く。update で自分の1件だけを足すので、
+   他の端末のぶんには触らない。
+
+   書くのは起動したときと、人が変わったときだけ。
+   同じ版・同じ人で6時間以内なら書かない（通信を増やさない）。
+   ════════════════════════════════════════════════════════════ */
+const DEV_ID_KEY = 'nikki_device_id';
+const SEEN_KEY   = 'nikki_seen_mark';
+function _deviceId(){
+  try{
+    let v = localStorage.getItem(DEV_ID_KEY);
+    if(!v){
+      v = (window.crypto && crypto.randomUUID) ? crypto.randomUUID()
+        : ('d' + Date.now().toString(36) + Math.random().toString(36).slice(2,10));
+      v = String(v).replace(/[.$#\[\]\/]/g, '-');
+      localStorage.setItem(DEV_ID_KEY, v);
+    }
+    return v;
+  }catch(e){ return ''; }
+}
+async function _markSeen(){
+  try{
+    if(!fbDB || !window._fbImports) return;
+    const id = _deviceId();
+    if(!id) return;
+    const who = (typeof driver!=='undefined' && driver) ? driver : _lastLogin();
+    const name = String((who && who.name) || '');
+    const mark = APP_VER + '|' + name;
+    let prev = null;
+    try{ prev = JSON.parse(localStorage.getItem(SEEN_KEY) || 'null'); }catch(e){}
+    if(prev && prev.mark === mark && (Date.now() - (prev.at||0)) < 6*3600*1000) return;
+    const { ref, update } = window._fbImports;
+    await update(ref(fbDB, 'nikki/app_seen'), {
+      [id]: { ver: APP_VER, at: new Date().toISOString(), name }
+    });
+    try{ localStorage.setItem(SEEN_KEY, JSON.stringify({mark, at: Date.now()})); }catch(e){}
+  }catch(e){ console.warn('[版] 記録できませんでした', e && e.message); }
+}
+window._markSeen=_markSeen; window._deviceId=_deviceId;
+
 /* キャッシュを捨てて読み直す。押した人がそれ以上何もしなくていいようにする。 */
 async function _forceUpdate(){
   const el = document.getElementById('ver-banner');
@@ -3490,7 +3536,7 @@ function selectDriverId(id){
 
 
 // ★ 版の文字列（差し替えのたびに必ず上げる。ログイン画面の表示と一致させる）
-const APP_VER = '2026-11-09.13';
+const APP_VER = '2026-11-09.14';
 console.log('[日報アプリ] APP_VER', APP_VER);
 /* ★ 2026-11-07.4: 画面の「ver ...」はHTMLに直接書いてあり、
    APP_VER と連動していなかった。差し替えても画面の表示だけ
@@ -5082,7 +5128,7 @@ let _osqTab = 'home';       // 現在のタブ
 function _completeOsqOwnerLogin(d){
   driver = d;                // driver変数も使えるようにしておく(通知配信先計算等で参照)
   _osqOwner = d;
-  try{ _rememberLogin(d); }catch(e){}   /* ★ .7: 役員は全部見るので絞らない */
+  try{ _rememberLogin(d); _markSeen(); }catch(e){}   /* ★ .7: 役員は全部見るので絞らない */
   // 表示
   const roleLabel = d.role==='president' ? '社長' : (d.role==='director' ? '役員' : '');
   if($('osq-tb-name')) $('osq-tb-name').textContent = `${d.name} さん`;
@@ -14852,7 +14898,7 @@ function _completeLogin(d){
   // PIN認証成功後、業務 / 月次確認・設定 / お知らせ を選んでもらう
   driver = d;
   /* ★ 2026-11-09.7: 誰が入ったかを覚えて、端末の控えを自分のぶんに絞り直す */
-  try{ _rememberLogin(d); _retrimAfterLogin(); }catch(e){}
+  try{ _rememberLogin(d); _retrimAfterLogin(); _markSeen(); }catch(e){}
   if($('mode-name')) $('mode-name').textContent = `${d.name} さん`;
   if($('mode-sub')) $('mode-sub').textContent = `${d.office}　ID: ${d.id}`;
   // 通知バッジ更新
@@ -15007,7 +15053,7 @@ function enterMode(mode){
 function _enterWorkMode(d){
   _isViewOnlyMode = false;
   driver = d;
-  try{ _rememberLogin(d); _retrimAfterLogin(); }catch(e){}   /* ★ .7 */
+  try{ _rememberLogin(d); _retrimAfterLogin(); _markSeen(); }catch(e){}   /* ★ .7 */
   const now = new Date();
   const dt = now.toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric',weekday:'short'});
   $('sel-name').textContent = `${d.name} さん`;
