@@ -2016,8 +2016,11 @@ const _idbSeen = new Set();
 function _idbPut(k, v){
   try{
     _idbSeen.add(k);
-    /* localStorage と同じ「文字列のまま」で入れる（.18） */
-    _idbQ.set(k, (typeof v === 'string') ? v : JSON.stringify(v));
+    /* ★ localStorage と同じ形（JSON文字列）で入れる。
+       lsSet は値をそのまま渡してくるので、文字列でも JSON.stringify
+       する。ここを素通りさせると "2026-11-11.18" が引用符なしで
+       入り、JSON.parse に失敗して読めなくなる。 */
+    _idbQ.set(k, JSON.stringify(v));
     if(_idbTimer) return;
     _idbTimer = setTimeout(_idbFlush, 400);
   }catch(e){}
@@ -2235,6 +2238,7 @@ window._idbStats=_idbStats; window._idbFlush=_idbFlush;
    ════════════════════════════════════════════════════════════ */
 const _mem = Object.create(null);
 let _memReady = false, _memMs = 0;
+const _fixUp = [];
 async function _idbLoad(){
   const t0 = (performance && performance.now) ? performance.now() : Date.now();
   const db = await _idbOpen();
@@ -2248,9 +2252,13 @@ async function _idbLoad(){
         if(!c){ return res(true); }
         try{
           const v = c.value;
-          /* .17 までは中身をそのまま（オブジェクトで）入れていた。
-             どちらで入っていても文字列にそろえる。 */
-          _mem[String(c.key)] = (typeof v === 'string') ? v : JSON.stringify(v);
+          const key = String(c.key);
+          /* 古い版が入れた形（中身そのまま／引用符なしの文字列）を
+             JSON文字列にそろえる。直せたものは入れ直す。 */
+          let t = (typeof v === 'string') ? v : JSON.stringify(v);
+          try{ JSON.parse(t); }
+          catch(e3){ t = JSON.stringify(v); _fixUp.push([key, t]); }
+          _mem[key] = t;
         }catch(e2){}
         c.continue();
       };
@@ -2258,6 +2266,17 @@ async function _idbLoad(){
     }catch(e){ res(false); }
   });
   _memReady = ok;
+  /* 形がちがっていたものを入れ直す（引用符なしの文字列など） */
+  if(ok && _fixUp.length){
+    const n = _fixUp.length;
+    try{
+      const tx = db.transaction(IDB_STORE,'readwrite');
+      const st2 = tx.objectStore(IDB_STORE);
+      _fixUp.forEach(([k,t])=>{ try{ st2.put(t, k); }catch(e){} });
+      tx.oncomplete = ()=>console.log('[IndexedDB] 形をそろえ直しました ' + n + '件');
+    }catch(e){}
+    _fixUp.length = 0;
+  }
   _memMs = Math.round(((performance && performance.now) ? performance.now() : Date.now()) - t0);
   console.log('[IndexedDB] 読み込み ' + (ok ? Object.keys(_mem).length + 'キー / ' + _memMs + 'ms'
                                             : '失敗（localStorageを使います・E-04）'));
@@ -3900,7 +3919,7 @@ function selectDriverId(id){
 
 
 // ★ 版の文字列（差し替えのたびに必ず上げる。ログイン画面の表示と一致させる）
-const APP_VER = '2026-11-11.18';
+const APP_VER = '2026-11-11.19';
 console.log('[日報アプリ] APP_VER', APP_VER);
 /* ★ 2026-11-07.4: 画面の「ver ...」はHTMLに直接書いてあり、
    APP_VER と連動していなかった。差し替えても画面の表示だけ
