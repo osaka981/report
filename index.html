@@ -2012,8 +2012,10 @@ function _idbOpen(){
    0.4秒ぶんを貯めて、同じキーは最後の1回だけ書く。 */
 const _idbQ = new Map();
 let _idbTimer = null, _idbWrites = 0, _idbFails = 0;
+const _idbSeen = new Set();
 function _idbPut(k, v){
   try{
+    _idbSeen.add(k);
     _idbQ.set(k, v);
     if(_idbTimer) return;
     _idbTimer = setTimeout(_idbFlush, 400);
@@ -2042,6 +2044,29 @@ async function _idbFlush(){
    このひと手間が無いと第2段階で読み込みを切り替えたときに欠ける。
    写し終えたら印を付け、以降はやらない。版を上げたらもう一度やる。 */
 const IDB_SEED_KEY = 'nikki_idb_seeded';
+/* ★ .17: 日報アプリが使うキーだけを写す。
+   osaka981.github.io は経営管理・計数アプリと同じ localStorage を
+   共有していて、川村さんのPCでは nikki_ で始まるキーが54個ある。
+   そのまま写すと、経営管理の従業員台帳（口座・生年月日・単価）まで
+   日報アプリの入れ物に入ってしまう。実害は無いが、アプリごとに
+   入れ物を分ける意味が無くなるので、使うものだけに限る。
+
+   fbSet が作る動的なキー（nikki_app_min_ver など）は ls_set を
+   通るので _idbPut で写る。ここに並べる必要はない。 */
+const IDB_KEYS = [
+  'nikki_att_fix', 'nikki_att_logs', 'nikki_col_courses',
+  'nikki_col_logs', 'nikki_col_photos', 'nikki_col_routes',
+  'nikki_companies', 'nikki_cust_hist', 'nikki_customer_notes',
+  'nikki_customers', 'nikki_drivers', 'nikki_edit_logs',
+  'nikki_fb_config', 'nikki_fs', 'nikki_item_defs',
+  'nikki_jet_scan', 'nikki_jet_settings', 'nikki_notifications',
+  'nikki_offices', 'nikki_oil_state', 'nikki_owner_pins',
+  'nikki_photo_purged_on', 'nikki_regions', 'nikki_schedule_logs',
+  'nikki_schedule_overrides', 'nikki_schedule_surveys', 'nikki_shifts',
+  'nikki_survey_responses', 'nikki_theme', 'nikki_yp_count_mode',
+  'nikki_yp_logs'
+];
+function _idbMine(k){ return IDB_KEYS.indexOf(k) >= 0; }
 let _idbSeedAt = 0;
 async function _idbSeed(force){
   try{
@@ -2053,7 +2078,7 @@ async function _idbSeed(force){
     const keys = [];
     for(let i=0;i<localStorage.length;i++){
       const k = localStorage.key(i);
-      if(k && k.indexOf('nikki_') === 0 && k !== IDB_SEED_KEY) keys.push(k);
+      if(k && _idbMine(k)) keys.push(k);
     }
     if(!keys.length){ try{ localStorage.setItem(IDB_SEED_KEY, APP_VER); }catch(e){} return; }
     await new Promise(res=>{
@@ -2070,7 +2095,8 @@ async function _idbSeed(force){
         });
         tx.oncomplete = ()=>{ _idbWrites += keys.length;
           try{ localStorage.setItem(IDB_SEED_KEY, APP_VER); }catch(e){}
-          console.log('[IndexedDB] 写しました ' + keys.length + '件'); res(); };
+          console.log('[IndexedDB] 写しました ' + keys.length + '件');
+          _idbSweep(); res(); };
         tx.onerror = ()=>{ _idbFails += keys.length;
           console.warn('[IndexedDB] 写しに失敗（E-02）', tx.error && tx.error.name); res(); };
         tx.onabort = ()=>{ _idbFails += keys.length; res(); };
@@ -2078,6 +2104,36 @@ async function _idbSeed(force){
     });
   }catch(e){ console.warn('[IndexedDB] 写しに失敗（E-02）', e && e.name); }
 }
+/* ★ .17: 日報アプリのものでないキーを片付ける。
+   .16 では nikki_ で始まるキーを全部写してしまったので、
+   経営管理のぶん（従業員台帳など）が入っている端末がある。
+   使うキーでも、この回に自分で書いたキーでもないものを消す。 */
+async function _idbSweep(){
+  try{
+    const db = await _idbOpen();
+    if(!db) return;
+    const drop = [];
+    await new Promise(res=>{
+      try{
+        const rq = db.transaction(IDB_STORE,'readonly').objectStore(IDB_STORE).getAllKeys();
+        rq.onsuccess = ()=>{
+          (rq.result||[]).forEach(k=>{
+            const key = String(k);
+            if(!_idbMine(key) && !_idbSeen.has(key)) drop.push(key);
+          });
+          res();
+        };
+        rq.onerror = ()=>res();
+      }catch(e){ res(); }
+    });
+    if(!drop.length) return;
+    const tx = db.transaction(IDB_STORE,'readwrite');
+    const st = tx.objectStore(IDB_STORE);
+    drop.forEach(k=>{ try{ st.delete(k); }catch(e){} });
+    tx.oncomplete = ()=>console.log('[IndexedDB] 日報アプリのものでないキーを片付けました ' + drop.length + '件');
+  }catch(e){}
+}
+window._idbSweep=_idbSweep;
 window._idbSeed=_idbSeed;
 /* 起動直後は同期の途中なので、落ち着いてから写す。
    画面を閉じる・裏に回すときにも写して、あとから直接書かれたぶんを拾う。 */
@@ -3746,7 +3802,7 @@ function selectDriverId(id){
 
 
 // ★ 版の文字列（差し替えのたびに必ず上げる。ログイン画面の表示と一致させる）
-const APP_VER = '2026-11-10.16';
+const APP_VER = '2026-11-11.17';
 console.log('[日報アプリ] APP_VER', APP_VER);
 /* ★ 2026-11-07.4: 画面の「ver ...」はHTMLに直接書いてあり、
    APP_VER と連動していなかった。差し替えても画面の表示だけ
