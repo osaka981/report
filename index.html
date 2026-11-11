@@ -1971,8 +1971,168 @@ const LS={
     localStorage.setItem('nikki_fb_config', cfg);
   }
 })();
+/* ════════════════════════════════════════════════════════════
+   ★ 2026-11-10.16: IndexedDB移行 第1段階（書くだけ）
+
+   localStorage は 5〜10MB で止まる。全件を持つ人（役員・管理者・
+   委託会社オーナー）と経営管理の端末は、このままだと数か月で
+   保存できなくなる。入れ物を IndexedDB に移す。
+
+   第1段階のこの版は【読み込みを一切変えない】。
+   ls_get はこれまでどおり localStorage から読む。
+   ls_set が localStorage に書いたあと、同じ内容を IndexedDB にも
+   書く。表示も動作も変わらない。容量もまだ減らない。
+   IndexedDB が正しく書けているかだけを確かめる段階。
+
+   うまくいかなくても日報アプリは普通に動く（下の _idbPut は
+   失敗しても黙って諦める）。次の版で読み込みを切り替える。
+   ════════════════════════════════════════════════════════════ */
+const IDB_NAME = 'nikki_report', IDB_STORE = 'kv', IDB_VER = 1;
+let _idb = null, _idbState = 'まだ開いていない';
+function _idbOpen(){
+  return new Promise(res=>{
+    if(_idb) return res(_idb);
+    let req;
+    try{ req = indexedDB.open(IDB_NAME, IDB_VER); }
+    catch(e){ _idbState = '使えない（' + (e&&e.name) + '）'; return res(null); }
+    req.onupgradeneeded = ()=>{
+      try{
+        const db = req.result;
+        if(!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE);
+      }catch(e){}
+    };
+    req.onsuccess = ()=>{ _idb = req.result; _idbState = '使える';
+      try{ _idb.onversionchange = ()=>{ try{ _idb.close(); }catch(e){} _idb = null; }; }catch(e){}
+      res(_idb); };
+    req.onerror   = ()=>{ _idbState = '開けない（' + ((req.error&&req.error.name)||'不明') + '）'; res(null); };
+    req.onblocked = ()=>{ _idbState = '他のタブが開いている（E-05）'; res(null); };
+  });
+}
+/* 書き込みはまとめて行う。ls_set は何度も呼ばれるので、
+   0.4秒ぶんを貯めて、同じキーは最後の1回だけ書く。 */
+const _idbQ = new Map();
+let _idbTimer = null, _idbWrites = 0, _idbFails = 0;
+function _idbPut(k, v){
+  try{
+    _idbQ.set(k, v);
+    if(_idbTimer) return;
+    _idbTimer = setTimeout(_idbFlush, 400);
+  }catch(e){}
+}
+async function _idbFlush(){
+  _idbTimer = null;
+  if(!_idbQ.size) return;
+  const batch = Array.from(_idbQ.entries());
+  _idbQ.clear();
+  const db = await _idbOpen();
+  if(!db){ _idbFails += batch.length; return; }
+  try{
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    const st = tx.objectStore(IDB_STORE);
+    batch.forEach(([k, v])=>{ try{ st.put(v, k); }catch(e){} });
+    tx.oncomplete = ()=>{ _idbWrites += batch.length; };
+    tx.onerror    = ()=>{ _idbFails  += batch.length;
+      console.warn('[IndexedDB] 書き込みに失敗', tx.error && tx.error.name); };
+    tx.onabort    = ()=>{ _idbFails  += batch.length; };
+  }catch(e){ _idbFails += batch.length; console.warn('[IndexedDB] 書き込みに失敗', e && e.name); }
+}
+/* ★ .16: 起動時に一度だけ、localStorage の中身を丸ごと写す。
+   ls_set を通らず localStorage を直接書いている所が日報アプリに
+   33か所ある（nikki_jet_scan など）。それらは _idbPut を通らないので、
+   このひと手間が無いと第2段階で読み込みを切り替えたときに欠ける。
+   写し終えたら印を付け、以降はやらない。版を上げたらもう一度やる。 */
+const IDB_SEED_KEY = 'nikki_idb_seeded';
+let _idbSeedAt = 0;
+async function _idbSeed(force){
+  try{
+    if(!force && localStorage.getItem(IDB_SEED_KEY) === APP_VER) return;
+    if(Date.now() - _idbSeedAt < 60000) return;   // 1分に1回まで
+    _idbSeedAt = Date.now();
+    const db = await _idbOpen();
+    if(!db) return;
+    const keys = [];
+    for(let i=0;i<localStorage.length;i++){
+      const k = localStorage.key(i);
+      if(k && k.indexOf('nikki_') === 0 && k !== IDB_SEED_KEY) keys.push(k);
+    }
+    if(!keys.length){ try{ localStorage.setItem(IDB_SEED_KEY, APP_VER); }catch(e){} return; }
+    await new Promise(res=>{
+      try{
+        const tx = db.transaction(IDB_STORE, 'readwrite');
+        const st = tx.objectStore(IDB_STORE);
+        keys.forEach(k=>{
+          try{
+            const raw = localStorage.getItem(k);
+            if(raw == null) return;
+            let v; try{ v = JSON.parse(raw); }catch(e){ v = raw; }
+            st.put(v, k);
+          }catch(e){}
+        });
+        tx.oncomplete = ()=>{ _idbWrites += keys.length;
+          try{ localStorage.setItem(IDB_SEED_KEY, APP_VER); }catch(e){}
+          console.log('[IndexedDB] 写しました ' + keys.length + '件'); res(); };
+        tx.onerror = ()=>{ _idbFails += keys.length;
+          console.warn('[IndexedDB] 写しに失敗（E-02）', tx.error && tx.error.name); res(); };
+        tx.onabort = ()=>{ _idbFails += keys.length; res(); };
+      }catch(e){ console.warn('[IndexedDB] 写しに失敗（E-02）', e && e.name); res(); }
+    });
+  }catch(e){ console.warn('[IndexedDB] 写しに失敗（E-02）', e && e.name); }
+}
+window._idbSeed=_idbSeed;
+/* 起動直後は同期の途中なので、落ち着いてから写す。
+   画面を閉じる・裏に回すときにも写して、あとから直接書かれたぶんを拾う。 */
+try{
+  setTimeout(()=>{ _idbSeed(); }, 5000);
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.visibilityState === 'hidden'){ try{ _idbSeed(true); }catch(e){} }
+  });
+}catch(e){}
+
+/* 第1段階の確認用。コンソールで _idbStats() と打つと中身が見える。 */
+async function _idbStats(){
+  const db = await _idbOpen();
+  const out = { 状態:_idbState, 書けた:_idbWrites, 失敗:_idbFails, 件数:0, 合計KB:0, 中身:[] };
+  if(!db) return out;
+  await new Promise(res=>{
+    try{
+      const st = db.transaction(IDB_STORE, 'readonly').objectStore(IDB_STORE);
+      const rq = st.openCursor();
+      rq.onsuccess = e=>{
+        const c = e.target.result;
+        if(!c){ return res(); }
+        let kb = 0;
+        try{ kb = JSON.stringify(c.value).length * 2 / 1024; }catch(e2){}
+        out.件数++; out.合計KB += kb;
+        if(kb >= 10) out.中身.push({キー:c.key, KB:Math.round(kb)});
+        c.continue();
+      };
+      rq.onerror = ()=>res();
+    }catch(e){ res(); }
+  });
+  out.合計KB = Math.round(out.合計KB);
+  out.中身.sort((a,b)=>b.KB-a.KB);
+  return out;
+}
+window._idbStats=_idbStats; window._idbFlush=_idbFlush;
+
 const ls_get=(k,def)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):def;}catch{return def;}};
-const ls_set=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}};
+/* ★ .16: これまでは失敗を握りつぶしていた（catch{}）。容量が尽きても
+   画面に何も出ず、控えだけが更新されない状態になっていた。
+   保存できなかったことが分かるようにし、同じ内容を IndexedDB にも書く。 */
+let _lsFailed = {};
+const ls_set=(k,v)=>{
+  let ok = true;
+  try{ localStorage.setItem(k, JSON.stringify(v)); delete _lsFailed[k]; }
+  catch(e){
+    ok = false;
+    if(!_lsFailed[k]){
+      _lsFailed[k] = Date.now();
+      console.warn('[storage] 端末に保存できませんでした（容量不足の可能性）', k, e && e.name);
+    }
+  }
+  _idbPut(k, v);
+  return ok;
+};
 
 // ══ FIREBASE 同期レイヤー ══
 const FB_KEY = 'nikki_fb_config';
@@ -3586,7 +3746,7 @@ function selectDriverId(id){
 
 
 // ★ 版の文字列（差し替えのたびに必ず上げる。ログイン画面の表示と一致させる）
-const APP_VER = '2026-11-10.15';
+const APP_VER = '2026-11-10.16';
 console.log('[日報アプリ] APP_VER', APP_VER);
 /* ★ 2026-11-07.4: 画面の「ver ...」はHTMLに直接書いてあり、
    APP_VER と連動していなかった。差し替えても画面の表示だけ
