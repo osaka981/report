@@ -2016,7 +2016,8 @@ const _idbSeen = new Set();
 function _idbPut(k, v){
   try{
     _idbSeen.add(k);
-    _idbQ.set(k, v);
+    /* localStorage と同じ「文字列のまま」で入れる（.18） */
+    _idbQ.set(k, (typeof v === 'string') ? v : JSON.stringify(v));
     if(_idbTimer) return;
     _idbTimer = setTimeout(_idbFlush, 400);
   }catch(e){}
@@ -2089,8 +2090,7 @@ async function _idbSeed(force){
           try{
             const raw = localStorage.getItem(k);
             if(raw == null) return;
-            let v; try{ v = JSON.parse(raw); }catch(e){ v = raw; }
-            st.put(v, k);
+            st.put(raw, k);              /* ★ .18: 文字列のまま入れる */
           }catch(e){}
         });
         tx.oncomplete = ()=>{ _idbWrites += keys.length;
@@ -2135,6 +2135,53 @@ async function _idbSweep(){
 }
 window._idbSweep=_idbSweep;
 window._idbSeed=_idbSeed;
+
+/* ★ .18: 読み終わるまで画面に蓋をする。
+   日報アプリは画面を作る前にデータを読むので、IndexedDBを待たずに
+   進むと空のまま描いてしまう。3秒で見切りをつけて先に進む
+   （そのときは localStorage の中身で動く。第2段階はまだ両方に
+   書いているので、見えかたは変わらない）。 */
+function _bootGateShow(){
+  try{
+    if(document.getElementById('boot-gate')) return;
+    const el = document.createElement('div');
+    el.id = 'boot-gate';
+    el.style.cssText = 'position:fixed;inset:0;z-index:99998;display:flex;align-items:center;'
+      + 'justify-content:center;background:#f5f1ec;'
+      + "font-family:'Noto Sans JP',sans-serif;font-size:13px;color:#8a7a6a;";
+    el.textContent = '読み込んでいます…';
+    (document.body || document.documentElement).appendChild(el);
+  }catch(e){}
+}
+function _bootGateHide(){
+  try{ const el = document.getElementById('boot-gate'); if(el) el.remove(); }catch(e){}
+}
+/* 読み終えたら、画面が参照している変数を入れ替える。
+   syncFromFirebase が同期のあとにやっているのと同じこと。 */
+function _idbHydrate(){
+  try{
+    DRIVERS   = ls_get(LS.DRIVERS, DRIVERS);
+    CUSTOMERS = ls_get(LS.CUSTOMERS, CUSTOMERS);
+    OFFICES   = ls_get(LS.OFFICES, OFFICES);
+    REGIONS   = ls_get(LS.REGIONS, REGIONS);
+    YP_LOGS   = ls_get(LS.YP_LOGS, []);
+    COL_LOGS  = ls_get(LS.COL_LOGS, []);
+    ATT_LOGS  = ls_get(LS.ATT_LOGS, []);
+    OIL_STATE = ls_get(LS.OIL, {}) || {};
+    try{ _mergeJetIntoColLogs(); }catch(e){}
+    try{ if(typeof loadUserItemDefsFromLS==='function') loadUserItemDefsFromLS(); }catch(e){}
+    try{ if(typeof renderIdList==='function') renderIdList(); }catch(e){}
+  }catch(e){ console.warn('[IndexedDB] 入れ替えに失敗', e && e.message); }
+}
+const _bootReady = (async ()=>{
+  _bootGateShow();
+  try{
+    await Promise.race([ _idbLoad(), new Promise(r=>setTimeout(()=>r(false), 3000)) ]);
+  }catch(e){}
+  _idbHydrate();
+  _bootGateHide();
+})();
+try{ document.addEventListener('DOMContentLoaded', ()=>{ _bootGateShow(); _bootReady.then(_bootGateHide); }); }catch(e){}
 /* 起動直後は同期の途中なので、落ち着いてから写す。
    画面を閉じる・裏に回すときにも写して、あとから直接書かれたぶんを拾う。 */
 try{
@@ -2171,13 +2218,64 @@ async function _idbStats(){
 }
 window._idbStats=_idbStats; window._idbFlush=_idbFlush;
 
-const ls_get=(k,def)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):def;}catch{return def;}};
+/* ════════════════════════════════════════════════════════════
+   ★ 2026-11-11.18: IndexedDB移行 第2段階（読み込みを切り替え）
+
+   ls_get の読み先を IndexedDB に切り替える。ただし localStorage にも
+   書き続けるので、問題があれば前の版に差し替えるだけで元に戻る。
+
+   中身は localStorage と同じ「文字列のまま」持つ。
+   ls_get が毎回 JSON.parse する形を変えないため。オブジェクトを
+   そのまま配っていると、受け取った側が中身を書き換えたときに
+   元の控えまで変わってしまい、いまの動きと変わってしまう。
+
+   IndexedDB は待つ必要がある。日報アプリは画面を作る前にデータを
+   読んでいる（let DRIVERS = ls_get(...)）ので、読み終わるまで
+   画面に蓋をして、読めたら中身を入れ替えてから見せる。
+   ════════════════════════════════════════════════════════════ */
+const _mem = Object.create(null);
+let _memReady = false, _memMs = 0;
+async function _idbLoad(){
+  const t0 = (performance && performance.now) ? performance.now() : Date.now();
+  const db = await _idbOpen();
+  if(!db){ _memMs = 0; return false; }
+  const ok = await new Promise(res=>{
+    try{
+      const st = db.transaction(IDB_STORE,'readonly').objectStore(IDB_STORE);
+      const rq = st.openCursor();
+      rq.onsuccess = e=>{
+        const c = e.target.result;
+        if(!c){ return res(true); }
+        try{
+          const v = c.value;
+          /* .17 までは中身をそのまま（オブジェクトで）入れていた。
+             どちらで入っていても文字列にそろえる。 */
+          _mem[String(c.key)] = (typeof v === 'string') ? v : JSON.stringify(v);
+        }catch(e2){}
+        c.continue();
+      };
+      rq.onerror = ()=>res(false);
+    }catch(e){ res(false); }
+  });
+  _memReady = ok;
+  _memMs = Math.round(((performance && performance.now) ? performance.now() : Date.now()) - t0);
+  console.log('[IndexedDB] 読み込み ' + (ok ? Object.keys(_mem).length + 'キー / ' + _memMs + 'ms'
+                                            : '失敗（localStorageを使います・E-04）'));
+  return ok;
+}
+const ls_get=(k,def)=>{
+  if(_memReady && _mem[k] !== undefined){
+    try{ const v = _mem[k]; return v ? JSON.parse(v) : def; }catch(e){ /* 壊れていたら下へ */ }
+  }
+  try{const v=localStorage.getItem(k);return v?JSON.parse(v):def;}catch{return def;}
+};
 /* ★ .16: これまでは失敗を握りつぶしていた（catch{}）。容量が尽きても
    画面に何も出ず、控えだけが更新されない状態になっていた。
    保存できなかったことが分かるようにし、同じ内容を IndexedDB にも書く。 */
 let _lsFailed = {};
 const ls_set=(k,v)=>{
   let ok = true;
+  try{ _mem[k] = JSON.stringify(v); }catch(e){}       /* ★ .18: 読み先も合わせる */
   try{ localStorage.setItem(k, JSON.stringify(v)); delete _lsFailed[k]; }
   catch(e){
     ok = false;
@@ -3802,7 +3900,7 @@ function selectDriverId(id){
 
 
 // ★ 版の文字列（差し替えのたびに必ず上げる。ログイン画面の表示と一致させる）
-const APP_VER = '2026-11-11.17';
+const APP_VER = '2026-11-11.18';
 console.log('[日報アプリ] APP_VER', APP_VER);
 /* ★ 2026-11-07.4: 画面の「ver ...」はHTMLに直接書いてあり、
    APP_VER と連動していなかった。差し替えても画面の表示だけ
@@ -14103,7 +14201,7 @@ async function ownerToggleDriverActive(driverId, isActive){
   const idx = DRIVERS.findIndex(x=>String(x.id)===String(driverId));
   if(idx>=0) DRIVERS[idx] = d;
   try{ if(typeof fbSet==='function') await fbSet('drivers', DRIVERS); }catch(e){ console.warn('fbSet failed', e); }
-  try{ if(typeof ls_set==='function') ls_set(LS.DRIVERS, DRIVERS); }catch(e){ try{ localStorage.setItem('nikki_drivers', JSON.stringify(DRIVERS)); }catch(e2){} }
+  try{ if(typeof ls_set==='function') ls_set(LS.DRIVERS, DRIVERS); }catch(e){ try{ _mem['nikki_drivers']=JSON.stringify(DRIVERS); localStorage.setItem('nikki_drivers', JSON.stringify(DRIVERS)); }catch(e2){} }
   if(typeof toast==='function') toast(isActive?'稼働中に戻しました':'退職扱いにしました','ok');
   _renderOwnerDrivers();
 }
@@ -14414,7 +14512,7 @@ async function _coSubmitEditDriver(driverId){
 
   try{ if(typeof fbSet === 'function') await fbSet('drivers', DRIVERS); }catch(e){ console.warn('fbSet failed:', e); }
   try{ if(typeof ls_set === 'function') ls_set(LS.DRIVERS, DRIVERS); }catch(e){
-    try{ localStorage.setItem('nikki_drivers', JSON.stringify(DRIVERS)); }catch(e2){}
+    try{ _mem['nikki_drivers']=JSON.stringify(DRIVERS); localStorage.setItem('nikki_drivers', JSON.stringify(DRIVERS)); }catch(e2){}
   }
 
   _coCloseEditDriverModal();
@@ -14504,7 +14602,7 @@ async function _coSubmitAddDriver(){
   DRIVERS.push(newDrv);
   try{ if(typeof fbSet === 'function') await fbSet('drivers', DRIVERS); }catch(e){ console.warn('fbSet failed:', e); }
   try{ if(typeof ls_set === 'function') ls_set(LS.DRIVERS, DRIVERS); }catch(e){
-    try{ localStorage.setItem('nikki_drivers', JSON.stringify(DRIVERS)); }catch(e2){}
+    try{ _mem['nikki_drivers']=JSON.stringify(DRIVERS); localStorage.setItem('nikki_drivers', JSON.stringify(DRIVERS)); }catch(e2){}
   }
 
   // 完了メッセージ:PINを表示(一度きり)
