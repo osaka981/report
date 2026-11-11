@@ -2504,6 +2504,50 @@ function _verCmp(a, b){
   const nb = parseInt(pb[1]||'0', 10) || 0;
   return na === nb ? 0 : (na < nb ? -1 : 1);
 }
+/* ════════════════════════════════════════════════════════════
+   ★ 2026-11-10.15: メンテナンス中は開けないようにする
+
+   データの引っ越しなど、触られると困る作業のあいだ、
+   日報アプリ全体に蓋をする。Firebase の nikki/maintenance を
+   見張って、on なら画面を覆う。off に戻せばその場で開く。
+
+   安全側の作りにしてある。
+     ・既定は「開く」。読めなかった・圏外・設定が無い → 蓋をしない
+     ・はっきり on と読めたときだけ蓋をする
+     ・URLの末尾に #maint を付けると蓋を外せる（川村さんの確認用）
+   ════════════════════════════════════════════════════════════ */
+let _maint = null;
+function _maintBypass(){
+  try{ return String(location.hash||'').indexOf('maint') >= 0; }catch(e){ return false; }
+}
+function _maintApply(){
+  const on = !!(_maint && _maint.on) && !_maintBypass();
+  let el = document.getElementById('maint-layer');
+  if(!on){ if(el) el.remove(); document.documentElement.style.overflow=''; return; }
+  const msg  = String((_maint && _maint.msg)  || 'ただいまシステムのメンテナンス中です。');
+  const till = String((_maint && _maint.till) || '');
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'maint-layer';
+    el.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;'
+      + 'justify-content:center;padding:24px;background:#2b2724;'
+      + "font-family:'Noto Sans JP',sans-serif;";
+    el.innerHTML = '<div style="max-width:420px;width:100%;background:#fff;border-radius:12px;'
+      + 'padding:28px 24px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.35);">'
+      + '<div style="font-size:17px;font-weight:700;color:#8a5a3b;margin-bottom:14px;">メンテナンス中</div>'
+      + '<div id="maint-msg" style="font-size:14px;line-height:1.9;color:#333;"></div>'
+      + '<div id="maint-till" style="font-size:12.5px;color:#777;margin-top:12px;"></div>'
+      + '<div style="font-size:11.5px;color:#999;margin-top:20px;border-top:1px solid #eee;padding-top:14px;">'
+      + 'しばらくしてから開き直してください。<br>お急ぎの場合は川村までご連絡ください。</div>'
+      + '</div>';
+    document.body.appendChild(el);
+  }
+  const m = document.getElementById('maint-msg');   if(m) m.textContent = msg;
+  const t = document.getElementById('maint-till');  if(t) t.textContent = till ? ('再開の見込み: ' + till) : '';
+  document.documentElement.style.overflow = 'hidden';
+}
+window._maintApply=_maintApply;
+
 let _minVer = '';
 function _verBanner(){
   let el = document.getElementById('ver-banner');
@@ -2746,6 +2790,12 @@ function setupRealtimeSync() {
     renderJetCard();
   });
   // マスタデータもリアルタイム更新(安全弁: データ破損時はlocalStorageを守る)
+  /* ★ .15: メンテナンスの指定を見張る */
+  subscribeNode('nikki/maintenance', snap => {
+    _maint = snap.exists() ? (snap.val() || null) : null;
+    if(_maint && _maint.on) console.log('[メンテナンス] 停止中', _maint.msg || '');
+    _maintApply();
+  }, 'メンテナンス');
   /* ★ .13: この版以降を使う、という指定を見張る */
   subscribeNode('nikki/app_min_ver', snap => {
     _minVer = snap.exists() ? String(snap.val()||'') : '';
@@ -3536,7 +3586,7 @@ function selectDriverId(id){
 
 
 // ★ 版の文字列（差し替えのたびに必ず上げる。ログイン画面の表示と一致させる）
-const APP_VER = '2026-11-09.14';
+const APP_VER = '2026-11-10.15';
 console.log('[日報アプリ] APP_VER', APP_VER);
 /* ★ 2026-11-07.4: 画面の「ver ...」はHTMLに直接書いてあり、
    APP_VER と連動していなかった。差し替えても画面の表示だけ
