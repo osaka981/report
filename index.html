@@ -2074,6 +2074,9 @@ function _idbMine(k){ return IDB_KEYS.indexOf(k) >= 0; }
 let _idbSeedAt = 0;
 async function _idbSeed(force){
   try{
+    /* ★ .20: 片付けたあとは写さない。localStorage は経営管理・計数アプリと
+       共有で、向こうが書いたものを写すと控えが入れ替わってしまう。 */
+    if(_idbPurged()) return;
     if(!force && localStorage.getItem(IDB_SEED_KEY) === APP_VER) return;
     if(Date.now() - _idbSeedAt < 60000) return;   // 1分に1回まで
     _idbSeedAt = Date.now();
@@ -2189,10 +2192,72 @@ try{ document.addEventListener('DOMContentLoaded', ()=>{ _bootGateShow(); _bootR
    画面を閉じる・裏に回すときにも写して、あとから直接書かれたぶんを拾う。 */
 try{
   setTimeout(()=>{ _idbSeed(); }, 5000);
+  /* ★ .20: 写しが済んだころに片付ける。守りは _idbPurge の中。 */
+  setTimeout(async ()=>{
+    try{
+      if(_idbPurged()) return;
+      const r = await _idbPurge(false);
+      if(r.消した.length) console.log('[IndexedDB] localStorageを片付けました '
+        + r.消した.length + 'キー / ' + r.減ったKB + 'KB（' + r.前KB + 'KB → ' + r.後KB + 'KB）');
+      else if(r.消さなかった.length) console.log('[IndexedDB] 片付けを見送りました', r.可否, r.消さなかった);
+    }catch(e){}
+  }, 9000);
   document.addEventListener('visibilitychange', ()=>{
     if(document.visibilityState === 'hidden'){ try{ _idbSeed(true); }catch(e){} }
   });
 }catch(e){}
+
+/* ════════════════════════════════════════════════════════════
+   ★ 2026-11-11.20: IndexedDB移行 第3段階（localStorageを片付ける）
+
+   ここで初めて容量が減る。消す前に IndexedDB の中身と1キーずつ
+   突き合わせ、一致したものだけ消す。読み込みに失敗している端末
+   （_memReady が false）では何もしない。
+
+   ただし localStorage は計数アプリ・経営管理と共有している。
+   計数アプリのコードは手元に無く、どのキーを読んでいるか確かめ
+   られないので、【確実に日報アプリだけのもの】に限って消す。
+   名簿・顧客・会社・計数まわりは残す（大きくないので実害も小さい）。
+   ════════════════════════════════════════════════════════════ */
+const IDB_PURGE_KEYS = [
+  'nikki_yp_logs', 'nikki_col_logs', 'nikki_att_logs', 'nikki_edit_logs',
+  'nikki_col_photos', 'nikki_col_routes', 'nikki_col_courses',
+  'nikki_cust_hist', 'nikki_customer_notes', 'nikki_notifications',
+  'nikki_schedule_logs', 'nikki_schedule_overrides', 'nikki_schedule_surveys',
+  'nikki_survey_responses', 'nikki_shifts', 'nikki_att_fix'
+];
+const IDB_PURGED_KEY = 'nikki_idb_purged_report';
+function _idbPurged(){ try{ return !!localStorage.getItem(IDB_PURGED_KEY); }catch(e){ return false; } }
+function _lsBytes(){
+  let n=0;
+  try{ for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i);
+    n += (k.length + (localStorage.getItem(k)||'').length) * 2; } }catch(e){}
+  return n;
+}
+async function _idbPurge(dry){
+  const out={ 消した:[], 消さなかった:[], 減ったKB:0, 前KB:Math.round(_lsBytes()/1024), 後KB:0, 可否:'' };
+  if(!_memReady){ out.可否='IndexedDBを読めていないので片付けません（E-04）'; out.後KB=out.前KB; return out; }
+  if(Object.keys(_mem).length < 3){ out.可否='IndexedDBの中身が少なすぎます。片付けません'; out.後KB=out.前KB; return out; }
+  IDB_PURGE_KEYS.forEach(k=>{
+    let raw=null;
+    try{ raw=localStorage.getItem(k); }catch(e){}
+    if(raw==null) return;
+    const mine=_mem[k];
+    if(mine===undefined){ out.消さなかった.push(k+'（控えが無い）'); return; }
+    let a,b;
+    try{ a=JSON.stringify(JSON.parse(raw)); }catch(e){ a=raw; }
+    try{ b=JSON.stringify(JSON.parse(mine)); }catch(e){ b=mine; }
+    if(a!==b){ out.消さなかった.push(k+'（中身がちがう）'); return; }
+    out.減ったKB += Math.round((k.length+raw.length)*2/1024);
+    out.消した.push(k);
+    if(!dry){ try{ localStorage.removeItem(k); }catch(e){} }
+  });
+  if(!dry && out.消した.length){ try{ localStorage.setItem(IDB_PURGED_KEY, APP_VER); }catch(e){} }
+  out.後KB=Math.round(_lsBytes()/1024);
+  out.可否 = dry ? '試算しただけです（消していません）' : '片付けました';
+  return out;
+}
+window._idbPurge=_idbPurge;
 
 /* 第1段階の確認用。コンソールで _idbStats() と打つと中身が見える。 */
 async function _idbStats(){
@@ -2295,6 +2360,17 @@ let _lsFailed = {};
 const ls_set=(k,v)=>{
   let ok = true;
   try{ _mem[k] = JSON.stringify(v); }catch(e){}       /* ★ .18: 読み先も合わせる */
+  /* ★ .20: 片付けたあとは localStorage に書き戻さない。読み先は
+     IndexedDB なので控える必要がない。IndexedDBを読めていないときは
+     控えがどこにも無い状態を作らないよう localStorage に残す。 */
+  try{
+    if(_memReady && _idbPurged() && IDB_PURGE_KEYS.indexOf(k) >= 0){
+      try{ localStorage.removeItem(k); }catch(e){}
+      delete _lsFailed[k];
+      _idbPut(k, v);
+      return true;
+    }
+  }catch(e){}
   try{ localStorage.setItem(k, JSON.stringify(v)); delete _lsFailed[k]; }
   catch(e){
     ok = false;
@@ -3919,7 +3995,7 @@ function selectDriverId(id){
 
 
 // ★ 版の文字列（差し替えのたびに必ず上げる。ログイン画面の表示と一致させる）
-const APP_VER = '2026-11-11.19';
+const APP_VER = '2026-11-11.20';
 console.log('[日報アプリ] APP_VER', APP_VER);
 /* ★ 2026-11-07.4: 画面の「ver ...」はHTMLに直接書いてあり、
    APP_VER と連動していなかった。差し替えても画面の表示だけ
