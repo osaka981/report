@@ -3995,7 +3995,7 @@ function selectDriverId(id){
 
 
 // ★ 版の文字列（差し替えのたびに必ず上げる。ログイン画面の表示と一致させる）
-const APP_VER = '2026-11-11.20';
+const APP_VER = '2026-11-16.21';
 console.log('[日報アプリ] APP_VER', APP_VER);
 /* ★ 2026-11-07.4: 画面の「ver ...」はHTMLに直接書いてあり、
    APP_VER と連動していなかった。差し替えても画面の表示だけ
@@ -6612,7 +6612,7 @@ function _renderMgrStatsDrvTab(year, month, stats){
     if(!drvId) return;
     const drv = (DRIVERS||[]).find(d=>String(d.id)===drvId);
     if(!driverStats[drvId]){
-      driverStats[drvId] = {drv: drv || {id:drvId, name:`ID:${drvId}`}, kt:0, postCol:0, col:0, dayCount:0, byOffice:{}};
+      driverStats[drvId] = {drv: drv || {id:drvId, name:(String(r.driver&&r.driver.name||'').trim() || `ID:${drvId}`)}, kt:0, postCol:0, col:0, dayCount:0, byOffice:{}};   /* ★ .21 名簿に無くても記録の氏名を使う */
     }
     const f = r.form||{};
     const del = f.del || f;   // ★ 2026/08/10 旧形式(form直下)にも対応
@@ -6637,7 +6637,7 @@ function _renderMgrStatsDrvTab(year, month, stats){
     if(!drvId) return;
     if(!driverStats[drvId]){
       const drv = (DRIVERS||[]).find(d=>String(d.id)===drvId);
-      driverStats[drvId] = {drv: drv || {id:drvId, name:`ID:${drvId}`}, kt:0, postCol:0, col:0, dayCount:0, byOffice:{}};
+      driverStats[drvId] = {drv: drv || {id:drvId, name:(String(r.driver&&r.driver.name||'').trim() || `ID:${drvId}`)}, kt:0, postCol:0, col:0, dayCount:0, byOffice:{}};   /* ★ .21 名簿に無くても記録の氏名を使う */
     }
     const blocks = _normalizeBlocks(r.blocks);
     blocks.forEach(b=>{
@@ -14172,8 +14172,14 @@ function _jetToColRows(){
     const blk={type:'indiv',custId:cust.id,custName:cust.name,region:cust.region||'',items:items};
     const rows=Object.entries(items).map(([k,v])=>({customerId:cust.id,customerName:cust.name,
       region:cust.region||'',masterKey:k,label:k.replace(/_/g,' '),qty:v,unit:'個'}));
+    /* ★ 2026-11-16.21: 名簿に当てて、日報と同じ鍵（名簿の id）にそろえる。
+       当たらなければこれまでどおり計数アプリの値をそのまま使う。 */
+    const _d = (typeof _jetFindDriver==='function') ? _jetFindDriver(c) : null;
+    const _did = _d ? String(_d.id || _d.empNo || _d.driverNo || c.id) : c.id;
+    const _dnm = _d ? String(_d.name || c.name || '') : c.name;
     out.push({ id:'jet_'+j.key, type:'collection', date:date,
-      driver:{ id:c.id, name:c.name, empNo:c.id, driverNo:c.id },
+      driver:{ id:_did, name:_dnm,
+               empNo:(_d && _d.empNo) || _did, driverNo:(_d && _d.driverNo) || _did },
       rows:rows, blocks:[blk],
       companyId: String(j.carrierCompanyId || j.companyId || ''),
       note:'バーコード計数 '+(j.bin||'')+((j.carrierName&&j.driverName&&j.carrierName!==j.driverName)?'／計数 '+j.driverName:''),
@@ -19095,6 +19101,27 @@ function _jetCustomerOf(j, custIdFromPath){
 // ★ 2026/09/07: 表示するのは「局へ運んだ便」のみ。計数しただけの便は出さない。
 function _jetCarrierOf(j){
   return { id:_jetIdNorm(j.carrierId||j.driverId), name:String(j.carrierName||j.driverName||'').trim() };
+}
+
+/* ★ 2026-11-16.21: 計数アプリの「局へ運んだ人」を名簿の人に結び付ける。
+   計数アプリは carrierId に台帳の内部番号（例 1782093690831）を書くことがあり、
+   名簿の id（社員番号 8010）とは形が違う。そのため全社統計で名前が引けず
+   「ID:1782093690831」と出て、同じ人が社員番号の行と2つに分かれていた。
+   番号（id・社員番号・ドライバー番号のいずれか）で当て、だめなら氏名で当てる。 */
+function _jetFindDriver(c){
+  const list = DRIVERS || [];
+  const id = String(c && c.id || '');
+  if(id){
+    const hit = list.find(d => d && (
+      _jetIdNorm(d.id)===id || _jetIdNorm(d.empNo)===id || _jetIdNorm(d.driverNo)===id));
+    if(hit) return hit;
+  }
+  const nm = String(c && c.name || '').replace(/\s+/g,'');
+  if(nm){
+    const hit = list.find(d => d && String(d.name||'').replace(/\s+/g,'')===nm);
+    if(hit) return hit;
+  }
+  return null;
 }
 function _jetShiftsFor(dateStr, forDriver){
   const d = forDriver || driver;
